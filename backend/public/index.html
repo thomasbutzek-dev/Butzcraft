@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Butzcraft Backend & Balancing</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Butzcraft Balancing-Backend</h1>
+        <p>Erlaube nur sichere Parameter-Anpassungen aus dem Spiel. Änderungen erfordern einen Neustart des Spiels.</p>
+    </header>
+
+    <main>
+        <div id="loading" class="status-box">Konfiguration wird geladen...</div>
+        <div id="success-msg" class="status-box success" style="display:none;">Speicherung erfolgreich!</div>
+        <div id="error-msg" class="status-box error" style="display:none;">Fehler aufgetreten!</div>
+
+        <form id="config-form" style="display:none;">
+            <!-- Gameplay Sektion -->
+            <section class="config-section">
+                <h2>🎮 Gameplay & Überleben</h2>
+                
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="DAY_DURATION">Tageslänge (Sekunden)</label>
+                        <span class="value-display" id="val_DAY_DURATION">300</span>
+                    </div>
+                    <p class="desc">Wie lange das Spiel benötigt, um von Morgen bis zur Nacht zu gelangen.</p>
+                    <input type="range" id="DAY_DURATION" min="60" max="1200" step="10">
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="HUNGER_LOSS_MOVE">Hunger-Verlust (Bewegung)</label>
+                        <span class="value-display" id="val_HUNGER_LOSS_MOVE">0.1</span>
+                    </div>
+                    <p class="desc">Je höher, desto schneller verhungert man beim Laufen.</p>
+                    <input type="range" id="HUNGER_LOSS_MOVE" min="0" max="1.0" step="0.01">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="FALL_DAMAGE_MULT">Fall-Schaden Multiplikator</label>
+                        <span class="value-display" id="val_FALL_DAMAGE_MULT">0.5</span>
+                    </div>
+                    <p class="desc">Bestimmt, wie viel Prozent der Fallgeschwindigkeit als Schaden berechnet wird.</p>
+                    <input type="range" id="FALL_DAMAGE_MULT" min="0" max="2.0" step="0.1">
+                </div>
+            </section>
+
+            <!-- Mobs Sektion -->
+            <section class="config-section">
+                <h2>🧟 Kreaturen (Mobs)</h2>
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="WEIGHT_COW">Wahrscheinlichkeit: Kühe</label>
+                        <span class="value-display" id="val_WEIGHT_COW">30</span>
+                    </div>
+                    <input type="range" id="WEIGHT_COW" min="0" max="100" step="1">
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="WEIGHT_PIG">Wahrscheinlichkeit: Schweine</label>
+                        <span class="value-display" id="val_WEIGHT_PIG">30</span>
+                    </div>
+                    <input type="range" id="WEIGHT_PIG" min="0" max="100" step="1">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="WEIGHT_SHEEP">Wahrscheinlichkeit: Schafe</label>
+                        <span class="value-display" id="val_WEIGHT_SHEEP">20</span>
+                    </div>
+                    <input type="range" id="WEIGHT_SHEEP" min="0" max="100" step="1">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="WEIGHT_CHICKEN">Wahrscheinlichkeit: Hühner</label>
+                        <span class="value-display" id="val_WEIGHT_CHICKEN">20</span>
+                    </div>
+                    <input type="range" id="WEIGHT_CHICKEN" min="0" max="100" step="1">
+                </div>
+
+                
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="MAX_COUNT">Maximale Anzahl</label>
+                        <span class="value-display" id="val_MAX_COUNT">12</span>
+                    </div>
+                    <p class="desc">Maximal generierte Lebewesen gleichzeitig im Chunk (z.B. Schweine, Zombies).</p>
+                    <input type="range" id="MAX_COUNT" min="0" max="50" step="1">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="SPAWN_CHANCE">Spawn Wahrscheinlichkeit</label>
+                        <span class="value-display" id="val_SPAWN_CHANCE">0.005</span>
+                    </div>
+                    <p class="desc">Die Chance pro Tick, dass in Spieler-Nähe etwas spawnt.</p>
+                    <input type="range" id="SPAWN_CHANCE" min="0.001" max="0.1" step="0.001">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="ZOMBIE_SPEED">Zombie Laufgeschwindigkeit</label>
+                        <span class="value-display" id="val_ZOMBIE_SPEED">1.5</span>
+                    </div>
+                    <p class="desc">Wie schnell dich die Zombies in der Nacht umkreisen.</p>
+                    <input type="range" id="ZOMBIE_SPEED" min="0.5" max="5.0" step="0.1">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="ZOMBIE_DAMAGE">Zombie Schaden pro Attacke</label>
+                        <span class="value-display" id="val_ZOMBIE_DAMAGE">5</span>
+                    </div>
+                    <p class="desc">Wie hart dich der Angriffs-Schaden eines Zombies trifft.</p>
+                    <input type="range" id="ZOMBIE_DAMAGE" min="1" max="50" step="1">
+                </div>
+            </section>
+
+            <!-- Physik Sektion -->
+            <section class="config-section">
+                <h2>🌍 Physik</h2>
+                
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="GRAVITY">Schwerkraft (Gravitation)</label>
+                        <span class="value-display" id="val_GRAVITY">9.8</span>
+                    </div>
+                    <p class="desc">Basis-Anziehungskraft der Welt. 9.8 entspricht klassischer Erdanziehung.</p>
+                    <input type="range" id="GRAVITY" min="1.0" max="30.0" step="0.1">
+                </div>
+
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="PLAYER_JUMP_FORCE">Sprungkraft (Spieler)</label>
+                        <span class="value-display" id="val_PLAYER_JUMP_FORCE">15</span>
+                    </div>
+                    <p class="desc">Bestimmt wie noch der Charakter nach Drücken der Leertaste katapultiert wird.</p>
+                    <input type="range" id="PLAYER_JUMP_FORCE" min="5" max="50" step="1">
+                </div>
+                
+                <div class="slider-group">
+                    <div class="slider-info">
+                        <label for="WALK_SPEED">Sprint & Lauf-Geschwindigkeit</label>
+                        <span class="value-display" id="val_WALK_SPEED">150</span>
+                    </div>
+                    <p class="desc">Basis-Momentum für die WASD-Bewegung.</p>
+                    <input type="range" id="WALK_SPEED" min="50" max="400" step="10">
+                </div>
+            </section>
+
+        </form>
+    </main>
+
+    <footer class="footer-actions">
+        <button id="btn-save" class="btn-primary" disabled>Speichern & Übernehmen</button>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
