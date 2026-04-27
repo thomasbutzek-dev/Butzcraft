@@ -329,7 +329,7 @@ export function setupInventoryEvents() {
             
             const is2D = (cursorItem.type === 9 || cursorItem.type === 10 || cursorItem.type === 17 || cursorItem.type === 18 || cursorItem.type === 19);
             let texIdx = 0;
-            if (cursorItem.type === 17) texIdx = 21; else if (cursorItem.type === 18) texIdx = 22; else if (cursorItem.type === 19) texIdx = 23; else texIdx = BLOCK_TEX[cursorItem.type] || 0;
+            if (cursorItem.type === 17) texIdx = 21; else if (cursorItem.type === 18) texIdx = 23; else if (cursorItem.type === 19) texIdx = 26; else texIdx = BLOCK_TEX[cursorItem.type] || 0;
             const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
             const bgPos = `${u}% ${v}%`;
             

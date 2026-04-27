@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=1775830882304';
+import { CONFIG } from '../config.js';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 

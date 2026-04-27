@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=1775830882304';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=1775830882304';
+import { CONFIG } from '../config.js';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260427b';
 
 const { CHUNK_SIZE, CHUNK_HEIGHT, WATER_LEVEL, RENDER_DIST, CLOUD_HEIGHT } = CONFIG.WORLD;
 
@@ -47,8 +47,45 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 this.scene = scene;
                 this.chunks = new Map();
                 this.modifiedBlocks = {};
+                this.uTime = { value: 0 };
+                
+                // Opaque Material mit Wind-Shader für Vegetation
                 this.opaqueMaterial = new THREE.MeshPhongMaterial({ vertexColors: true, map: textureAtlas, shininess: 10, alphaTest: 0.5 });
+                const windTime = this.uTime;
+                this.opaqueMaterial.onBeforeCompile = (shader) => {
+                    shader.uniforms.uTime = windTime;
+                    shader.vertexShader = shader.vertexShader.replace(
+                        'void main() {',
+                        'attribute float aSway;\nuniform float uTime;\nvoid main() {'
+                    );
+                    shader.vertexShader = shader.vertexShader.replace(
+                        '#include <begin_vertex>',
+                        `#include <begin_vertex>
+                        if (aSway > 0.5) {
+                            float windStr = sin(uTime * 1.8 + position.x * 0.7 + position.z * 0.9) * 0.08;
+                            float windStr2 = cos(uTime * 1.3 + position.x * 0.5 + position.z * 1.1) * 0.05;
+                            transformed.x += windStr * aSway;
+                            transformed.z += windStr2 * aSway;
+                        }`
+                    );
+                };
+                
+                // Water Material mit Wellen-Shader
                 this.waterMaterial = new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, opacity: 0.6, shininess: 100, depthWrite: false });
+                this.waterMaterial.onBeforeCompile = (shader) => {
+                    shader.uniforms.uTime = windTime;
+                    shader.vertexShader = shader.vertexShader.replace(
+                        'void main() {',
+                        'uniform float uTime;\nvoid main() {'
+                    );
+                    shader.vertexShader = shader.vertexShader.replace(
+                        '#include <begin_vertex>',
+                        `#include <begin_vertex>
+                        vec4 waveWorldPos = modelMatrix * vec4(position, 1.0);
+                        transformed.y += sin(waveWorldPos.x * 1.5 + uTime * 1.8) * 0.04
+                                       + cos(waveWorldPos.z * 1.2 + uTime * 1.4) * 0.03;`
+                    );
+                };
 
                 this.worker = new Worker('js/chunkWorker.js');
                 this.worker.postMessage({ type: 'init', config: CONFIG.WORLD });
@@ -90,12 +127,19 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     this.worker.postMessage({ type: 'generate', cx, cz });
                 }
             }
+            // Entfernt Mesh aus Scene UND disposed Geometry (Material wird global geteilt → NICHT disposen!)
+            disposeMesh(mesh) {
+                if (!mesh) return;
+                this.scene.remove(mesh);
+                if (mesh.geometry) mesh.geometry.dispose();
+            }
             updateChunkMesh(cx, cz) {
                 const chunk = this.chunks.get(this.getChunkKey(cx, cz)); if (!chunk) return;
-                if (chunk.mesh) this.scene.remove(chunk.mesh); if (chunk.waterMesh) this.scene.remove(chunk.waterMesh);
+                this.disposeMesh(chunk.mesh); this.disposeMesh(chunk.waterMesh);
+                chunk.mesh = null; chunk.waterMesh = null;
                 
                 const build = (isW) => {
-                    const pos = [], col = [], norm = [], idx = [], uv = []; let vc = 0;
+                    const pos = [], col = [], norm = [], idx = [], uv = [], sway = []; let vc = 0;
                     for (let y = 0; y < CHUNK_HEIGHT; y++) {
                         for (let z = 0; z < CHUNK_SIZE; z++) {
                             for (let x = 0; x < CHUNK_SIZE; x++) {
@@ -104,8 +148,19 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                 const bc = new THREE.Color(BLOCK_COLORS[t]);
                                 const rng = mulberry32(x * 12 + y * 34 + z * 56 + cx * 78 + cz * 90);
                                 bc.multiplyScalar(0.9 + rng() * 0.2);
+                                
+                                // Gras: Weiße Vertex-Color, damit die HD-Textur unverfälscht erscheint
+                                if (t === 1) {
+                                    bc.set(0xffffff);
+                                    bc.multiplyScalar(0.85 + rng() * 0.3);
+                                }
+                                
+                                // Wasser: Einheitliche Farbe ohne Block-Raster
+                                if (t === 4) {
+                                    bc.set(BLOCK_COLORS[4]);
+                                }
 
-                                if (t === 9 || t === 10 || t === 27 || t === 43 || t === 44 || t === 46 || t === 47 || t === 48 || t === 49 || t === 50 || t === 52) {
+                                if (t === 9 || t === 10 || t === 27 || t === 43 || t === 44 || t === 46 || t === 47 || t === 48 || t === 49 || t === 50 || t === 52 || t === 54) {
                                     // Visual Excellence 2D Elements: Stern-Mesh (3 Flächen à 60°) + Variation
                                     const rng2 = mulberry32(x * 123 + y * 456 + z * 789 + cx * 101 + cz * 202);
                                     const offX = (rng2() - 0.5) * 0.4;
@@ -120,6 +175,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     else if (t === 43 || t === 52) scaleY = 0.8 + rng2() * 0.5; // Beerenbüsche: 0.8-1.3
                                     else if (t === 46) scaleY = 0.7 + rng2() * 0.6;      // Toter Strauch: 0.7-1.3
                                     else if (t === 49) scaleY = 1.0 + rng2() * 0.6;      // Zuckerrohr: 1.0-1.6
+                                    else if (t === 54) scaleY = 0.6 + rng2() * 0.4;      // Wassergras: 0.6-1.0
                                     else scaleY = 0.7 + rng2() * 0.5;                    // Standard (Stöcke etc.)
                                     
                                     // Use texture atlas mappings for flowers
@@ -144,6 +200,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                         col.push(bc.r, bc.g, bc.b, bc.r, bc.g, bc.b, bc.r, bc.g, bc.b, bc.r, bc.g, bc.b);
                                         norm.push(-s, 0, c, -s, 0, c, -s, 0, c, -s, 0, c);
                                         uv.push(u0, v0, u1, v0, u1, v1, u0, v1);
+                                        sway.push(0, 0, 1, 1); // Unten fest, oben schwingt
                                         idx.push(st, st + 1, st + 2, st, st + 2, st + 3); vc += 4;
                                     }
                                     continue;
@@ -162,6 +219,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     col.push(bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b);
                                     norm.push(0,0,-1, 0,0,-1, 0,0,-1, 0,0,-1);
                                     uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                                    sway.push(0,0,0,0);
                                     idx.push(st,st+1,st+2, st,st+2,st+3); vc+=4;
                                     // Rückseite
                                     st = vc;
@@ -169,6 +227,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     col.push(bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b);
                                     norm.push(0,0,1, 0,0,1, 0,0,1, 0,0,1);
                                     uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                                    sway.push(0,0,0,0);
                                     idx.push(st,st+1,st+2, st,st+2,st+3); vc+=4;
                                     continue;
                                 }
@@ -186,6 +245,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     col.push(bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b);
                                     norm.push(0,1,0, 0,1,0, 0,1,0, 0,1,0);
                                     uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                                    sway.push(0,0,0,0);
                                     idx.push(st,st+1,st+2, st,st+2,st+3); vc+=4;
                                     // Vorderseite (schmal)
                                     st = vc;
@@ -193,6 +253,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     col.push(bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b);
                                     norm.push(0,0,1, 0,0,1, 0,0,1, 0,0,1);
                                     uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                                    sway.push(0,0,0,0);
                                     idx.push(st,st+1,st+2, st,st+2,st+3); vc+=4;
                                     // Rückseite
                                     st = vc;
@@ -200,6 +261,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     col.push(bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b);
                                     norm.push(0,0,-1, 0,0,-1, 0,0,-1, 0,0,-1);
                                     uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                                    sway.push(0,0,0,0);
                                     idx.push(st,st+1,st+2, st,st+2,st+3); vc+=4;
                                     // Linke Seite
                                     st = vc;
@@ -207,6 +269,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     col.push(bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b);
                                     norm.push(-1,0,0, -1,0,0, -1,0,0, -1,0,0);
                                     uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                                    sway.push(0,0,0,0);
                                     idx.push(st,st+1,st+2, st,st+2,st+3); vc+=4;
                                     // Rechte Seite
                                     st = vc;
@@ -214,6 +277,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     col.push(bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b, bc.r,bc.g,bc.b);
                                     norm.push(1,0,0, 1,0,0, 1,0,0, 1,0,0);
                                     uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                                    sway.push(0,0,0,0);
                                     idx.push(st,st+1,st+2, st,st+2,st+3); vc+=4;
                                     continue;
                                 }
@@ -227,14 +291,27 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                     if (isW) {
                                         if (neigh === 0) shouldDraw = true;
                                     } else {
-                                        if (neigh === 0 || neigh === -1 || neigh === 4 || neigh === 9 || neigh === 10 || neigh === 27 || neigh === 32 || neigh === 33 || neigh === 34 || neigh === 36 || neigh === 38 || neigh === 39 || neigh === 43 || neigh === 44 || neigh === 46 || neigh === 47 || neigh === 48 || neigh === 49 || neigh === 50 || neigh === 52) shouldDraw = true;
+                                        if (neigh === 0 || neigh === -1 || neigh === 4 || neigh === 9 || neigh === 10 || neigh === 27 || neigh === 32 || neigh === 33 || neigh === 34 || neigh === 36 || neigh === 38 || neigh === 39 || neigh === 43 || neigh === 44 || neigh === 46 || neigh === 47 || neigh === 48 || neigh === 49 || neigh === 50 || neigh === 52 || neigh === 54) shouldDraw = true;
                                     }
 
                                     if (shouldDraw) {
                                         const st = vc;
-                                        const texIdx = BLOCK_TEX[t] || 0;
-                                        const u0 = (texIdx % 16) / 16, v0 = 1 - (Math.floor(texIdx / 16) + 1) / 16;
-                                        const u1 = u0 + 1/16, v1 = v0 + 1/16;
+                                        let texIdx = BLOCK_TEX[t] || 0;
+                                        
+                                        // Gras-Block: Unterschiedliche Texturen pro Seite
+                                        if (t === 1) { // BLOCK_TYPES.GRASS = 1
+                                            if (f.d[1] === 1) {
+                                                texIdx = 0;  // Oben: Gras-Top (komplett grün)
+                                            } else if (f.d[1] === -1) {
+                                                texIdx = 1;  // Unten: Erde
+                                            } else {
+                                                texIdx = 53; // Seiten: Gras-Seite (grün/braun)
+                                            }
+                                        }
+                                        
+                                        const eps = 0.5 / 1024; // UV-Inset gegen weiße Streifen (Bleeding Fix)
+                                        const u0 = (texIdx % 16) / 16 + eps, v0 = 1 - (Math.floor(texIdx / 16) + 1) / 16 + eps;
+                                        const u1 = u0 + 1/16 - 2*eps, v1 = v0 + 1/16 - 2*eps;
                                         const uvs = [[u0, v0], [u1, v0], [u1, v1], [u0, v1]];
 
                                         f.v.forEach((v, i) => { 
@@ -242,6 +319,8 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                             col.push(bc.r, bc.g, bc.b); 
                                             norm.push(f.d[0], f.d[1], f.d[2]);
                                             uv.push(uvs[i][0], uvs[i][1]);
+                                            // Nur 2D-Pflanzen schwingen, Blätter-Blöcke nicht
+                                            sway.push(0);
                                         });
                                         idx.push(st, st + 1, st + 2, st, st + 2, st + 3); vc += 4;
                                     }
@@ -255,12 +334,16 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     geom.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
                     geom.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
                     geom.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+                    geom.setAttribute('aSway', new THREE.Float32BufferAttribute(sway, 1));
                     geom.setIndex(idx);
                     const mesh = new THREE.Mesh(geom, isW ? this.waterMaterial : this.opaqueMaterial);
                     mesh.position.set(cx * CHUNK_SIZE, 0, cz * CHUNK_SIZE); return mesh;
                 };
                 chunk.mesh = build(false); if (chunk.mesh) this.scene.add(chunk.mesh);
                 chunk.waterMesh = build(true); if (chunk.waterMesh) this.scene.add(chunk.waterMesh);
+            }
+            update(time) {
+                this.uTime.value = time;
             }
             getBlock(x, y, z) {
                 const cx = Math.floor(x / CHUNK_SIZE), cz = Math.floor(z / CHUNK_SIZE);
@@ -290,7 +373,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 }
                 for (const [key, chunk] of this.chunks) {
                     if (Math.abs(chunk.cx - pcx) > RENDER_DIST + 1 || Math.abs(chunk.cz - pcz) > RENDER_DIST + 1) {
-                        if (chunk.mesh) this.scene.remove(chunk.mesh); if (chunk.waterMesh) this.scene.remove(chunk.waterMesh);
+                        this.disposeMesh(chunk.mesh); this.disposeMesh(chunk.waterMesh);
                         if (chunk.data) this.chunkPool.push(chunk.data.buffer);
                         this.chunks.delete(key);
                     }

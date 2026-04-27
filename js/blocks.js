@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 export const BLOCK_TYPES = {
         AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, WATER: 4, WOOD: 5, LEAVES: 6, SAND: 7, CLOUD: 8, FLOWER_RED: 9, FLOWER_YELLOW: 10, SNOW: 11, ICE: 12, JUNGLE_WOOD: 13, JUNGLE_LEAVES: 14, PALM_WOOD: 15, PALM_LEAVES: 16, EGG: 17, MILK: 18, WOOL: 19, BEDROCK: 20, FISH: 21, RAW_MEAT: 22, RAW_CHICKEN: 23, ROTTEN_FLESH: 24, MUTTON: 25, PLANKS: 26, STICK: 27, WORKBENCH: 28, STONE_BRICK: 29, SANDSTONE: 30, BONE: 31, WINDOW: 32, DOOR_BOTTOM: 33, DOOR_TOP: 34, WORKBENCH_SIDE: 36, BED_HEAD: 38, BED_FOOT: 39,
-        BERRY_BUSH: 43, TALL_GRASS: 44, CACTUS: 45, DEAD_BUSH: 46, MUSHROOM_RED: 47, MUSHROOM_BROWN: 48, SUGARCANE: 49, FERN: 50, BERRIES: 51, BERRY_BUSH_EMPTY: 52
+        BERRY_BUSH: 43, TALL_GRASS: 44, CACTUS: 45, DEAD_BUSH: 46, MUSHROOM_RED: 47, MUSHROOM_BROWN: 48, SUGARCANE: 49, FERN: 50, BERRIES: 51, BERRY_BUSH_EMPTY: 52, SEAGRASS: 54
         };
 
         export const BLOCK_COLORS = {
@@ -14,7 +14,7 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.PLANKS]: 0xCD853F, [BLOCK_TYPES.STICK]: 0x8B4513, [BLOCK_TYPES.WORKBENCH]: 0xA0522D, [BLOCK_TYPES.STONE_BRICK]: 0x696969, [BLOCK_TYPES.SANDSTONE]: 0xF4A460, [BLOCK_TYPES.BONE]: 0xFFFFFF,
             [BLOCK_TYPES.WINDOW]: 0x88CCEE, [BLOCK_TYPES.DOOR_BOTTOM]: 0xA0724A, [BLOCK_TYPES.DOOR_TOP]: 0xA0724A, [BLOCK_TYPES.BED_HEAD]: 0xCC3333, [BLOCK_TYPES.BED_FOOT]: 0xCC3333,
             [BLOCK_TYPES.WORKBENCH_SIDE]: 0xA0522D,
-            [BLOCK_TYPES.BERRY_BUSH]: 0x2E7D32, [BLOCK_TYPES.TALL_GRASS]: 0x4CAF50, [BLOCK_TYPES.CACTUS]: 0x2E7D32, [BLOCK_TYPES.DEAD_BUSH]: 0x8D6E63, [BLOCK_TYPES.MUSHROOM_RED]: 0xE53935, [BLOCK_TYPES.MUSHROOM_BROWN]: 0x795548, [BLOCK_TYPES.SUGARCANE]: 0x81C784, [BLOCK_TYPES.FERN]: 0x388E3C, [BLOCK_TYPES.BERRIES]: 0xE53935, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 0x33691E
+            [BLOCK_TYPES.BERRY_BUSH]: 0x2E7D32, [BLOCK_TYPES.TALL_GRASS]: 0x4CAF50, [BLOCK_TYPES.CACTUS]: 0x2E7D32, [BLOCK_TYPES.DEAD_BUSH]: 0x8D6E63, [BLOCK_TYPES.MUSHROOM_RED]: 0xE53935, [BLOCK_TYPES.MUSHROOM_BROWN]: 0x795548, [BLOCK_TYPES.SUGARCANE]: 0x81C784, [BLOCK_TYPES.FERN]: 0x388E3C, [BLOCK_TYPES.BERRIES]: 0xE53935, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 0x33691E, [BLOCK_TYPES.SEAGRASS]: 0x2E8B57
         };
 
         export const BLOCK_TEX = {
@@ -25,7 +25,7 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.FLOWER_RED]: 15, [BLOCK_TYPES.FLOWER_YELLOW]: 16,
             [BLOCK_TYPES.PLANKS]: 27, [BLOCK_TYPES.STICK]: 28, [BLOCK_TYPES.WORKBENCH]: 29, [BLOCK_TYPES.STONE_BRICK]: 30, [BLOCK_TYPES.SANDSTONE]: 31, [BLOCK_TYPES.BONE]: 32, [BLOCK_TYPES.WORKBENCH_SIDE]: 36,
             [BLOCK_TYPES.WINDOW]: 38, [BLOCK_TYPES.DOOR_BOTTOM]: 39, [BLOCK_TYPES.DOOR_TOP]: 40, [BLOCK_TYPES.BED_HEAD]: 41, [BLOCK_TYPES.BED_FOOT]: 42,
-            [BLOCK_TYPES.BERRY_BUSH]: 43, [BLOCK_TYPES.TALL_GRASS]: 44, [BLOCK_TYPES.CACTUS]: 45, [BLOCK_TYPES.DEAD_BUSH]: 46, [BLOCK_TYPES.MUSHROOM_RED]: 47, [BLOCK_TYPES.MUSHROOM_BROWN]: 48, [BLOCK_TYPES.SUGARCANE]: 49, [BLOCK_TYPES.FERN]: 50, [BLOCK_TYPES.BERRIES]: 51, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 52
+            [BLOCK_TYPES.BERRY_BUSH]: 43, [BLOCK_TYPES.TALL_GRASS]: 44, [BLOCK_TYPES.CACTUS]: 45, [BLOCK_TYPES.DEAD_BUSH]: 46, [BLOCK_TYPES.MUSHROOM_RED]: 47, [BLOCK_TYPES.MUSHROOM_BROWN]: 48, [BLOCK_TYPES.SUGARCANE]: 49, [BLOCK_TYPES.FERN]: 50, [BLOCK_TYPES.BERRIES]: 51, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 52, [BLOCK_TYPES.SEAGRASS]: 54
         };
 
 // --- TEXTURE GENERATOR ---
@@ -61,98 +61,275 @@ export const BLOCK_TYPES = {
                  }
             };
 
-            // GRAS (Sattes, klares HD-Grün, top-reflektiv wie im Vorbild)
-            drawTile(0, 0, (c) => { c.fillStyle='#fff'; c.fillRect(0,0,64,64); 
-                const greens = ['#64DD17', '#76FF03', '#4CAF50', '#43A047', '#558B2F'];
-                pixelDraw(c, 64, 64, 2, (x, y) => greens[Math.floor(Math.random() * greens.length)]);
-                const grad = c.createLinearGradient(0,0,0,64);
-                grad.addColorStop(0, 'rgba(255, 255, 255, 0.15)');
-                grad.addColorStop(1, 'rgba(0, 0, 0, 0.05)'); // Soft edge at bottom
-                c.fillStyle = grad; c.fillRect(0,0,64,64);
+            // Hilfsfunktion: Zeichnet eine 16x16 Pixel-Map auf ein 64x64 Tile
+            const pixelMapDraw = (c, map, palette) => {
+                const pw = 64 / 16; // = 4 Pixel pro Map-Pixel
+                for (let row = 0; row < map.length; row++) {
+                    for (let col = 0; col < map[row].length; col++) {
+                        const ch = map[row][col];
+                        if (palette[ch]) {
+                            c.fillStyle = palette[ch];
+                            c.fillRect(col * pw, row * pw, pw, pw);
+                        }
+                    }
+                }
+            };
+
+            // GRAS OBEN (Tile 0) – Komplett grüne Pixeltextur wie Minecraft
+            drawTile(0, 0, (c) => {
+                const grassPalette = {
+                    '1': '#5B9C2E', // Hell-Grün
+                    '2': '#4E8C25', // Mittel-Grün
+                    '3': '#6BAD38', // Satt-Grün
+                    '4': '#3D7A1C', // Dunkel-Grün
+                    '5': '#52A028', // Leucht-Grün
+                    '6': '#468B20'  // Schatten-Grün
+                };
+                const grassMap = [
+                    "1234512345123451",
+                    "3516234156234152",
+                    "2143651234516234",
+                    "5631243561243516",
+                    "4215634215634215",
+                    "1346521346521346",
+                    "6524136252413652",
+                    "3261456321456321",
+                    "1453261453261453",
+                    "5316425316425316",
+                    "2641532641532641",
+                    "4123654123654123",
+                    "6352146352146352",
+                    "1246531246531246",
+                    "3514263514263514",
+                    "2631425263142526"
+                ];
+                pixelMapDraw(c, grassMap, grassPalette);
             });
-            // ERDE (Sauberes Braun mit kontrastreichen Krümeln)
-            drawTile(1, 0, (c) => { c.fillStyle='#fff'; c.fillRect(0,0,64,64); 
-                const browns = ['#6D4C41', '#5D4037', '#4E342E', '#3E2723'];
-                pixelDraw(c, 64, 64, 4, (x, y) => browns[Math.floor(Math.random() * browns.length)]);
+            // ERDE (Warmes Braun mit Steinkrümeln und Wurzel-Details)
+            drawTile(1, 0, (c) => {
+                const browns = ['#8B6B4A', '#7A5C3A', '#6D4C33', '#7F6040', '#5C3D2E'];
+                pixelDraw(c, 64, 64, 2, (x, y) => browns[Math.floor(Math.random() * browns.length)]);
+                // Kleine Steinchen
+                for (let i = 0; i < 8; i++) {
+                    c.fillStyle = ['#9E9E9E', '#8D8D8D'][Math.floor(Math.random() * 2)];
+                    c.fillRect(Math.random()*60+2, Math.random()*60+2, 4, 2);
+                }
+                // Tiefe durch leichten Schatten
+                const grad = c.createLinearGradient(0, 0, 0, 64);
+                grad.addColorStop(0, 'rgba(255,255,255,0.05)'); grad.addColorStop(1, 'rgba(0,0,0,0.1)');
+                c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
             });
-            // STEIN (Scharfe Pixelfelsen, helles Grau)
-            drawTile(2, 0, (c) => { c.fillStyle='#fff'; c.fillRect(0,0,64,64); 
-                const grays = ['#9E9E9E', '#A4A4A4', '#8E8E8E', '#757575'];
-                pixelDraw(c, 64, 64, 4, (x, y) => grays[Math.floor(Math.random() * grays.length)]);
-                c.fillStyle = 'rgba(0,0,0,0.1)'; c.fillRect(0,0,64,2); c.fillRect(0,0,2,64);
+            // STEIN (Realistisch mit Rissen und Mineralien)
+            drawTile(2, 0, (c) => {
+                // Basis-Grau mit feiner Körnung
+                const grays = ['#8A8A8A', '#959595', '#7E7E7E', '#888888', '#929292'];
+                pixelDraw(c, 64, 64, 2, (x, y) => grays[Math.floor(Math.random() * grays.length)]);
+                // Dunklere Adern/Risse
+                c.strokeStyle = 'rgba(0,0,0,0.2)'; c.lineWidth = 1;
+                for (let i = 0; i < 5; i++) {
+                    c.beginPath();
+                    let rx = Math.random()*64, ry = Math.random()*64;
+                    c.moveTo(rx, ry);
+                    for (let j = 0; j < 3; j++) { rx += (Math.random()-0.5)*20; ry += (Math.random()-0.5)*20; c.lineTo(rx, ry); }
+                    c.stroke();
+                }
+                // Helle Mineralien-Flecken
+                for (let i = 0; i < 4; i++) {
+                    c.fillStyle = 'rgba(180,180,180,0.4)';
+                    c.fillRect(Math.random()*56+4, Math.random()*56+4, 6, 4);
+                }
+                // Kanten-Tiefe
+                c.fillStyle = 'rgba(0,0,0,0.08)'; c.fillRect(0, 0, 64, 2); c.fillRect(0, 0, 2, 64);
+                c.fillStyle = 'rgba(255,255,255,0.06)'; c.fillRect(0, 62, 64, 2); c.fillRect(62, 0, 2, 64);
             });
-            // WASSER (Extrem klares, tropisches Türkisblau)
-            drawTile(3, 0, (c) => { 
-                c.fillStyle = 'rgba(3, 169, 244, 0.5)'; c.fillRect(0,0,64,64);
-                drawNoise(c, 64, 64, 4, ['rgba(255,255,255,0.0)', 'rgba(255,255,255,0.0)', 'rgba(255,255,255,0.1)', 'rgba(255,255,255,0.2)']);
-                for(let i=0; i<15; i++) {
-                    c.fillStyle = 'rgba(255,255,255,0.25)';
-                    c.fillRect(Math.random()*64, Math.random()*64, 12+Math.random()*24, 2);
+            // WASSER (Tiefes Ozeanblau mit Kaustik-Effekt)
+            drawTile(3, 0, (c) => {
+                c.fillStyle = 'rgba(20, 120, 200, 0.55)'; c.fillRect(0, 0, 64, 64);
+                // Sanfte Wellen-Farbvariation
+                pixelDraw(c, 64, 64, 4, (x, y) => {
+                    const wave = Math.sin(x*0.15 + y*0.1) * 0.5 + 0.5;
+                    return wave > 0.6 ? 'rgba(80,180,255,0.15)' : (wave < 0.3 ? 'rgba(0,40,80,0.1)' : null);
+                });
+                // Kaustik-Lichtmuster
+                for (let i = 0; i < 12; i++) {
+                    c.fillStyle = 'rgba(255,255,255,0.15)';
+                    const wx = Math.random()*54, wy = Math.random()*54;
+                    c.beginPath(); c.moveTo(wx, wy); c.lineTo(wx+10+Math.random()*14, wy+2); c.lineTo(wx+8, wy+4); c.fill();
+                }
+                // Oberflächen-Schimmer
+                c.fillStyle = 'rgba(255,255,255,0.08)';
+                for (let i = 0; i < 8; i++) { c.fillRect(Math.random()*40, Math.random()*10, 16+Math.random()*20, 1); }
+            });
+            // HOLZ (Detaillierte Rinde mit vertikaler Maserung)
+            drawTile(4, 0, (c) => {
+                // Basis-Braun
+                c.fillStyle = '#5D4037'; c.fillRect(0, 0, 64, 64);
+                // Vertikale Rindenstreifen
+                for (let x = 0; x < 64; x += 4) {
+                    const shade = Math.random() * 0.3;
+                    c.fillStyle = `rgba(${30+shade*40},${20+shade*30},${10+shade*20},1)`;
+                    c.fillRect(x, 0, 4, 64);
+                }
+                // Horizontale Ringe/Kerben
+                for (let y = 0; y < 64; y += (8 + Math.floor(Math.random()*8))) {
+                    c.fillStyle = 'rgba(0,0,0,0.15)'; c.fillRect(0, y, 64, 2);
+                }
+                // Rinden-Detail
+                pixelDraw(c, 64, 64, 4, (x, y) => Math.random() > 0.8 ? 'rgba(0,0,0,0.12)' : (Math.random() > 0.9 ? 'rgba(255,255,255,0.06)' : null));
+                // Seitliche Schattierung
+                c.fillStyle = 'rgba(0,0,0,0.1)'; c.fillRect(0, 0, 3, 64);
+                c.fillStyle = 'rgba(255,255,255,0.05)'; c.fillRect(61, 0, 3, 64);
+            });
+            // LAUB (Dichte Blatt-Cluster mit Tiefe und Lichtpunkten)
+            drawTile(5, 0, (c) => {
+                // Dunklere Basis-Schicht
+                const darkLeaves = ['#1B5E20', '#2E7D32', '#256029'];
+                pixelDraw(c, 64, 64, 4, (x, y) => {
+                    if (Math.random() > 0.82) return 'rgba(0,0,0,0)';
+                    return darkLeaves[Math.floor(Math.random() * darkLeaves.length)];
+                });
+                // Hellere Blatt-Cluster oben drauf
+                for (let i = 0; i < 18; i++) {
+                    c.fillStyle = ['#388E3C', '#43A047', '#4CAF50', '#66BB6A'][Math.floor(Math.random()*4)];
+                    const lx = Math.random()*56+4, ly = Math.random()*56+4;
+                    c.beginPath(); c.arc(lx, ly, 4+Math.random()*4, 0, Math.PI*2); c.fill();
+                }
+                // Sonnenflecken
+                for (let i = 0; i < 6; i++) {
+                    c.fillStyle = 'rgba(150,220,80,0.25)';
+                    c.beginPath(); c.arc(Math.random()*64, Math.random()*64, 2+Math.random()*3, 0, Math.PI*2); c.fill();
                 }
             });
-            // HOLZ (Crispe Rinden-Pixel-Struktur)
-            drawTile(4, 0, (c) => { c.fillStyle='#fff'; c.fillRect(0,0,64,64); 
-                const barkLine = ['#4E342E', '#3E2723', '#212121'];
-                pixelDraw(c, 64, 64, 4, (x, y) => {
-                    const line = Math.floor(x / 4);
-                    return barkLine[(line + Math.floor(Math.random()*2)) % barkLine.length];
-                });
+            // SAND (Warmer Wüstensand mit feiner Körnung)
+            drawTile(6, 0, (c) => {
+                const sands = ['#E8D5A3', '#DECA91', '#F0DFB0', '#D4C487', '#EBD9A8'];
+                pixelDraw(c, 64, 64, 2, (x, y) => sands[Math.floor(Math.random() * sands.length)]);
+                // Winzige dunkle Sandkörner
+                for (let i = 0; i < 12; i++) {
+                    c.fillStyle = 'rgba(160,130,80,0.3)';
+                    c.fillRect(Math.random()*62, Math.random()*62, 2, 2);
+                }
+                // Sanfter Lichtgradient
+                const grad = c.createLinearGradient(0, 0, 64, 64);
+                grad.addColorStop(0, 'rgba(255,255,255,0.08)'); grad.addColorStop(1, 'rgba(0,0,0,0.05)');
+                c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
             });
-            // LAUB (Detailreiches Pixel-Muster mit Schatten)
-            drawTile(5, 0, (c) => { 
-                const lgs = ['#2E7D32', '#1B5E20', '#388E3C', '#1B5E20'];
+            // WOLKE (Weiche Wolkenstruktur)
+            drawTile(7, 0, (c) => {
+                c.fillStyle = '#ffffff'; c.fillRect(0, 0, 64, 64);
+                // Sanfte Schatten-Flecken
+                for (let i = 0; i < 8; i++) {
+                    c.fillStyle = 'rgba(200,210,220,0.15)';
+                    c.beginPath(); c.arc(Math.random()*64, Math.random()*64, 10+Math.random()*12, 0, Math.PI*2); c.fill();
+                }
+                c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(0, 0, 64, 64);
+            });
+            // SCHNEE (Kristallweiß mit Glitzer und Schatten)
+            drawTile(8, 0, (c) => {
+                c.fillStyle = '#F8FBFF'; c.fillRect(0, 0, 64, 64);
+                drawNoise(c, 64, 64, 2, ['#FFFFFF', '#F5F8FF', '#EDF2FA', '#FFFFFF', '#F0F4FC']);
+                // Glitzer-Punkte
+                for (let i = 0; i < 10; i++) {
+                    c.fillStyle = 'rgba(200,230,255,0.4)';
+                    c.fillRect(Math.random()*62, Math.random()*62, 2, 2);
+                }
+                // Sanfte Schatten-Mulden
+                for (let i = 0; i < 4; i++) {
+                    c.fillStyle = 'rgba(180,200,220,0.1)';
+                    c.beginPath(); c.ellipse(Math.random()*56+4, Math.random()*56+4, 8, 4, Math.random()*Math.PI, 0, Math.PI*2); c.fill();
+                }
+            });
+            // EIS (Transparent mit Riss-Muster)
+            drawTile(9, 0, (c) => {
+                c.fillStyle = 'rgba(160, 220, 240, 0.5)'; c.fillRect(0, 0, 64, 64);
+                // Eis-Kristallstruktur
+                pixelDraw(c, 64, 64, 4, (x, y) => Math.random() > 0.7 ? 'rgba(200,240,255,0.3)' : null);
+                // Risse
+                c.strokeStyle = 'rgba(255,255,255,0.6)'; c.lineWidth = 1;
+                for (let i = 0; i < 4; i++) {
+                    c.beginPath();
+                    let rx = Math.random()*64, ry = Math.random()*64;
+                    c.moveTo(rx, ry);
+                    for (let j = 0; j < 4; j++) { rx += (Math.random()-0.5)*24; ry += (Math.random()-0.5)*24; c.lineTo(rx, ry); }
+                    c.stroke();
+                }
+                // Reflexion oben
+                c.fillStyle = 'rgba(255,255,255,0.2)'; c.fillRect(4, 4, 24, 12);
+            });
+            // JUNGLE WOOD (Dunkles Tropenholz mit Moos)
+            drawTile(10, 0, (c) => {
+                c.fillStyle = '#3E2723'; c.fillRect(0, 0, 64, 64);
+                // Vertikale Maserung
+                for (let x = 0; x < 64; x += 4) {
+                    c.fillStyle = `rgba(${20+Math.random()*30},${10+Math.random()*20},${5+Math.random()*15},1)`;
+                    c.fillRect(x, 0, 4, 64);
+                }
+                // Moos-Flecken
+                for (let i = 0; i < 10; i++) {
+                    c.fillStyle = ['rgba(76,175,80,0.3)', 'rgba(56,142,60,0.25)', 'rgba(46,125,50,0.2)'][Math.floor(Math.random()*3)];
+                    c.beginPath(); c.arc(Math.random()*64, Math.random()*64, 3+Math.random()*5, 0, Math.PI*2); c.fill();
+                }
+                // Horizontale Ringe
+                for (let y = 0; y < 64; y += (10+Math.floor(Math.random()*6))) { c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(0, y, 64, 2); }
+            });
+            // JUNGLE LEAVES (Dichtes tropisches Blattwerk)
+            drawTile(11, 0, (c) => {
+                const lgs = ['#1B5E20', '#33691E', '#2E7D32', '#1A4F1A'];
                 pixelDraw(c, 64, 64, 4, (x, y) => {
-                    if (Math.random() > 0.8) return 'rgba(0,0,0,0)'; // WICHTIGER TRANSPARENZ CHECK IN THREEJS
+                    if (Math.random() > 0.82) return 'rgba(0,0,0,0)';
                     return lgs[Math.floor(Math.random() * lgs.length)];
                 });
+                // Helle Blattspitzen
+                for (let i = 0; i < 12; i++) {
+                    c.fillStyle = ['#4CAF50', '#388E3C'][Math.floor(Math.random()*2)];
+                    c.beginPath(); c.arc(Math.random()*56+4, Math.random()*56+4, 3+Math.random()*3, 0, Math.PI*2); c.fill();
+                }
+                // Lianen-Akzente
+                c.strokeStyle = 'rgba(76,175,80,0.3)'; c.lineWidth = 2;
+                for (let i = 0; i < 3; i++) {
+                    const sx = Math.random()*60+2;
+                    c.beginPath(); c.moveTo(sx, 0); c.quadraticCurveTo(sx+(Math.random()-0.5)*10, 32, sx+(Math.random()-0.5)*8, 64); c.stroke();
+                }
             });
-            // SAND (Strahlend, glatt und hell wie Minecraft Shader)
-            drawTile(6, 0, (c) => { c.fillStyle='#fff'; c.fillRect(0,0,64,64); 
-                const sands = ['#FFE082', '#FFCA28', '#FFD54F', '#FFF090'];
-                pixelDraw(c, 64, 64, 4, (x, y) => sands[Math.floor(Math.random() * sands.length)]);
+            // PALM WOOD (Helle Faser-Rinde mit Ringen)
+            drawTile(12, 0, (c) => {
+                c.fillStyle = '#C4A882'; c.fillRect(0, 0, 64, 64);
+                drawNoise(c, 64, 64, 2, ['#D7CCC8', '#C4A882', '#BCAAA4', '#B09878']);
+                // Markante horizontale Ringe
+                for (let i = 0; i < 64; i += (8+Math.floor(Math.random()*4))) {
+                    c.fillStyle = 'rgba(93,64,55,0.35)'; c.fillRect(0, i, 64, 3);
+                    c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(0, i+3, 64, 1);
+                }
+                // Fasern
+                pixelDraw(c, 64, 64, 2, (x, y) => Math.random() > 0.9 ? 'rgba(160,130,90,0.2)' : null);
             });
-            // NEUTRAL / CLOUD
-            drawTile(7, 0, (c) => { 
-               c.fillStyle = '#ffffff'; c.fillRect(0,0,64,64);
-               drawNoise(c, 64, 64, 16, ['#ffffff', '#f5f5f5', '#eeeeee']);
+            // PALM LEAVES (Kräftige Wedel mit Blattadern)
+            drawTile(13, 0, (c) => {
+                c.fillStyle = '#2E7D32'; c.fillRect(0, 0, 64, 64);
+                // Blattadern-Muster
+                const veins = ['#4CAF50', '#43A047', '#66BB6A'];
+                for (let i = 0; i < 64; i += 8) {
+                    c.fillStyle = veins[Math.floor(Math.random()*veins.length)]; c.fillRect(0, i, 64, 3);
+                    c.fillStyle = veins[Math.floor(Math.random()*veins.length)]; c.fillRect(i, 0, 3, 64);
+                }
+                // Licht-Reflexe
+                pixelDraw(c, 64, 64, 4, (x, y) => Math.random() > 0.85 ? 'rgba(120,220,80,0.2)' : null);
+                // Rand-Schatten
+                c.fillStyle = 'rgba(0,0,0,0.1)'; c.fillRect(0, 0, 64, 2); c.fillRect(0, 0, 2, 64);
             });
-            // SCHNEE (Blendend weiß mit Mini-Glitzer)
-            drawTile(8, 0, (c) => { 
-                c.fillStyle = '#ffffff'; c.fillRect(0,0,64,64);
-                drawNoise(c, 64, 64, 4, ['#ffffff', '#FAFAFA', '#F5F5F5', '#E0E0E0']);
-            });
-            // EIS (Leicht transparent)
-            drawTile(9, 0, (c) => { 
-                c.fillStyle = 'rgba(128, 222, 234, 0.5)'; c.fillRect(0,0,64,64);
-                c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(0,0,64,2); c.fillRect(0,0,2,64);
-            });
-            // JUNGLE WOOD
-            drawTile(10, 0, (c) => { 
-                drawNoise(c, 64, 64, 4, ['#3E2723', '#212121', '#4E342E']);
-                c.fillStyle = 'rgba(76, 175, 80, 0.3)'; c.fillRect(0,0,64,64); // Moos überzug
-            });
-            // JUNGLE LEAVES
-            drawTile(11, 0, (c) => { 
-                const lgs = ['#1B5E20', '#33691E'];
-                pixelDraw(c, 64, 64, 4, (x, y) => {
-                    if (Math.random() > 0.8) return 'rgba(0,0,0,0)';
-                    return lgs[Math.floor(Math.random() * lgs.length)];
-                });
-            });
-            // PALM WOOD (Helles Beige-Braun)
-            drawTile(12, 0, (c) => { 
-                drawNoise(c, 64, 64, 4, ['#D7CCC8', '#BCAAA4', '#A1887F']);
-                for(let i=0; i<64; i+=12) { c.fillStyle='#5D4037'; c.fillRect(0, i, 64, 3); }
-            });
-            // PALM LEAVES (Lange, kräftige Bahnen)
-            drawTile(13, 0, (c) => { 
-                c.fillStyle = '#1B5E20'; c.fillRect(0,0,64,64);
-                c.fillStyle = '#4CAF50';
-                for(let i=0; i<64; i+=16) { c.fillRect(0, i, 64, 4); c.fillRect(i, 0, 4, 64); }
-            });
-            // BEDROCK
-            drawTile(14, 0, (c) => { 
-                drawNoise(c, 64, 64, 8, ['#000000', '#212121', '#111111']);
+            // BEDROCK (Unzerstörbarer Urgestein)
+            drawTile(14, 0, (c) => {
+                const darks = ['#1A1A1A', '#252525', '#0F0F0F', '#1F1F1F', '#141414'];
+                pixelDraw(c, 64, 64, 4, (x, y) => darks[Math.floor(Math.random() * darks.length)]);
+                // Lava-Adern
+                for (let i = 0; i < 3; i++) {
+                    c.strokeStyle = 'rgba(120,50,20,0.15)'; c.lineWidth = 2;
+                    c.beginPath();
+                    let rx = Math.random()*64, ry = Math.random()*64;
+                    c.moveTo(rx, ry);
+                    for (let j = 0; j < 3; j++) { rx += (Math.random()-0.5)*30; ry += (Math.random()-0.5)*30; c.lineTo(rx, ry); }
+                    c.stroke();
+                }
             });
             // FLOWER RED
             drawTile(15, 0, (c) => { 
@@ -258,12 +435,24 @@ export const BLOCK_TYPES = {
                 }
             });
 
-            // RECIPE ITEM: PLANKS
-            drawTile(27, 0, (c) => { 
-                c.fillStyle='#CD853F'; c.fillRect(0,0,64,64); 
-                c.fillStyle='#8B4513';
-                for(let i=15; i<64; i+=16) { c.fillRect(0, i, 64, 2); }
-                pixelDraw(c, 64, 64, 4, (x, y) => Math.random()>0.8 ? 'rgba(0,0,0,0.1)' : '');
+            // RECIPE ITEM: PLANKS (Detaillierte Holzbretter mit Maserung)
+            drawTile(27, 0, (c) => {
+                c.fillStyle = '#C8944A'; c.fillRect(0, 0, 64, 64);
+                // Planken-Maserung
+                const plankColors = ['#C8944A', '#BA8640', '#D4A254', '#BF8E46'];
+                pixelDraw(c, 64, 64, 2, (x, y) => {
+                    const plank = Math.floor(y / 16);
+                    return plankColors[(plank + Math.floor(x*0.05)) % plankColors.length];
+                });
+                // Trennlinien zwischen Brettern
+                c.fillStyle = '#7D5A3C';
+                for (let i = 15; i < 64; i += 16) { c.fillRect(0, i, 64, 2); }
+                // Schatten unter jeder Planke
+                c.fillStyle = 'rgba(0,0,0,0.06)';
+                for (let i = 0; i < 64; i += 16) { c.fillRect(0, i+12, 64, 3); }
+                // Nagel-Akzente
+                c.fillStyle = 'rgba(80,60,40,0.3)';
+                c.fillRect(6, 6, 2, 2); c.fillRect(56, 6, 2, 2); c.fillRect(6, 22, 2, 2); c.fillRect(56, 22, 2, 2);
             });
             // RECIPE ITEM: STICK (Optimiert für 2D-Mesh)
             drawTile(28, 0, (c) => { 
@@ -287,20 +476,41 @@ export const BLOCK_TYPES = {
                 // Oberseiten-Struktur (Arbeitsplatte)
                 c.fillStyle='rgba(255,255,255,0.05)'; c.fillRect(8,8,64,48); // Geht bis zum rechten Rand
             });
-            // RECIPE ITEM: STONE_BRICK
-            drawTile(30, 0, (c) => { 
-                c.fillStyle='#757575'; c.fillRect(0,0,64,64); 
-                c.fillStyle='#424242';
-                for(let i=31; i<64; i+=32) { c.fillRect(0, i, 64, 2); }
-                c.fillRect(31, 0, 2, 32); c.fillRect(15, 32, 2, 32); c.fillRect(47, 32, 2, 32);
-                pixelDraw(c, 64, 64, 4, (x, y) => Math.random()>0.8 ? 'rgba(255,255,255,0.05)' : '');
+            // RECIPE ITEM: STONE_BRICK (Detailliertes Ziegelmauerwerk)
+            drawTile(30, 0, (c) => {
+                c.fillStyle = '#808080'; c.fillRect(0, 0, 64, 64);
+                // Ziegel-Flächen mit Variation
+                const brickColors = ['#7A7A7A', '#858585', '#727272', '#8A8A8A'];
+                for (let row = 0; row < 2; row++) {
+                    const yOff = row * 32;
+                    const xShift = row * 16;
+                    for (let col = 0; col < 2; col++) {
+                        c.fillStyle = brickColors[row*2+col];
+                        c.fillRect((col * 32 + xShift) % 64, yOff, 30, 30);
+                    }
+                }
+                // Fugen
+                c.fillStyle = '#555555';
+                c.fillRect(0, 30, 64, 2); c.fillRect(0, 62, 64, 2);
+                c.fillRect(30, 0, 2, 32); c.fillRect(14, 32, 2, 32); c.fillRect(46, 32, 2, 32);
+                // Stein-Körnung
+                pixelDraw(c, 64, 64, 2, (x, y) => Math.random() > 0.85 ? 'rgba(255,255,255,0.06)' : (Math.random() > 0.92 ? 'rgba(0,0,0,0.08)' : null));
             });
-            // RECIPE ITEM: SANDSTONE
-            drawTile(31, 0, (c) => { 
-                c.fillStyle='#FFE082'; c.fillRect(0,0,64,64); 
-                c.fillStyle='#FFCA28';
-                for(let i=0; i<64; i+=8) { c.fillRect(0, i, 64, 2); }
-                pixelDraw(c, 64, 64, 4, (x, y) => Math.random()>0.9 ? 'rgba(0,0,0,0.05)' : '');
+            // RECIPE ITEM: SANDSTONE (Geschichteter Sandstein)
+            drawTile(31, 0, (c) => {
+                // Warme Basis
+                const sandStone = ['#E8CFA0', '#DEC494', '#F0D8AB', '#D4B888'];
+                pixelDraw(c, 64, 64, 2, (x, y) => sandStone[Math.floor(Math.random() * sandStone.length)]);
+                // Horizontale Schichten
+                c.fillStyle = 'rgba(180,150,100,0.2)';
+                for (let i = 0; i < 64; i += (6+Math.floor(Math.random()*4))) { c.fillRect(0, i, 64, 2); }
+                // Obere Zierleiste
+                c.fillStyle = '#C4A870'; c.fillRect(0, 0, 64, 8);
+                c.fillStyle = '#B89860'; c.fillRect(4, 2, 56, 4);
+                // Unterer Rahmen
+                c.fillStyle = '#C4A870'; c.fillRect(0, 56, 64, 8);
+                // Subtile Körnung
+                pixelDraw(c, 64, 64, 4, (x, y) => Math.random() > 0.9 ? 'rgba(0,0,0,0.06)' : null);
             });
             
             // 36: WORKBENCH_SIDE (RECHTS)
@@ -492,20 +702,28 @@ export const BLOCK_TYPES = {
                 }
             });
 
-            // 45: CACTUS (Kaktus)
+            // 45: CACTUS (Detaillierter Kaktus mit Rippen und Stacheln)
             drawTile(45, 0, (c) => {
-                c.fillStyle = '#2E7D32'; c.fillRect(0, 0, 64, 64);
-                // Dunklere Streifen
-                c.fillStyle = '#1B5E20';
-                for (let i = 7; i < 64; i += 8) { c.fillRect(i, 0, 2, 64); }
-                // Stacheln
-                c.fillStyle = '#FFF9C4';
-                for (let i = 0; i < 20; i++) {
-                    const sx = Math.random() * 60 + 2, sy = Math.random() * 60 + 2;
-                    c.fillRect(sx, sy, 2, 2);
+                // Basis
+                c.fillStyle = '#3A8B3E'; c.fillRect(0, 0, 64, 64);
+                // Vertikale Rippen mit 3D-Effekt
+                for (let i = 0; i < 64; i += 8) {
+                    c.fillStyle = '#2E7D32'; c.fillRect(i, 0, 4, 64);
+                    c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(i+1, 0, 2, 64);
+                    c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(i+5, 0, 2, 64);
                 }
-                // Rahmen (leicht dunkler, Kaktus ist nicht ganz blockvoll)
-                c.fillStyle = 'rgba(0,0,0,0.15)'; c.fillRect(0, 0, 4, 64); c.fillRect(60, 0, 4, 64);
+                // Stachel-Cluster
+                c.fillStyle = '#FFF9C4';
+                for (let y = 4; y < 64; y += 12) {
+                    for (let x = 4; x < 64; x += 10) {
+                        const ox = x + (Math.random()-0.5)*4, oy = y + (Math.random()-0.5)*4;
+                        c.fillRect(ox, oy, 2, 2);
+                        c.fillStyle = 'rgba(200,200,150,0.5)'; c.fillRect(ox+1, oy-1, 1, 1); c.fillStyle = '#FFF9C4';
+                    }
+                }
+                // Kanten (Kaktus ist schmaler als Block)
+                c.fillStyle = 'rgba(0,0,0,0.2)'; c.fillRect(0, 0, 4, 64); c.fillRect(60, 0, 4, 64);
+                c.fillStyle = 'rgba(30,80,30,0.5)'; c.fillRect(0, 0, 2, 64); c.fillRect(62, 0, 2, 64);
             });
 
             // 46: DEAD_BUSH (Toter Strauch)
@@ -622,6 +840,56 @@ export const BLOCK_TYPES = {
                     if (Math.random() > 0.7) return null;
                     return greens[Math.floor(Math.random() * greens.length)];
                 });
+            });
+
+            // 54: SEAGRASS (Wassergras)
+            drawTile(54, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                const greens = ['#2E8B57', '#3CB371', '#20B2AA'];
+                for (let i = 0; i < 5; i++) {
+                    const x = 16 + i * 8;
+                    const y = 64;
+                    const h = 24 + Math.random() * 32;
+                    c.strokeStyle = greens[i % greens.length];
+                    c.lineWidth = 3 + Math.random() * 2;
+                    c.beginPath();
+                    c.moveTo(x, y);
+                    c.quadraticCurveTo(x + (Math.random()*10 - 5), y - h/2, x + (Math.random()*20 - 10), y - h);
+                    c.stroke();
+                }
+            });
+
+            // GRAS SEITE (Tile 53) – Oben ~25% Grün, unten ~75% Braun, gezackter Übergang
+            drawTile(53, 0, (c) => {
+                const sidePalette = {
+                    'G': '#5B9C2E', // Gras Hell
+                    'D': '#4E8C25', // Gras Dunkel
+                    'S': '#3D7A1C', // Gras Schatten
+                    '1': '#8B6B4A', // Erde Hell
+                    '2': '#7A5C3A', // Erde Mittel
+                    '3': '#6D4C33', // Erde Dunkel
+                    '4': '#5C3D2E', // Erde Tief
+                    '5': '#7F6040'  // Erde Warm
+                };
+                const sideMap = [
+                    "GGDDGGSGGGDDGGSG",
+                    "GDGSSGDGGDGSSGDG",
+                    "DSGGSSDGSGSSDGSS",
+                    "SGD1SSGD1GSSG1DS",
+                    "1S12S1S21S12S1S2",
+                    "2131213121312131",
+                    "1312412131124121",
+                    "3215131532151315",
+                    "1131221113122111",
+                    "5213113152131131",
+                    "1124315111243151",
+                    "3312114233121142",
+                    "1241531312415313",
+                    "2113214121132141",
+                    "1432115314321153",
+                    "3211432132114321"
+                ];
+                pixelMapDraw(c, sideMap, sidePalette);
             });
 
             atlasDataURL = canvas.toDataURL("image/png");

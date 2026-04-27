@@ -1,10 +1,10 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-        import { CONFIG } from '../config.js?v=1775830882304';
-        import { SoundManager } from './sound.js?v=1775830882304';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=1775830882304';
-        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=1775830882304';
-        import { Mob, updateProjectiles } from './mobs.js?v=1775830882304';
+        import { CONFIG } from '../config.js';
+        import { SoundManager } from './sound.js';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260427b';
+        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260427b';
+        import { Mob, updateProjectiles } from './mobs.js?v=20260427b';
 
         import { Input } from './Input.js';
         import { Player } from './Player.js';
@@ -192,7 +192,7 @@
                 spawnX = Math.floor(Math.random() * 2000 - 1000);
                 spawnZ = Math.floor(Math.random() * 2000 - 1000);
                 const h = getHeightAt(spawnX, spawnZ);
-                if (h > 38) { // WATER_LEVEL = 38
+                if (h > WATER_LEVEL) {
                     spawnH = h;
                     foundLand = true;
                 }
@@ -336,6 +336,9 @@
 
             const playerPos = controls.getObject().position;
 
+            // Shader-Zeit für Wellen & Wind aktualisieren
+            world.update(now * 0.001);
+
             // 1. VOID PROTECTION (Immer aktiv)
             window.player.updateWaterAndVoid(world, SoundManager);
             // 3. SKY & HUD (Immer aktiv)
@@ -384,7 +387,12 @@
                     } else {
                         window.player.velocity.y = Math.max(window.player.velocity.y, -4.0);
                         const bt = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z));
-                        if (bt !== 0 && bt !== 8 && bt !== 9 && bt !== 10) spawning = false;
+                        if (bt !== 0 && bt !== 8 && bt !== 9 && bt !== 10) {
+                            spawning = false;
+                            if (!controls.isLocked) {
+                                controls.lock();
+                            }
+                        }
                     }
                 }
 
@@ -488,48 +496,61 @@
         window.loadGamesList = function() {
             const startList = document.getElementById('save-list');
             const pauseList = document.getElementById('pause-load-list');
-            
-            const loadingHtml = '<div style="text-align:center;color:#aaa;padding:10px;">Lade...</div>';
-            if (startList) startList.innerHTML = loadingHtml;
-            if (pauseList) pauseList.innerHTML = loadingHtml;
-            
+
+            // Helper: zentrierter Status-Text (ersetzt Inhalt einer Liste sicher als textContent)
+            const setStatus = (list, text, color) => {
+                if (!list) return;
+                list.textContent = '';
+                const div = document.createElement('div');
+                div.style.textAlign = 'center';
+                div.style.color = color;
+                div.style.padding = '10px';
+                div.textContent = text;
+                list.appendChild(div);
+            };
+
+            // Helper: Save-Item aus echten DOM-Nodes (kein innerHTML mit User-Daten)
+            const buildSaveItem = (name, compact) => {
+                const item = document.createElement('div');
+                item.className = 'save-item';
+                if (compact) {
+                    item.style.padding = '5px 10px';
+                    item.style.fontSize = '14px';
+                }
+                const span = document.createElement('span');
+                span.textContent = `🎮 ${name}`;
+                const btn = document.createElement('button');
+                btn.className = 'save-btn';
+                btn.textContent = 'Laden';
+                btn.addEventListener('click', () => window.loadGame(name));
+                item.appendChild(span);
+                item.appendChild(btn);
+                return item;
+            };
+
+            setStatus(startList, 'Lade...', '#aaa');
+            setStatus(pauseList, 'Lade...', '#aaa');
+
             fetch('/api/saves')
                 .then(res => res.json())
                 .then(saves => {
-                    if (startList) startList.innerHTML = '';
-                    if (pauseList) pauseList.innerHTML = '';
+                    if (startList) startList.textContent = '';
+                    if (pauseList) pauseList.textContent = '';
 
-                    if(!saves || saves.length === 0) {
-                        const emptyHtml = '<div style="text-align:center;color:#aaa;padding:10px;">Keine Speicherstände gefunden!</div>';
-                        if (startList) startList.innerHTML = emptyHtml;
-                        if (pauseList) pauseList.innerHTML = emptyHtml;
+                    if (!saves || saves.length === 0) {
+                        setStatus(startList, 'Keine Speicherstände gefunden!', '#aaa');
+                        setStatus(pauseList, 'Keine Speicherstände gefunden!', '#aaa');
                         return;
                     }
 
                     saves.forEach(name => {
-                        const itemHtml = `<span>🎮 ${name}</span><button class="save-btn" onclick="loadGame('${name}')">Laden</button>`;
-                        
-                        if (startList) {
-                            const item = document.createElement('div');
-                            item.className = 'save-item';
-                            item.innerHTML = itemHtml;
-                            startList.appendChild(item);
-                        }
-
-                        if (pauseList) {
-                            const item = document.createElement('div');
-                            item.className = 'save-item';
-                            item.style.padding = '5px 10px';
-                            item.style.fontSize = '14px';
-                            item.innerHTML = itemHtml;
-                            pauseList.appendChild(item);
-                        }
+                        if (startList) startList.appendChild(buildSaveItem(name, false));
+                        if (pauseList) pauseList.appendChild(buildSaveItem(name, true));
                     });
                 })
                 .catch(err => {
-                    const errorHtml = '<div style="text-align:center;color:#ff6b6b;padding:10px;">Fehler!</div>';
-                    if (startList) startList.innerHTML = errorHtml;
-                    if (pauseList) pauseList.innerHTML = errorHtml;
+                    setStatus(startList, 'Fehler!', '#ff6b6b');
+                    setStatus(pauseList, 'Fehler!', '#ff6b6b');
                 });
         };
 
@@ -570,4 +591,4 @@
             .catch(err => alert("Fehler beim Speichern: Server nicht erreichbar?"));
         };
 
-        window.loadGamesList(); // Initial laden
+        window.loadGamesList(); // Initial laden

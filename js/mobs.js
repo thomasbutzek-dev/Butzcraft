@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=1775830882304';
-import { SoundManager } from './sound.js?v=1775830882304';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=1775830882304';
+import { CONFIG } from '../config.js';
+import { SoundManager } from './sound.js';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js';
 import { Physics } from './Physics.js?v=1775830882304';
 
 const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5 } = CONFIG.MOBS;
@@ -62,7 +62,7 @@ export class Mob {
         tex.needsUpdate = true;
         
         const tileW = 1 / 16;
-        const tileH = 1 / 15; // blocks.js height is 1024, but wait. In blocks.js, we have 15 rows defined? Let's check: 64x64 tiles, 1024/64 = 16! Oh wait, 1024/64 = 16 tiles horizontally and vertically!
+        const tileH = 1 / 16;
         const u = (texIdx % 16) * tileW;
         const v = Math.floor(texIdx / 16) * tileW; // 16x16 tiles
         
@@ -505,8 +505,8 @@ export class Mob {
                             }
                         }
                         const nX = pos.x + dir.x * 0.5, nZ = pos.z + dir.z * 0.5;
-                        if (world.getBlock(Math.floor(nX), Math.floor(pos.y), Math.floor(nZ)) !== 0 && Date.now() - this.lastJump > 1200) {
-                            this.velocity.y = MOB_JUMP_FORCE; this.lastJump = Date.now();
+                        if (world.getBlock(Math.floor(nX), Math.floor(pos.y), Math.floor(nZ)) !== 0 && performance.now() - this.lastJump > 1200) {
+                            this.velocity.y = MOB_JUMP_FORCE; this.lastJump = performance.now();
                         }
                     }
                 } else {

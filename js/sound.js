@@ -34,18 +34,32 @@ export const SoundManager = {
                 }
             },
             startMusicLoop() {
-                if (this.musicAudio) return;
-                this.musicAudio = new Audio('sounds/music.ogg');
-                this.musicAudio.volume = 0.25;
-                
-                const playNext = () => {
-                    setTimeout(() => {
-                        this.musicAudio.play().catch(e => console.warn("Music play blocked", e));
-                    }, 60000 + Math.random() * 180000); // Wait 1 to 4 minutes between songs
-                };
-                
-                this.musicAudio.onended = playNext;
-                setTimeout(() => this.musicAudio.play().catch(e=>console.warn(e)), 5000);
+                if (!this.ctx || this.musicBuffer) return;
+                fetch('sounds/music.ogg')
+                    .then(res => res.arrayBuffer())
+                    .then(data => this.ctx.decodeAudioData(data))
+                    .then(buffer => {
+                        this.musicBuffer = buffer;
+                        setTimeout(() => this.playMusicSequence(), 5000);
+                    })
+                    .catch(err => console.warn("Konnte music.ogg nicht laden:", err));
+            },
+            playMusicSequence() {
+                if (!this.ctx || !this.musicBuffer) return;
+                try {
+                    const source = this.ctx.createBufferSource();
+                    source.buffer = this.musicBuffer;
+                    const gain = this.ctx.createGain();
+                    gain.gain.value = 0.25;
+                    source.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    source.onended = () => {
+                        setTimeout(() => this.playMusicSequence(), 60000 + Math.random() * 180000);
+                    };
+                    source.start();
+                } catch (e) {
+                    console.warn("Musik-Wiedergabe fehlgeschlagen:", e);
+                }
             },
             loadSound(name, url) {
                 if (!this.ctx) return;

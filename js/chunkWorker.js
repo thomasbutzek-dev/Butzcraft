@@ -1,4 +1,4 @@
-let CHUNK_SIZE = 16, CHUNK_HEIGHT = 64, WATER_LEVEL = 38, CLOUD_HEIGHT = 50;
+let CHUNK_SIZE = 16, CHUNK_HEIGHT = 64, WATER_LEVEL = 32, CLOUD_HEIGHT = 50;
 const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW: 'Schneefeld', PLAINS: 'Grasland' };
 
 function mulberry32(a) {
@@ -78,13 +78,13 @@ function spawnPalm(data, x, h, z, rng) {
         if (ty > 2) { ox = Math.floor(rng() * 2); oz = Math.floor(rng() * 2); }
         const wx = x + ox, wz = z + oz, wy = h + ty;
         if (wx >= 0 && wx < CHUNK_SIZE && wz >= 0 && wz < CHUNK_SIZE && wy < CHUNK_HEIGHT)
-            data[(wy * CHUNK_SIZE * CHUNK_SIZE) + (wz * CHUNK_SIZE) + wx] = 5;
+            data[(wy * CHUNK_SIZE * CHUNK_SIZE) + (wz * CHUNK_SIZE) + wx] = 15;
     }
     for (let i = 0; i < 5; i++) {
         const lx = Math.floor(Math.cos(i * 1.5) * 2), lz = Math.floor(Math.sin(i * 1.5) * 2);
         const wx = x + lx, wz = z + lz, wy = h + th;
         if (wx >= 0 && wx < CHUNK_SIZE && wz >= 0 && wz < CHUNK_SIZE && wy < CHUNK_HEIGHT)
-            data[(wy * CHUNK_SIZE * CHUNK_SIZE) + (wz * CHUNK_SIZE) + wx] = 6;
+            data[(wy * CHUNK_SIZE * CHUNK_SIZE) + (wz * CHUNK_SIZE) + wx] = 16;
     }
 }
 
@@ -156,6 +156,14 @@ self.onmessage = function(e) {
                         const cloudLarge = (Math.sin(wx * 0.04) + Math.cos(wz * 0.04)) * 0.5;
                         if (cloudLarge > 0.75 || cloudN > 0.7 || (cloudN > 0.4 && rng() < 0.1)) data[idx] = 8;
                     } else data[idx] = 0;
+                }
+                
+                // === SEAGRASS unter Wasser (nur ab 3 Blöcke Tiefe) ===
+                if (h <= WATER_LEVEL - 3 && rng() < 0.15) {
+                    const seagrassY = Math.floor(h) + 1;
+                    if (seagrassY <= WATER_LEVEL) {
+                        data[(seagrassY * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x] = 54;
+                    }
                 }
                 
                 if (h > WATER_LEVEL + 1) {

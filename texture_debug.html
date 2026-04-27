@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Texture Atlas Debug</title>
+</head>
+<body style="background-color: #333; color: white;">
+    <h1>Texture Atlas 1024x1024</h1>
+    <script type="module">
+        import { atlasDataURL } from './js/blocks.js?v=20260413_5';
+        document.body.innerHTML += '<img src="' + atlasDataURL + '" style="width:1024px; height:1024px; border:2px solid red; image-rendering: pixelated; margin-bottom: 50px;" />';
+    </script>
+</body>
+</html>
