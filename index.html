@@ -24,7 +24,15 @@
     </div>
     <div id="game-over">
         <h1>DU BIST GESTORBEN!</h1>
-        <button onclick="location.reload()">Neu starten</button>
+        <div style="display: flex; flex-direction: column; gap: 12px; align-items: center;">
+            <button id="game-over-restart" style="padding: 14px 28px; font-size: 16px; cursor: pointer;">Neu starten</button>
+            <div id="game-over-load-section" style="display:none; flex-direction:column; align-items:center; gap:8px;">
+                <p style="margin:8px 0 4px; font-size:14px; color:#ccc;">Oder einen Spielstand laden:</p>
+                <div id="game-over-save-list" style="display:flex; flex-direction:column; gap:6px; max-height:180px; overflow-y:auto;">
+                    <!-- per JS gefüllt -->
+                </div>
+            </div>
+        </div>
     </div>
     <div id="ui">
         <div id="top-ui">
@@ -44,6 +52,7 @@
                 <button class="save-btn" style="padding: 15px 30px; font-size: 18px; cursor: pointer; background: #e74c3c;" onclick="event.stopPropagation(); window.location.reload();">Spiel neu starten</button>
             </div>
             <p style="font-size: 12px; color: #aaa;">(WASD = Bewegen, LEERTASTE = Springen/Auftauchen)<br>
+               (SHIFT = Sprinten, STRG = Schleichen)<br>
                (LINKSKLICK = Abbauen/Angreifen, RECHTSKLICK = Bauen/Kuh melken)</p>
             
             <div id="save-section" onclick="event.stopPropagation()">
@@ -51,6 +60,18 @@
                 <button class="save-btn" onclick="saveGame()">Speichern</button>
             </div>
             <div id="save-msg" style="color: #4caf50; font-size: 14px; margin-top: 10px; display: none;">Spiel gespeichert!</div>
+
+            <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;" onclick="event.stopPropagation()">
+                <p style="font-size: 14px; margin-bottom: 5px;">Einstellungen:</p>
+                <label for="render-distance-select" style="font-size: 13px; color: #ccc;">Sichtweite (Chunks):</label>
+                <select id="render-distance-select" style="margin-left: 8px; padding: 4px 8px; background: #222; color: #fff; border: 1px solid #444; border-radius: 3px;">
+                    <option value="2">2 (schwache GPU)</option>
+                    <option value="4">4 (Standard)</option>
+                    <option value="6">6 (gut)</option>
+                    <option value="8">8 (high-end)</option>
+                    <option value="12">12 (extrem)</option>
+                </select>
+            </div>
 
             <div style="margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;">
                 <p style="font-size: 14px; margin-bottom: 5px;">Anderen Spielstand laden:</p>
@@ -123,7 +144,7 @@
         }
     </script>
 
-    <script type="module" src="./js/GameMain.js?v=20260427b"></script>
+    <script type="module" src="./js/GameMain.js?v=20260501a"></script>
 </body>
 
 </html>

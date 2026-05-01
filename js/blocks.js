@@ -2,7 +2,7 @@ import * as THREE from 'three';
 
 export const BLOCK_TYPES = {
         AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, WATER: 4, WOOD: 5, LEAVES: 6, SAND: 7, CLOUD: 8, FLOWER_RED: 9, FLOWER_YELLOW: 10, SNOW: 11, ICE: 12, JUNGLE_WOOD: 13, JUNGLE_LEAVES: 14, PALM_WOOD: 15, PALM_LEAVES: 16, EGG: 17, MILK: 18, WOOL: 19, BEDROCK: 20, FISH: 21, RAW_MEAT: 22, RAW_CHICKEN: 23, ROTTEN_FLESH: 24, MUTTON: 25, PLANKS: 26, STICK: 27, WORKBENCH: 28, STONE_BRICK: 29, SANDSTONE: 30, BONE: 31, WINDOW: 32, DOOR_BOTTOM: 33, DOOR_TOP: 34, WORKBENCH_SIDE: 36, BED_HEAD: 38, BED_FOOT: 39,
-        BERRY_BUSH: 43, TALL_GRASS: 44, CACTUS: 45, DEAD_BUSH: 46, MUSHROOM_RED: 47, MUSHROOM_BROWN: 48, SUGARCANE: 49, FERN: 50, BERRIES: 51, BERRY_BUSH_EMPTY: 52, SEAGRASS: 54
+        BERRY_BUSH: 43, TALL_GRASS: 44, CACTUS: 45, DEAD_BUSH: 46, MUSHROOM_RED: 47, MUSHROOM_BROWN: 48, SUGARCANE: 49, FERN: 50, BERRIES: 51, BERRY_BUSH_EMPTY: 52, SEAGRASS: 54, TURTLE_MEAT: 55
         };
 
         export const BLOCK_COLORS = {
@@ -14,7 +14,7 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.PLANKS]: 0xCD853F, [BLOCK_TYPES.STICK]: 0x8B4513, [BLOCK_TYPES.WORKBENCH]: 0xA0522D, [BLOCK_TYPES.STONE_BRICK]: 0x696969, [BLOCK_TYPES.SANDSTONE]: 0xF4A460, [BLOCK_TYPES.BONE]: 0xFFFFFF,
             [BLOCK_TYPES.WINDOW]: 0x88CCEE, [BLOCK_TYPES.DOOR_BOTTOM]: 0xA0724A, [BLOCK_TYPES.DOOR_TOP]: 0xA0724A, [BLOCK_TYPES.BED_HEAD]: 0xCC3333, [BLOCK_TYPES.BED_FOOT]: 0xCC3333,
             [BLOCK_TYPES.WORKBENCH_SIDE]: 0xA0522D,
-            [BLOCK_TYPES.BERRY_BUSH]: 0x2E7D32, [BLOCK_TYPES.TALL_GRASS]: 0x4CAF50, [BLOCK_TYPES.CACTUS]: 0x2E7D32, [BLOCK_TYPES.DEAD_BUSH]: 0x8D6E63, [BLOCK_TYPES.MUSHROOM_RED]: 0xE53935, [BLOCK_TYPES.MUSHROOM_BROWN]: 0x795548, [BLOCK_TYPES.SUGARCANE]: 0x81C784, [BLOCK_TYPES.FERN]: 0x388E3C, [BLOCK_TYPES.BERRIES]: 0xE53935, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 0x33691E, [BLOCK_TYPES.SEAGRASS]: 0x2E8B57
+            [BLOCK_TYPES.BERRY_BUSH]: 0x2E7D32, [BLOCK_TYPES.TALL_GRASS]: 0x4CAF50, [BLOCK_TYPES.CACTUS]: 0x2E7D32, [BLOCK_TYPES.DEAD_BUSH]: 0x8D6E63, [BLOCK_TYPES.MUSHROOM_RED]: 0xE53935, [BLOCK_TYPES.MUSHROOM_BROWN]: 0x795548, [BLOCK_TYPES.SUGARCANE]: 0x81C784, [BLOCK_TYPES.FERN]: 0x388E3C, [BLOCK_TYPES.BERRIES]: 0xE53935, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 0x33691E, [BLOCK_TYPES.SEAGRASS]: 0x2E8B57, [BLOCK_TYPES.TURTLE_MEAT]: 0x4A7A3D
         };
 
         export const BLOCK_TEX = {
@@ -859,37 +859,42 @@ export const BLOCK_TYPES = {
                 }
             });
 
-            // GRAS SEITE (Tile 53) – Oben ~25% Grün, unten ~75% Braun, gezackter Übergang
+            // GRAS SEITE (Tile 53) – Oben Grasüberhang, unten exakt dieselbe Erde wie DIRT-Block
             drawTile(53, 0, (c) => {
-                const sidePalette = {
-                    'G': '#5B9C2E', // Gras Hell
-                    'D': '#4E8C25', // Gras Dunkel
-                    'S': '#3D7A1C', // Gras Schatten
-                    '1': '#8B6B4A', // Erde Hell
-                    '2': '#7A5C3A', // Erde Mittel
-                    '3': '#6D4C33', // Erde Dunkel
-                    '4': '#5C3D2E', // Erde Tief
-                    '5': '#7F6040'  // Erde Warm
-                };
-                const sideMap = [
-                    "GGDDGGSGGGDDGGSG",
-                    "GDGSSGDGGDGSSGDG",
-                    "DSGGSSDGSGSSDGSS",
-                    "SGD1SSGD1GSSG1DS",
-                    "1S12S1S21S12S1S2",
-                    "2131213121312131",
-                    "1312412131124121",
-                    "3215131532151315",
-                    "1131221113122111",
-                    "5213113152131131",
-                    "1124315111243151",
-                    "3312114233121142",
-                    "1241531312415313",
-                    "2113214121132141",
-                    "1432115314321153",
-                    "3211432132114321"
-                ];
-                pixelMapDraw(c, sideMap, sidePalette);
+                // 1) Erdbasis identisch zum DIRT-Block (Tile 1) – garantiert farbgleich
+                const browns = ['#8B6B4A', '#7A5C3A', '#6D4C33', '#7F6040', '#5C3D2E'];
+                pixelDraw(c, 64, 64, 2, (x, y) => browns[Math.floor(Math.random() * browns.length)]);
+                // Steinkrümel wie im DIRT-Block
+                for (let i = 0; i < 8; i++) {
+                    c.fillStyle = ['#9E9E9E', '#8D8D8D'][Math.floor(Math.random() * 2)];
+                    c.fillRect(Math.random()*60+2, Math.random()*60+2, 4, 2);
+                }
+
+                // 2) Grasüberhang oben mit gezacktem Rand (~oberes Viertel)
+                const grassPalette = ['#5B9C2E', '#4E8C25', '#3D7A1C', '#6BAD38', '#52A028'];
+                const px = 4; // 16x16 Pixel-Raster
+                // Vollflächiges Gras in den obersten 3 Reihen
+                for (let row = 0; row < 3; row++) {
+                    for (let col = 0; col < 16; col++) {
+                        c.fillStyle = grassPalette[Math.floor(Math.random() * grassPalette.length)];
+                        c.fillRect(col * px, row * px, px, px);
+                    }
+                }
+                // Gezackter Übergang in Reihe 3 und 4 (zufällig auslaufend)
+                for (let col = 0; col < 16; col++) {
+                    const limit = 3 + Math.floor(Math.random() * 2); // 3 oder 4
+                    for (let row = 3; row <= limit; row++) {
+                        if (Math.random() > 0.35) {
+                            c.fillStyle = grassPalette[Math.floor(Math.random() * grassPalette.length)];
+                            c.fillRect(col * px, row * px, px, px);
+                        }
+                    }
+                }
+
+                // 3) Tiefenschatten wie im DIRT-Block
+                const grad = c.createLinearGradient(0, 0, 0, 64);
+                grad.addColorStop(0, 'rgba(255,255,255,0.05)'); grad.addColorStop(1, 'rgba(0,0,0,0.1)');
+                c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
             });
 
             atlasDataURL = canvas.toDataURL("image/png");

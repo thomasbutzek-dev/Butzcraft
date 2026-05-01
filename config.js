@@ -15,6 +15,7 @@ export const CONFIG = {
     // Spiel-Balance & Zeit
     GAMEPLAY: {
         DAY_DURATION: 300, // Dauer eines Tages in Sekunden (5 Min)
+        BLOOD_MOON_INTERVAL: 3, // Alle N Nächte kommt der Blutmond (Zombie-Angriffswelle)
         MAX_HEALTH: 100,
         MAX_HUNGER: 100,
         HUNGER_LOSS_PASSIVE: 0.02, // Passiv pro Sekunde
@@ -40,6 +41,7 @@ export const CONFIG = {
         WEIGHT_CHICKEN: 20,
         WEIGHT_FISH: 40,
         WEIGHT_OCTOPUS: 5,
+        WEIGHT_TURTLE: 15,
         ZOMBIE_DETECTION_RANGE: 20,
         ZOMBIE_SPEED: 1.5,
         ZOMBIE_DAMAGE: 5,           // Schaden pro Sekunde (Basiswert)
@@ -63,6 +65,25 @@ export const CONFIG = {
         PLAYER_JUMP_FORCE: 15.0, // Manuelles Springen (Optimiert für g=4.0)
         WALK_SPEED: 150.0,
         FRICTION: 10.0,
-        PLAYER_WIDTH: 0.3
+        PLAYER_WIDTH: 0.3,
+        // Player AABB-Hitbox (relativ zu Augen-Position):
+        PLAYER_HITBOX_Y_MIN: -1.60, // Füße
+        PLAYER_HITBOX_Y_MAX: 0.10,  // Kopf
+        // Sub-Stepping: max. Distanz pro Mikro-Schritt (Wall-Phasing-Schutz). Hitbox=0.3 → 0.4 sicher.
+        SUB_STEP_MAX: 0.4,
+        // Sprint/Crouch Modifiers (Multiplikator auf WALK_SPEED & Sound-Schritt-Frequenz)
+        SPRINT_SPEED_MULT: 1.6,
+        CROUCH_SPEED_MULT: 0.4,
+        // Hunger-Verbrauch beim Sprinten (Multiplikator auf HUNGER_LOSS_MOVE)
+        SPRINT_HUNGER_MULT: 1.8
+    },
+
+    // Entities (Mobs, Projektile, Drops)
+    ENTITIES: {
+        ARROW_SPEED: 22.0,
+        ARROW_DAMAGE: 10,
+        ARROW_MAX_LIFETIME: 5.0,      // Sek bis Auto-Despawn (auch ohne Treffer)
+        PROJECTILE_HARD_CAP: 200,     // Globaler Sicherheits-Cap gegen Spam
+        MOB_DESPAWN_DISTANCE: 50      // Blöcke vom Spieler entfernt → Mob despawnt
     }
 };

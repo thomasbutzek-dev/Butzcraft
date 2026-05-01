@@ -15,12 +15,44 @@ const _tempDir = new THREE.Vector3();
 const _tempPDir = new THREE.Vector3();
 const _tempNormVel = new THREE.Vector3();
 
+// Material-Cache pro (baseColor, texIdx). Vorher wurde pro Body-Part eines Mobs
+// ein NEUES Material + Textur-Clone erzeugt → Skelett-Mob = ~20 Materials, 20 Textur-Klone.
+// Bei 20 Mobs = 400 Material-Instanzen mit eigenen Atlas-Klonen. Mit Cache: ~10 Materials total.
+const _matCache = new Map();
+function getCachedMobMaterial(baseColor, texIdx) {
+    const key = (baseColor << 16) | (texIdx & 0xffff);
+    let mat = _matCache.get(key);
+    if (mat) return mat;
+    if (!textureAtlas || texIdx === undefined) {
+        mat = new THREE.MeshPhongMaterial({ color: baseColor });
+    } else {
+        const tex = textureAtlas.clone();
+        tex.needsUpdate = true;
+        const tile = 1 / 16;
+        const u = (texIdx % 16) * tile;
+        const v = Math.floor(texIdx / 16) * tile;
+        tex.repeat.set(tile, tile);
+        tex.offset.set(u, 1.0 - tile - v);
+        tex.magFilter = THREE.NearestFilter;
+        tex.minFilter = THREE.NearestFilter;
+        mat = new THREE.MeshPhongMaterial({
+            color: baseColor,
+            map: tex,
+            transparent: true,
+            alphaTest: 0.5,
+            side: THREE.DoubleSide
+        });
+    }
+    _matCache.set(key, mat);
+    return mat;
+}
+
 
 export class Mob {
     constructor(scene, type, x, y, z) {
         this.scene = scene;
         this.type = type;
-        this.health = (type === 'zombie' || type === 'skeleton') ? 20 : (type === 'pig' || type === 'sheep' || type === 'cow') ? 12 : 5;
+        this.health = (type === 'zombie' || type === 'skeleton') ? 20 : (type === 'turtle') ? 15 : (type === 'pig' || type === 'sheep' || type === 'cow') ? 12 : (type === 'geist') ? Infinity : 5;
         this.lastMilkTime = 0; // Für Kühe
         this.lastShotTime = 0; // Für Skelette
         this.isDead = false;
@@ -47,6 +79,12 @@ export class Mob {
             this._buildFish();
         } else if (type === 'octopus') {
             this._buildOctopus();
+        } else if (type === 'turtle') {
+            this._buildTurtle();
+        } else if (type === 'geist') {
+            this._buildGeist();
+        } else if (type === 'parrot') {
+            this._buildParrot();
         }
 
         this.group.position.set(x, y, z);
@@ -55,30 +93,9 @@ export class Mob {
     }
 
     _getTexMat(baseColor, texIdx) {
-        if (texIdx === undefined) return new THREE.MeshPhongMaterial({ color: baseColor });
-        if (!textureAtlas) return new THREE.MeshPhongMaterial({ color: baseColor });
-
-        const tex = textureAtlas.clone();
-        tex.needsUpdate = true;
-        
-        const tileW = 1 / 16;
-        const tileH = 1 / 16;
-        const u = (texIdx % 16) * tileW;
-        const v = Math.floor(texIdx / 16) * tileW; // 16x16 tiles
-        
-        tex.repeat.set(tileW, tileW);
-        // V in Three.js starts from bottom, our tiles start from top.
-        tex.offset.set(u, 1.0 - tileW - v);
-        tex.magFilter = THREE.NearestFilter;
-        tex.minFilter = THREE.NearestFilter;
-
-        return new THREE.MeshPhongMaterial({
-            color: baseColor,
-            map: tex,
-            transparent: true,
-            alphaTest: 0.5,
-            side: THREE.DoubleSide
-        });
+        // Delegiert an Modul-globalen Cache → eine Material/Textur-Instanz pro (color, texIdx)-Paar
+        // statt pro Mesh. Massive Reduktion bei vielen Mobs.
+        return getCachedMobMaterial(baseColor, texIdx);
     }
 
     _buildSkeleton() {
@@ -262,6 +279,12 @@ export class Mob {
             this.tentacles.forEach(t => {
                 t.position.y = 0.1 + Math.sin(time * 0.005 + t.userData.angleOffset) * 0.1;
             });
+        } else if (this.type === 'turtle' && this.flippers) {
+            const paddle = Math.sin(time * 0.003) * 0.3;
+            this.flippers[0].rotation.x = paddle;
+            this.flippers[1].rotation.x = -paddle;
+            this.flippers[2].rotation.x = -paddle * 0.5;
+            this.flippers[3].rotation.x = paddle * 0.5;
         }
         
         const myBlockY = Math.floor(pos.y);
@@ -288,18 +311,20 @@ export class Mob {
             if (Math.random() < 0.02) {
                 // Pick a new target depth within strict bounds
                 const randomRange = topY - botY;
-                if (randomRange > 0) {
+                if (this.isSurfaceSwimmer) {
+                    this.targetDepth = topY;
+                } else if (randomRange > 0) {
                     if (this.type === 'fish') {
                         this.targetDepth = topY - Math.random() * Math.min(1.0, randomRange);
-                    } else { // Octopus prefers bottom
+                    } else {
                         this.targetDepth = botY + Math.random() * Math.min(1.0, randomRange);
                     }
                 } else {
-                    this.targetDepth = (topY + botY) / 2; // Flat boundary
+                    this.targetDepth = (topY + botY) / 2;
                 }
                 
                 const a = Math.random() * Math.PI * 2;
-                const speed = (this.type === 'fish') ? 1.0 : 0.3;
+                const speed = (this.type === 'fish') ? 1.0 : (this.type === 'turtle') ? 0.5 : 0.3;
                 this.velocity.x = Math.cos(a) * speed;
                 this.velocity.z = Math.sin(a) * speed;
                 this.group.rotation.y = -a + Math.PI/2;
@@ -448,8 +473,354 @@ export class Mob {
         this.box = new THREE.Box3();
     }
 
-    update(delta, playerPos, world, onDamage) {
+    _buildTurtle() {
+        this.isAquatic = true;
+        this.isSurfaceSwimmer = true;
+        this.flippers = [];
+        this.group = new THREE.Group();
+        const box = (w, h, d, c) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshPhongMaterial({ color: c }));
+
+        const shell = box(0.7, 0.2, 0.8, 0x2E5E22);
+        shell.position.y = 0.3;
+        this.group.add(shell);
+
+        const plastron = box(0.65, 0.08, 0.75, 0xC4A96A);
+        plastron.position.y = 0.15;
+        this.group.add(plastron);
+
+        const head = box(0.2, 0.18, 0.25, 0x5A7A3D);
+        head.position.set(0, 0.25, 0.45);
+        this.group.add(head);
+
+        const eyeL = box(0.04, 0.04, 0.02, 0x111111);
+        eyeL.position.set(-0.07, 0.28, 0.58);
+        this.group.add(eyeL);
+        const eyeR = box(0.04, 0.04, 0.02, 0x111111);
+        eyeR.position.set(0.07, 0.28, 0.58);
+        this.group.add(eyeR);
+
+        const flipper = (ox, oz, angle) => {
+            const f = box(0.25, 0.05, 0.15, 0x4A6A2D);
+            f.position.set(ox, 0.18, oz);
+            f.rotation.y = angle;
+            this.group.add(f);
+            this.flippers.push(f);
+        };
+        flipper(-0.38, 0.2, -0.3);
+        flipper(0.38, 0.2, 0.3);
+        flipper(-0.35, -0.2, -0.2);
+        flipper(0.35, -0.2, 0.2);
+
+        this.box = new THREE.Box3();
+    }
+
+    _buildParrot() {
+        this.isFlying = true;
+        this.parrotTarget = null;
+        this.parrotPerchUntil = 0;
+        this.parrotNextRetarget = 0;
+        this.flapPhase = Math.random() * Math.PI * 2;
+        this.wings = [];
+
+        const box = (w, h, d, c) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c));
+        const RED = 0xC81818;
+        const RED_DARK = 0x8E1010;
+        const YELLOW = 0xE6C32A;
+        const BLUE = 0x2E6FD4;
+        const BEAK = 0xE8B89A;
+        const FEET = 0xC9A88A;
+        const DARK = 0x1a1a1a;
+
+        const body = box(0.32, 0.42, 0.32, RED);
+        body.position.y = 0.55;
+        this.group.add(body);
+
+        const head = box(0.32, 0.32, 0.30, RED);
+        head.position.set(0, 0.92, 0.04);
+        this.group.add(head);
+
+        // Schwarze Augenmaske
+        const mask = box(0.33, 0.13, 0.06, DARK);
+        mask.position.set(0, 0.90, 0.18);
+        this.group.add(mask);
+
+        const eyeL = box(0.04, 0.04, 0.02, 0xFFFFFF);
+        eyeL.position.set(-0.09, 0.90, 0.21);
+        this.group.add(eyeL);
+        const eyeR = box(0.04, 0.04, 0.02, 0xFFFFFF);
+        eyeR.position.set(0.09, 0.90, 0.21);
+        this.group.add(eyeR);
+
+        // Schnabel
+        const beak = box(0.10, 0.09, 0.10, BEAK);
+        beak.position.set(0, 0.81, 0.22);
+        this.group.add(beak);
+
+        // Federn auf dem Kopf
+        const feather1 = box(0.06, 0.20, 0.06, RED);
+        feather1.position.set(-0.07, 1.18, -0.04);
+        feather1.rotation.z = -0.25;
+        this.group.add(feather1);
+        const feather2 = box(0.06, 0.20, 0.06, RED);
+        feather2.position.set(0.07, 1.18, -0.01);
+        feather2.rotation.z = 0.18;
+        this.group.add(feather2);
+
+        // Flügel mit Drehgelenk
+        const buildWing = (side) => {
+            const wingGroup = new THREE.Group();
+            const w1 = box(0.08, 0.34, 0.30, RED);
+            w1.position.set(side * 0.04, -0.17, 0);
+            wingGroup.add(w1);
+            const w2 = box(0.08, 0.10, 0.24, YELLOW);
+            w2.position.set(side * 0.04, -0.34, -0.02);
+            wingGroup.add(w2);
+            const w3 = box(0.08, 0.10, 0.16, BLUE);
+            w3.position.set(side * 0.04, -0.45, -0.06);
+            wingGroup.add(w3);
+            wingGroup.position.set(side * 0.18, 0.73, 0);
+            this.group.add(wingGroup);
+            this.wings.push(wingGroup);
+        };
+        buildWing(-1);
+        buildWing(1);
+
+        // Schwanz
+        const tail = box(0.18, 0.08, 0.24, RED_DARK);
+        tail.position.set(0, 0.45, -0.22);
+        this.group.add(tail);
+
+        // Beine/Füße
+        const footL = box(0.06, 0.10, 0.10, FEET);
+        footL.position.set(-0.09, 0.32, 0);
+        this.group.add(footL);
+        const footR = box(0.06, 0.10, 0.10, FEET);
+        footR.position.set(0.09, 0.32, 0);
+        this.group.add(footR);
+    }
+
+    _findTreeTarget(pos, world) {
+        const LEAVES = 6, JUNGLE_LEAVES = 14, PALM_LEAVES = 16;
+        const candidates = [];
+        const R = 14;
+        const cx = Math.floor(pos.x), cz = Math.floor(pos.z);
+        const cy = Math.floor(pos.y);
+
+        // Sparse-Sampling um Performance zu schonen
+        for (let dx = -R; dx <= R; dx += 2) {
+            for (let dz = -R; dz <= R; dz += 2) {
+                const distSq = dx * dx + dz * dz;
+                if (distSq < 16 || distSq > R * R) continue;
+                for (let dy = 8; dy >= -4; dy--) {
+                    const y = cy + dy;
+                    const b = world.getBlock(cx + dx, y, cz + dz);
+                    if (b === LEAVES || b === JUNGLE_LEAVES || b === PALM_LEAVES) {
+                        const above = world.getBlock(cx + dx, y + 1, cz + dz);
+                        if (above === 0) {
+                            candidates.push(new THREE.Vector3(cx + dx + 0.5, y + 1.6, cz + dz + 0.5));
+                        }
+                        break;
+                    }
+                }
+                if (candidates.length > 24) break;
+            }
+            if (candidates.length > 24) break;
+        }
+        if (candidates.length === 0) return null;
+        return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    updateParrot(delta, playerPos, world) {
+        const time = performance.now();
+        const pos = this.group.position;
+
+        if (pos.distanceTo(playerPos) > SPAWN_DIST_MAX + 15) {
+            this.isDead = true;
+            return;
+        }
+
+        const isPerched = time < this.parrotPerchUntil;
+
+        // Flügelschlag-Animation
+        if (this.wings && this.wings.length === 2) {
+            if (isPerched) {
+                this.wings[0].rotation.z = 0.05;
+                this.wings[1].rotation.z = -0.05;
+            } else {
+                const flap = Math.sin(time * 0.025 + this.flapPhase) * 0.9;
+                this.wings[0].rotation.z = -flap;
+                this.wings[1].rotation.z = flap;
+            }
+        }
+
+        if (isPerched) {
+            this.velocity.set(0, 0, 0);
+            // Leichtes Wippen auf der Sitzstange
+            const sway = Math.sin(time * 0.003) * 0.02;
+            this.group.rotation.y += sway * delta;
+            return;
+        }
+
+        // Neues Ziel suchen, falls keines vorhanden oder am aktuellen Ziel angekommen
+        if (!this.parrotTarget) {
+            this.parrotTarget = this._findTreeTarget(pos, world);
+            if (!this.parrotTarget) {
+                // Kein Baum in der Nähe → kurze Pause, dann erneut versuchen
+                this.parrotPerchUntil = time + 1500;
+                return;
+            }
+        } else if (pos.distanceTo(this.parrotTarget) < 1.0) {
+            // Ziel erreicht → kurze Verschnaufpause auf dem Baum
+            pos.copy(this.parrotTarget);
+            this.parrotPerchUntil = time + 3000 + Math.random() * 5000;
+            this.parrotTarget = null;
+            return;
+        }
+
+        // Sicherheits-Timeout: falls Ziel unerreichbar (z.B. Baum verschwunden), nach 12s neu wählen
+        if (!this.parrotNextRetarget || time > this.parrotNextRetarget) {
+            this.parrotNextRetarget = time + 12000;
+        }
+        if (time > this.parrotNextRetarget) {
+            this.parrotTarget = null;
+            this.parrotNextRetarget = 0;
+            return;
+        }
+
+        // Zum Ziel fliegen
+        const tx = this.parrotTarget.x - pos.x;
+        const ty = this.parrotTarget.y - pos.y;
+        const tz = this.parrotTarget.z - pos.z;
+        const horizDist = Math.hypot(tx, tz);
+
+        const speed = 3.5;
+        if (horizDist > 0.01) {
+            this.velocity.x = (tx / horizDist) * speed;
+            this.velocity.z = (tz / horizDist) * speed;
+            this.group.rotation.y = Math.atan2(tx, tz);
+        }
+        this.velocity.y = Math.max(-2.5, Math.min(2.5, ty * 2.5));
+
+        pos.x += this.velocity.x * delta;
+        pos.y += this.velocity.y * delta;
+        pos.z += this.velocity.z * delta;
+    }
+
+    _buildGeist() {
+        this.isFlying = true;
+        this.floatOffset = Math.random() * Math.PI * 2;
+        this._geistWander = false;
+
+        const ghostMat = new THREE.MeshPhongMaterial({
+            color: 0xddeeff,
+            transparent: true,
+            opacity: 0.70,
+            emissive: 0x3355aa,
+            emissiveIntensity: 0.28,
+            side: THREE.DoubleSide
+        });
+        const eyeMat = new THREE.MeshPhongMaterial({
+            color: 0x111133,
+            transparent: true,
+            opacity: 0.92
+        });
+        const box = (w, h, d, m) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), m || ghostMat);
+
+        // Kopf (etwas breiter als der Körper)
+        const head = box(0.76, 0.66, 0.66);
+        head.position.y = 1.05;
+        this.group.add(head);
+
+        // Körper
+        const body = box(0.70, 0.72, 0.56);
+        body.position.y = 0.46;
+        this.group.add(body);
+
+        // Hohle Augen
+        const eyeL = box(0.18, 0.16, 0.06, eyeMat);
+        eyeL.position.set(-0.18, 1.10, 0.34);
+        this.group.add(eyeL);
+
+        const eyeR = box(0.18, 0.16, 0.06, eyeMat);
+        eyeR.position.set(0.18, 1.10, 0.34);
+        this.group.add(eyeR);
+
+        // Mund (traurig / neutral)
+        const mouth = box(0.28, 0.09, 0.06, eyeMat);
+        mouth.position.set(0, 0.87, 0.34);
+        this.group.add(mouth);
+
+        // Wellige Fransen unten (3 Stück)
+        this.tendrils = [];
+        for (let i = 0; i < 3; i++) {
+            const t = box(0.20, 0.33, 0.20);
+            t.position.set((i - 1) * 0.26, 0.10, 0);
+            t.userData.tendrilIdx = i;
+            this.tendrils.push(t);
+            this.group.add(t);
+        }
+    }
+
+    updateGeist(delta, playerPos, world, dayRatio) {
+        const time = performance.now();
+        const pos = this.group.position;
+
+        // Am Tag lautlos auflösen
+        if (dayRatio >= 0.25 && dayRatio <= 0.75) {
+            this.isDead = true;
+            return;
+        }
+
+        // Zu weit weg → despawnen
+        if (pos.distanceTo(playerPos) > SPAWN_DIST_MAX + 15) {
+            this.isDead = true;
+            return;
+        }
+
+        // Tendril-Wellenanimation
+        if (this.tendrils) {
+            this.tendrils.forEach((t, i) => {
+                t.position.y = 0.06 + Math.sin(time * 0.0018 + i * 1.1) * 0.10;
+                t.rotation.z = Math.sin(time * 0.0013 + i * 0.9) * 0.18;
+            });
+        }
+
+        // Sanftes Zufalls-Driften (neue Richtung alle ~5 s)
+        if (!this._geistWander || Math.random() < 0.003) {
+            const angle = Math.random() * Math.PI * 2;
+            this.velocity.x = Math.cos(angle) * 1.3;
+            this.velocity.z = Math.sin(angle) * 1.3;
+            this.group.rotation.y = angle;
+            this._geistWander = true;
+        }
+
+        // Ziel-Höhe: 4–7 Blöcke über Boden + sanftes Wippen
+        const groundY = this._getGroundY(pos, world);
+        const targetY = groundY + 4.5 + Math.sin(time * 0.0009 + this.floatOffset) * 1.5;
+        this.velocity.y = (targetY - pos.y) * 2.5;
+
+        pos.x += this.velocity.x * delta;
+        pos.y += this.velocity.y * delta;
+        pos.z += this.velocity.z * delta;
+
+        // Horizontale Dämpfung (weiches Gleiten)
+        this.velocity.x *= 0.97;
+        this.velocity.z *= 0.97;
+    }
+
+    _getGroundY(pos, world) {
+        const cx = Math.floor(pos.x), cz = Math.floor(pos.z);
+        for (let y = Math.min(Math.floor(pos.y) + 3, 63); y > 0; y--) {
+            const b = world.getBlock(cx, y, cz);
+            if (b !== 0 && b !== 4 && b !== 8 && b !== 9) return y + 1;
+        }
+        return 1;
+    }
+
+    update(delta, playerPos, world, onDamage, dayRatio = 0.5) {
         if (this.isAquatic) { this.updateAquatic(delta, playerPos, world, onDamage); return; }
+        if (this.type === 'geist') { this.updateGeist(delta, playerPos, world, dayRatio); return; }
+        if (this.type === 'parrot') { this.updateParrot(delta, playerPos, world); return; }
                 if (this.isDead) return;
                 const pos = this.group.position;
                 const dist = pos.distanceTo(playerPos);
@@ -457,11 +828,14 @@ export class Mob {
                 if (!this.lastSound || performance.now() - this.lastSound > 3000) {
                     if (Math.random() < 0.005) { 
                         this.lastSound = performance.now();
-                        if (this.type === 'zombie' && dist < 25) SoundManager.playZombie();
-                        else if (this.type === 'pig' && dist < 20) SoundManager.playPig();
-                        else if (this.type === 'sheep' && dist < 20) SoundManager.playSheep();
-                        else if (this.type === 'cow' && dist < 20) SoundManager.playCow();
-                        else if (this.type === 'chicken' && dist < 20) SoundManager.playChicken();
+                        // Position übergeben → 3D-Spatial (Distanz-Attenuation + Stereo-Pan).
+                        // Distanz-Filter (dist < N) bleibt als Early-Exit, der Sound-Manager macht
+                        // den finalen Falloff fein.
+                        if (this.type === 'zombie' && dist < 25) SoundManager.playZombie(pos);
+                        else if (this.type === 'pig' && dist < 20) SoundManager.playPig(pos);
+                        else if (this.type === 'sheep' && dist < 20) SoundManager.playSheep(pos);
+                        else if (this.type === 'cow' && dist < 20) SoundManager.playCow(pos);
+                        else if (this.type === 'chicken' && dist < 20) SoundManager.playChicken(pos);
                     }
                 }
                 
@@ -634,6 +1008,7 @@ export class Mob {
             }
             takeDamage(amount, onKill) {
                 if (this.type === 'octopus') return; // Unsterblich
+                if (this.type === 'geist') return;   // Geist – unantastbar, kein Schaden möglich
                 this.health -= amount;
                 if (this.health <= 0) {
                     this.isDead = true; this.scene.remove(this.group);
@@ -646,6 +1021,7 @@ export class Mob {
                     else if (this.type === 'zombie') { blockType = 24; dropColor = 0x3a5f0b; }
                     else if (this.type === 'skeleton') { blockType = 31; dropColor = 0xebebeb; }
                     else if (this.type === 'sheep') { blockType = 25; dropColor = 0xFFB6C1; }
+                    else if (this.type === 'turtle') { blockType = 55; dropColor = 0x4A7A3D; }
 
                     if (blockType) {
                         const dropMesh = new THREE.Mesh(
@@ -663,43 +1039,74 @@ export class Mob {
         }
 
 export const projectiles = [];
+
+// Hard cap: zerstört Pfeile spätestens nach 5s — schützt vor unbegrenztem Wachstum,
+// falls ein Pfeil nie auf Block/Player trifft (z.B. nach oben in den Himmel geschossen).
+const ARROW_MAX_LIFETIME = 5.0;
+// Sicherheits-Cap, falls Skelette extrem spammen (z.B. Bug oder Cheat).
+const PROJECTILE_HARD_CAP = 200;
+
 export class ArrowProjectile {
     constructor(scene, startPos, dir) {
         this.scene = scene;
         this.dir = dir;
-        this.speed = 22.0; 
+        this.speed = 22.0;
         this.isDead = false;
-        
+        this.age = 0; // Sekunden seit Spawn
+
         this.mesh = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.8), new THREE.MeshPhongMaterial({ color: 0x555555 }));
         this.mesh.position.copy(startPos);
-        
+
         const target = new THREE.Vector3().copy(startPos).add(dir);
         this.mesh.lookAt(target);
-        
+
         scene.add(this.mesh);
     }
+
+    // Zentralisiert: Mesh aus Scene entfernen UND GPU-Ressourcen freigeben.
+    // Geometry + Material sind hier per-Pfeil (NICHT geteilt) → beides disposen.
+    dispose() {
+        if (this.mesh) {
+            this.scene.remove(this.mesh);
+            if (this.mesh.geometry) this.mesh.geometry.dispose();
+            if (this.mesh.material) this.mesh.material.dispose();
+            this.mesh = null;
+        }
+        this.isDead = true;
+    }
+
     update(delta, playerPos, world, onDamage) {
         if (this.isDead) return;
-        
-        const moveVec = new THREE.Vector3().copy(this.dir).multiplyScalar(this.speed * delta);
-        this.mesh.position.add(moveVec);
-        
-        if (this.mesh.position.distanceTo(playerPos) < 1.0) {
-            onDamage(10); 
-            this.isDead = true;
-            this.scene.remove(this.mesh);
+
+        this.age += delta;
+        if (this.age >= ARROW_MAX_LIFETIME) {
+            this.dispose();
             return;
         }
-        
+
+        const moveVec = new THREE.Vector3().copy(this.dir).multiplyScalar(this.speed * delta);
+        this.mesh.position.add(moveVec);
+
+        if (this.mesh.position.distanceTo(playerPos) < 1.0) {
+            onDamage(10);
+            this.dispose();
+            return;
+        }
+
         const block = world.getBlock(Math.floor(this.mesh.position.x), Math.floor(this.mesh.position.y), Math.floor(this.mesh.position.z));
-        if (block !== 0 && block !== 4 && block !== 8) { 
-            this.isDead = true;
-            this.scene.remove(this.mesh);
+        if (block !== 0 && block !== 4 && block !== 8) {
+            this.dispose();
         }
     }
 }
 
 export function updateProjectiles(delta, playerPos, world, onDamage) {
+    // Sicherheits-Cap: bei extremer Anzahl die ältesten zwangsweise entsorgen.
+    while (projectiles.length > PROJECTILE_HARD_CAP) {
+        const old = projectiles.shift();
+        if (old && typeof old.dispose === 'function') old.dispose();
+    }
+
     for (let i = projectiles.length - 1; i >= 0; i--) {
         const p = projectiles[i];
         p.update(delta, playerPos, world, onDamage);

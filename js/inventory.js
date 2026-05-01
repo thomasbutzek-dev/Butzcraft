@@ -5,6 +5,31 @@ import { initRecipeBook } from './recipe_book.js';
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js';
 import { SoundManager } from './sound.js';
 
+// Sprint 6: Tooltip-Hint für essbare Items.
+// Quelle der Wahrheit für Hunger-Werte ist PlayerInteraction.handleInteraction (Type-Match-Switch).
+// Hier dupliziert für UI-Anzeige — bei Änderung BEIDE Stellen synchron halten oder nach
+// CONFIG.GAMEPLAY zentralisieren (Future-Work).
+const HUNGER_RESTORES = {
+    17: 5,   // EGG
+    18: 15,  // MILK
+    21: 10,  // FISH
+    22: 15,  // MEAT
+    23: 10,  // CHICKEN
+    24: 5,   // ROTTEN_FLESH (30% Schaden-Risiko!)
+    25: 12,  // MUTTON
+    51: 8,   // BERRIES
+    55: 12   // TURTLE_MEAT
+};
+function buildItemTooltip(name, type) {
+    let tip = name;
+    const hunger = HUNGER_RESTORES[type];
+    if (hunger !== undefined) {
+        tip += `\n+${hunger} Hunger`;
+        if (type === 24) tip += ' (30% Risiko: -5 HP!)';
+    }
+    return tip;
+}
+
 export const inventorySlots = Array.from({ length: 64 }, () => ({ type: 0, count: 0 }));
 export let cursorItem = { type: 0, count: 0 };
 export let selectedSlot = 0;
@@ -21,8 +46,12 @@ const TRANSLATIONS = {
     'JUNGLE_WOOD': 'Dschungelholz', 'JUNGLE_LEAVES': 'Dschungelblätter', 
     'PALM_WOOD': 'Palmenholz', 'PALM_LEAVES': 'Palmenblätter', 'BEDROCK': 'Grundgestein',
     'PLANKS': 'Holzbretter', 'STICK': 'Stock', 'WORKBENCH': 'Werkbank', 'STONE_BRICK': 'Steinziegel', 'SANDSTONE': 'Sandstein', 'WORKBENCH_SIDE': 'Werkbank-Teil',
-    'WINDOW': 'Fenster', 'DOOR_BOTTOM': 'Tür', 'DOOR_TOP': 'Tür-Oberteil', 'BED_HEAD': 'Bett', 'BED_FOOT': 'Bett-Fußteil'
+    'WINDOW': 'Fenster', 'DOOR_BOTTOM': 'Tür', 'DOOR_TOP': 'Tür-Oberteil', 'BED_HEAD': 'Bett', 'BED_FOOT': 'Bett-Fußteil',
+    'BERRY_BUSH': 'Beerenbusch', 'TALL_GRASS': 'Hohes Gras', 'CACTUS': 'Kaktus', 'DEAD_BUSH': 'Toter Strauch',
+    'MUSHROOM_RED': 'Roter Pilz', 'MUSHROOM_BROWN': 'Brauner Pilz', 'SUGARCANE': 'Zuckerrohr',
+    'FERN': 'Farn', 'BERRIES': 'Beeren', 'BERRY_BUSH_EMPTY': 'Leerer Beerenbusch', 'SEAGRASS': 'Seegras', 'TURTLE_MEAT': 'Schildkrötenfleisch'
 };
+
 
 export function setSelectedSlot(idx) {
     selectedSlot = idx;
@@ -99,7 +128,7 @@ export function updateInventoryUI() {
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
             const translatedName = TRANSLATIONS[bName] ? TRANSLATIONS[bName].toUpperCase() : bName.toUpperCase();
             if (name.textContent !== translatedName) name.textContent = translatedName;
-            slot.title = TRANSLATIONS[bName] || bName;
+            slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
             icon.style.display = 'none'; count.style.display = 'none'; name.style.display = 'none'; slot.title = '';
         }
@@ -137,7 +166,7 @@ export function updateInventoryUI() {
             icon.innerHTML = createBlockHTML(item.type);
             if (count.textContent !== String(item.count)) count.textContent = item.count;
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
-            slot.title = TRANSLATIONS[bName] || bName;
+            slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
             icon.style.display = 'none'; count.style.display = 'none';
             icon.innerHTML = ''; slot.title = '';
@@ -171,7 +200,9 @@ function handleSlotClick(e, sType, index) {
                 }
                 checkCrafting();
                 updateInventoryUI();
-                SoundManager.playSound('step_grass', 0.2, 2.0);
+                // Crafting-Click: dig_wood bei hoher Pitch klingt wie ein Werkbank-Klick.
+                // Vorher: step_grass — semantisch falsch (Schritte beim Craften?).
+                SoundManager.playSound('dig_wood', 0.4, 1.8);
             }
         }
         return;

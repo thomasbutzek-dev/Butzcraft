@@ -30,6 +30,12 @@ export class Player {
         this.swingProgress = 0;
         this.swordGroup = this.createSword();
         this.camera.add(this.swordGroup);
+
+        // Wiederverwendbare Vector3-Instanzen für updatePhysics (vermeidet GC-Druck bei 60fps).
+        // Pattern wie in mobs.js (`_tempDir` etc.). Pro Frame wurden vorher 3 neue Vec3 alloziert.
+        this._fwd = new THREE.Vector3();
+        this._fwdH = new THREE.Vector3();
+        this._rgt = new THREE.Vector3();
     }
 
     createSword() {
@@ -146,50 +152,92 @@ export class Player {
         const feetInWater = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z)) === 4;
         const inWater = headInWater || feetInWater;
 
-        const fwd = new THREE.Vector3(); 
-        this.controls.getDirection(fwd);
-        const fwdH = new THREE.Vector3(fwd.x, 0, fwd.z).normalize();
-        const rgt = new THREE.Vector3().crossVectors(fwdH, this.camera.up).normalize();
-        
-        this.direction.z = Number(Input.moveF) - Number(Input.moveB); 
-        this.direction.x = Number(Input.moveL) - Number(Input.moveR); 
+        // Reuse persistente Vektoren statt new Vector3() pro Frame.
+        this.controls.getDirection(this._fwd);
+        this._fwdH.set(this._fwd.x, 0, this._fwd.z).normalize();
+        this._rgt.crossVectors(this._fwdH, this.camera.up).normalize();
+        const fwdH = this._fwdH, rgt = this._rgt;
+
+        this.direction.z = Number(Input.moveF) - Number(Input.moveB);
+        this.direction.x = Number(Input.moveL) - Number(Input.moveR);
         this.direction.normalize();
 
-        const checkC = (np) => Physics.checkAABBCollision(world, np, 0.3, -1.60, 0.1, false);
-
-        const { GRAVITY, GRAVITY_MULTIPLIER, PLAYER_JUMP_FORCE, WALK_SPEED, FRICTION } = this.CONFIG.PHYSICS;
+        const { PLAYER_WIDTH, PLAYER_HITBOX_Y_MIN, PLAYER_HITBOX_Y_MAX, GRAVITY, GRAVITY_MULTIPLIER, PLAYER_JUMP_FORCE, WALK_SPEED, FRICTION, SUB_STEP_MAX, SPRINT_SPEED_MULT, CROUCH_SPEED_MULT, SPRINT_HUNGER_MULT, WATER_DRAG } = this.CONFIG.PHYSICS;
         const { HUNGER_LOSS_MOVE } = this.CONFIG.GAMEPLAY;
 
+        // Sprint/Crouch: Sprint nur am Boden + bei Vorwärtsbewegung + ausreichend Hunger.
+        // Crouch dominiert über Sprint, falls beide Tasten gehalten werden.
+        const isSprinting = !!Input.sprint && this.canJ && Input.moveF && this.hunger > 6 && !Input.crouch;
+        const isCrouching = !!Input.crouch && this.canJ;
+        const speedMult = isCrouching ? CROUCH_SPEED_MULT : (isSprinting ? SPRINT_SPEED_MULT : 1.0);
+        const hungerMult = isSprinting ? SPRINT_HUNGER_MULT : 1.0;
+        const effectiveWalk = WALK_SPEED * speedMult;
+
+        // Crouch verkleinert die Player-Hitbox vertikal (Top-Y rückt von +0.10 auf -0.45).
+        // → Spieler kann unter 1-Block-Lücken durchkriechen. Nur wenn auf Boden (canJ),
+        //   damit man im Sprung nicht durch Decken phasen kann.
+        const effectiveYMax = (isCrouching ? -0.45 : PLAYER_HITBOX_Y_MAX);
+        const checkC = (np) => Physics.checkAABBCollision(world, np, PLAYER_WIDTH, PLAYER_HITBOX_Y_MIN, effectiveYMax, false);
+
+        // Sub-Step-Anzahl pro Achse: Hitbox-Halbbreite < SUB_STEP_MAX → kein Wand-Tunnel.
+        const subStepsFor = (totalMove) => Math.max(1, Math.ceil(Math.abs(totalMove) / SUB_STEP_MAX));
+
+        // Sub-stepped Y-Movement mit Boden-/Decken-Snap.
+        const stepY = (totalDy) => {
+            const n = subStepsFor(totalDy);
+            const dy = totalDy / n;
+            for (let s = 0; s < n; s++) {
+                playerPos.y += dy;
+                if (checkC(playerPos)) {
+                    if (this.velocity.y <= 0) {
+                        playerPos.y = (Math.floor(playerPos.y - 1.65) + 1.0) + 1.651;
+                        this.velocity.y = 0;
+                        return 'ground';
+                    } else {
+                        playerPos.y = Math.floor(playerPos.y + 0.1) - 0.11;
+                        this.velocity.y = 0;
+                        return 'ceiling';
+                    }
+                }
+            }
+            return null;
+        };
+
+        // Sub-stepped horizontale Bewegung. axis = 'x' oder 'z'.
+        const stepHoriz = (axis, totalD) => {
+            const n = subStepsFor(totalD);
+            const d = totalD / n;
+            for (let s = 0; s < n; s++) {
+                const old = playerPos[axis];
+                playerPos[axis] += d;
+                if (checkC(playerPos)) {
+                    playerPos[axis] = old;
+                    this.velocity[axis] = 0;
+                    return;
+                }
+            }
+        };
+
         if (inWater) {
-            const drag = 8.0; 
-            this.velocity.x -= this.velocity.x * drag * delta; 
-            this.velocity.y -= this.velocity.y * drag * delta; 
+            const drag = WATER_DRAG;
+            this.velocity.x -= this.velocity.x * drag * delta;
+            this.velocity.y -= this.velocity.y * drag * delta;
             this.velocity.z -= this.velocity.z * drag * delta;
-            this.velocity.y -= 9.8 * 1.5 * delta; 
-            
+            this.velocity.y -= 9.8 * 1.5 * delta;
+
             if (Input.moveUp) this.velocity.y += (PLAYER_JUMP_FORCE * 2.5) * delta;
             if (Input.moveF || Input.moveB) { this.velocity.z -= this.direction.z * (WALK_SPEED / 2) * delta; this.hunger -= (HUNGER_LOSS_MOVE / 2) * delta; }
             if (Input.moveL || Input.moveR) { this.velocity.x -= this.direction.x * (WALK_SPEED / 2) * delta; this.hunger -= (HUNGER_LOSS_MOVE / 2) * delta; }
-            
-            playerPos.y += this.velocity.y * delta;
-            if (checkC(playerPos)) { 
-                if (this.velocity.y <= 0) { playerPos.y = (Math.floor(playerPos.y - 1.65) + 1.0) + 1.651; this.velocity.y = 0; }
-                else { playerPos.y = Math.floor(playerPos.y + 0.1) - 0.11; this.velocity.y = 0; }
-            }
-            
-            const oldX = playerPos.x;
-            playerPos.x += (fwdH.x * -this.velocity.z + rgt.x * this.velocity.x) * delta;
-            if (checkC(playerPos)) { playerPos.x = oldX; this.velocity.x = 0; }
-            
-            const oldZ = playerPos.z;
-            playerPos.z += (fwdH.z * -this.velocity.z + rgt.z * this.velocity.x) * delta;
-            if (checkC(playerPos)) { playerPos.z = oldZ; this.velocity.z = 0; }
-            
+
+            stepY(this.velocity.y * delta);
+            stepHoriz('x', (fwdH.x * -this.velocity.z + rgt.x * this.velocity.x) * delta);
+            stepHoriz('z', (fwdH.z * -this.velocity.z + rgt.z * this.velocity.x) * delta);
+
             this.canJ = true;
         } else {
-            this.velocity.x -= this.velocity.x * FRICTION * delta; 
-            this.velocity.z -= this.velocity.z * FRICTION * delta; 
-            
+            this.velocity.x -= this.velocity.x * FRICTION * delta;
+            this.velocity.z -= this.velocity.z * FRICTION * delta;
+
             const onGround = checkC({ x: playerPos.x, y: playerPos.y - 0.05, z: playerPos.z });
             if (!onGround || this.velocity.y > 0) {
                 this.velocity.y -= GRAVITY * GRAVITY_MULTIPLIER * delta;
@@ -199,41 +247,33 @@ export class Player {
 
             if (Input.moveUp && this.canJ) {
                 this.velocity.y = PLAYER_JUMP_FORCE;
-                this.canJ = false; 
+                this.canJ = false;
             }
 
-            if (Input.moveF || Input.moveB) { this.velocity.z -= this.direction.z * WALK_SPEED * delta; this.hunger -= HUNGER_LOSS_MOVE * delta; }
-            if (Input.moveL || Input.moveR) { this.velocity.x -= this.direction.x * WALK_SPEED * delta; this.hunger -= HUNGER_LOSS_MOVE * delta; }
-            
+            if (Input.moveF || Input.moveB) { this.velocity.z -= this.direction.z * effectiveWalk * delta; this.hunger -= HUNGER_LOSS_MOVE * hungerMult * delta; }
+            if (Input.moveL || Input.moveR) { this.velocity.x -= this.direction.x * effectiveWalk * delta; this.hunger -= HUNGER_LOSS_MOVE * hungerMult * delta; }
+            this.isSprinting = isSprinting;
+            this.isCrouching = isCrouching;
+
             const spd = Math.hypot(this.velocity.x, this.velocity.z);
-            if (this.canJ && spd > 1.0) { 
-                this.distanceTravelled += spd * delta; 
-                if (this.distanceTravelled > 2.2) { 
-                    this.distanceTravelled = 0; 
-                    const bB = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z)); 
-                    if (bB !== 0 && bB !== 4) SoundManager.playStep(bB); 
-                } 
+            if (this.canJ && spd > 1.0) {
+                this.distanceTravelled += spd * delta;
+                // Schritt-Frequenz: Sprint = häufigere Schritte (1.5 statt 2.2 Distanz-Schwelle).
+                // Crouch = leiseres / langsameres Gehen → längere Schwelle (3.5).
+                const stepThreshold = isSprinting ? 1.5 : (isCrouching ? 3.5 : 2.2);
+                if (this.distanceTravelled > stepThreshold) {
+                    this.distanceTravelled = 0;
+                    const bB = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z));
+                    if (bB !== 0 && bB !== 4) SoundManager.playStep(bB);
+                }
             } else this.distanceTravelled = 0;
 
-            playerPos.y += (this.velocity.y * delta);
-            
-            if (checkC(playerPos)) { 
-                if (this.velocity.y <= 0) {
-                    playerPos.y = (Math.floor(playerPos.y - 1.65) + 1.0) + 1.651;
-                    this.velocity.y = 0; this.canJ = true;
-                } else {
-                    playerPos.y = Math.floor(playerPos.y + 0.1) - 0.11;
-                    this.velocity.y = 0;
-                }
-            }
+            // Y-Bewegung: bei Boden-Hit canJ setzen (Decke nicht).
+            const yHit = stepY(this.velocity.y * delta);
+            if (yHit === 'ground') this.canJ = true;
 
-            const oldX = playerPos.x;
-            playerPos.x += (fwdH.x * -this.velocity.z + rgt.x * this.velocity.x) * delta;
-            if (checkC(playerPos)) { playerPos.x = oldX; this.velocity.x = 0; }
-
-            const oldZ = playerPos.z;
-            playerPos.z += (fwdH.z * -this.velocity.z + rgt.z * this.velocity.x) * delta;
-            if (checkC(playerPos)) { playerPos.z = oldZ; this.velocity.z = 0; }
+            stepHoriz('x', (fwdH.x * -this.velocity.z + rgt.x * this.velocity.x) * delta);
+            stepHoriz('z', (fwdH.z * -this.velocity.z + rgt.z * this.velocity.x) * delta);
         }
     }
 }

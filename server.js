@@ -17,7 +17,9 @@ app.use(cors({
         return cb(new Error('CORS: Origin nicht erlaubt'));
     }
 }));
-app.use(bodyParser.json({ limit: '50mb' })); // Hohes Limit für Spielstände
+// Body-Limit: 5MB reicht für realistische Saves (Welt + Inventar + Mods).
+// Vorher 50MB → DoS-Vektor (RAM-Exhaustion durch parallele große Requests).
+app.use(bodyParser.json({ limit: '5mb' }));
 
 const savesDir = path.join(__dirname, 'saves');
 const savesDirResolved = path.resolve(savesDir);
@@ -86,17 +88,41 @@ app.post('/api/save', (req, res) => {
 });
 
 // API: Logging
+//
+// Sicherheits-Härtung (Sprint 5):
+//   - Nur lokale Requests (127.0.0.1 / ::1) — verhindert DoS via Disk-Fill von außen.
+//   - Newlines in user-controlled Feldern werden gestrippt → keine Log-Injection
+//     (Angreifer kann sich keine fake-Log-Zeilen unterjubeln).
+//   - Type-Whitelist + Längen-Cap auf Message → kein 1-MB-Spam-Log.
+//   - Fail-soft: Unbekannte/invalide Inputs werden ignoriert (200 OK), aber NICHT geloggt.
+const ALLOWED_LOG_TYPES = new Set(['info', 'warn', 'error', 'debug', 'test']);
+const MAX_LOG_MSG_LEN = 1000;
+function isLocalRequest(req) {
+    const ip = req.ip || req.connection.remoteAddress || '';
+    return ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1';
+}
 app.post('/api/tester/log', (req, res) => {
-    const data = req.body;
+    if (!isLocalRequest(req)) return res.status(403).json({ error: 'forbidden' });
+
+    const data = req.body || {};
+    const type = typeof data.type === 'string' ? data.type.toLowerCase() : '';
+    let message = typeof data.message === 'string' ? data.message : '';
+
+    if (!ALLOWED_LOG_TYPES.has(type)) return res.json({ success: true }); // soft-ignore
+    if (message.length === 0) return res.json({ success: true });
+
+    // Newlines + Carriage Returns durch Spaces ersetzen → keine Log-Injection
+    message = message.replace(/[\r\n]+/g, ' ').slice(0, MAX_LOG_MSG_LEN);
+
     const logDir = path.join(__dirname, 'js', 'tester');
     if (!fs.existsSync(logDir)) {
         fs.mkdirSync(logDir, { recursive: true });
     }
-    
+
     const logFile = path.join(logDir, 'protokoll.log');
     const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-    const logLine = `[${timestamp}] [${data.type}] ${data.message}\n`;
-    
+    const logLine = `[${timestamp}] [${type}] ${message}\n`;
+
     fs.appendFile(logFile, logLine, (err) => {
         if (err) console.error(err);
         res.json({ success: true });
@@ -119,10 +145,44 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`=======================================`);
-    console.log(` Butzcraft Server (Node.js) läuft!`);
-    console.log(` Port: ${PORT}`);
-    console.log(` Aufrufen unter: http://localhost:${PORT}`);
-    console.log(`=======================================`);
-});
+// Bind-Default: Localhost-only. Wer LAN-Zugriff (z.B. zum Testen vom Handy) braucht,
+// setzt explizit `HOST=0.0.0.0` als env-Var. Vorher band der Server immer an alle Interfaces
+// → im WLAN/Hotel konnte jeder Spielstände lesen/überschreiben/löschen.
+//
+// WICHTIG (Bugfix): Windows-Browser resolven `localhost` häufig erst zu `::1` (IPv6),
+// und nur bei IPv6-Failure fallback auf `127.0.0.1`. Wenn der Server nur IPv4 bindet,
+// schlägt der erste Verbindungsversuch fehl → für den User "Seite nicht erreichbar".
+// Lösung: Im Default-Modus ZWEI Listener — IPv4 (127.0.0.1) + IPv6 (::1). Beide Stacks
+// werden bedient, LAN bleibt ausgeschlossen (keine Wildcard-Bindung).
+const http = require('http');
+const HOST = process.env.HOST || '127.0.0.1';
+
+if (HOST === '127.0.0.1') {
+    // Dual-Stack-Localhost
+    http.createServer(app).listen(PORT, '127.0.0.1', () => {
+        console.log(`=======================================`);
+        console.log(` Butzcraft Server (Node.js) läuft!`);
+        console.log(` Bind: 127.0.0.1:${PORT} (IPv4 localhost)`);
+    });
+    // IPv6 ist auf manchen Systemen deaktiviert → try/catch verhindert harten Crash.
+    try {
+        http.createServer(app).listen(PORT, '::1', () => {
+            console.log(` Bind: [::1]:${PORT} (IPv6 localhost)`);
+            console.log(` Aufrufen unter: http://localhost:${PORT}`);
+            console.log(`=======================================`);
+        });
+    } catch (e) {
+        console.warn(` (IPv6-Bind fehlgeschlagen — IPv4-only. Falls localhost nicht geht: http://127.0.0.1:${PORT})`);
+        console.log(`=======================================`);
+    }
+} else {
+    // Explizit konfigurierter Host (z.B. 0.0.0.0 für LAN-Test). Single-Listener.
+    app.listen(PORT, HOST, () => {
+        console.log(`=======================================`);
+        console.log(` Butzcraft Server (Node.js) läuft!`);
+        console.log(` Bind: ${HOST}:${PORT}`);
+        console.log(` Aufrufen unter: http://localhost:${PORT}`);
+        console.log(` ⚠ Server ist netzwerk-erreichbar (HOST=${HOST}). Nur in vertrauten Netzen!`);
+        console.log(`=======================================`);
+    });
+}

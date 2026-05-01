@@ -16,10 +16,24 @@ export class PlayerInteraction {
     }
 
     init(controls, getGameActive, getSpawning) {
-        document.addEventListener('mousedown', (e) => {
-            if (!controls.isLocked || !getGameActive() || getSpawning()) return;
+        // Cleanup: falls init() mehrfach gerufen wird (z.B. nach loadGame), alten
+        // Listener entfernen. Sonst feuert ein Klick mehrfach → "Doppelschlag"-Bug.
+        this.destroy();
+        this._onMouseDown = (e) => {
+            // PointerLock ist auf Touch-Geräten nicht verfügbar → bei aktivem Touch-Mode
+            // wird die isLocked-Check übersprungen (Touch-Buttons feuern synthetische mousedowns).
+            const lockOk = controls.isLocked || window.touchActive;
+            if (!lockOk || !getGameActive() || getSpawning()) return;
             this.handleInteraction(e);
-        });
+        };
+        document.addEventListener('mousedown', this._onMouseDown);
+    }
+
+    destroy() {
+        if (this._onMouseDown) {
+            document.removeEventListener('mousedown', this._onMouseDown);
+            this._onMouseDown = null;
+        }
     }
 
     handleInteraction(e) {
@@ -79,7 +93,7 @@ export class PlayerInteraction {
         const inventorySlots = (window.inventorySlots) ? window.inventorySlots : this.context.getInventorySlots();
         const currentItem = inventorySlots[currentSlotIdx];
         
-        if (e.button === 2 && currentItem && (currentItem.type === 17 || currentItem.type === 18 || (currentItem.type >= 21 && currentItem.type <= 25) || currentItem.type === 51)) {
+        if (e.button === 2 && currentItem && (currentItem.type === 17 || currentItem.type === 18 || (currentItem.type >= 21 && currentItem.type <= 25) || currentItem.type === 51 || currentItem.type === 55)) {
             if (currentItem.count > 0) {
                 currentItem.count--;
                 let gain = 0;
@@ -91,6 +105,7 @@ export class PlayerInteraction {
                 else if (currentItem.type === 24) gain = 5;  // Zombie
                 else if (currentItem.type === 25) gain = 12; // Mutton
                 else if (currentItem.type === 51) gain = 8;  // Beeren
+                else if (currentItem.type === 55) gain = 12; // Schildkröte
                 // Wenn es vergammelt ist, 30% Chance auf kleinen Schaden
                 if (currentItem.type === 24 && Math.random() < 0.3) {
                     window.player.health -= 5;
@@ -155,10 +170,11 @@ export class PlayerInteraction {
                     }
                     this.context.addItemToInventory(28, 1);
                 // TÜR abbauen: Partner-Block (oben/unten) entfernen
-                } else if (brokenType === 33 || brokenType === 34) {
-                    if (brokenType === 33 && this.world.getBlock(bx, by + 1, bz) === 34) {
+                } else if ((brokenType & 0x3f) === 33 || (brokenType & 0x3f) === 34) {
+                    const partnerType = this.world.getBlock(bx, (brokenType & 0x3f) === 33 ? by + 1 : by - 1, bz);
+                    if ((brokenType & 0x3f) === 33 && (partnerType & 0x3f) === 34) {
                         this.world.setBlock(bx, by + 1, bz, 0);
-                    } else if (brokenType === 34 && this.world.getBlock(bx, by - 1, bz) === 33) {
+                    } else if ((brokenType & 0x3f) === 34 && (partnerType & 0x3f) === 33) {
                         this.world.setBlock(bx, by - 1, bz, 0);
                     }
                     this.context.addItemToInventory(33, 1); // Nur 1x Tür
@@ -257,9 +273,13 @@ export class PlayerInteraction {
                     }
                 // TÜR platzieren: Unten + Oben setzen
                 } else if (currentItem.type === 33) {
+                    const fwd = new THREE.Vector3();
+                    this.camera.getWorldDirection(fwd);
+                    const rotation = Math.abs(fwd.x) > Math.abs(fwd.z) ? 1 : 0;
+
                     if (this.world.getBlock(px, py + 1, pz) === 0) {
-                        this.world.setBlock(px, py, pz, 33);
-                        this.world.setBlock(px, py + 1, pz, 34);
+                        this.world.setBlock(px, py, pz, 33 | (rotation << 6));
+                        this.world.setBlock(px, py + 1, pz, 34 | (rotation << 6));
                         currentItem.count--;
                     } else {
                         this.showMessage("Kein Platz für die Tür!", "#ff9800", 20);
@@ -285,9 +305,12 @@ export class PlayerInteraction {
                         return;
                     }
                 } else {
-                    this.world.setBlock(px, py, pz, currentItem.type); 
+                    this.world.setBlock(px, py, pz, currentItem.type);
                     currentItem.count--;
                 }
+                // Place-Sound: Dig-Sound bei höherer Pitch klingt wie "Setz"-Klang.
+                // Vorher gab es gar keinen Sound beim Bauen (im Gegensatz zum Abbauen).
+                this.SoundManager.playSound('dig_' + this.SoundManager.getSoundCategory(currentItem.type), 0.5, 1.4);
                 this.context.updateInventoryUI();
             }
         }

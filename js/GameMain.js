@@ -4,9 +4,12 @@
         import { SoundManager } from './sound.js';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260427b';
         import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260427b';
-        import { Mob, updateProjectiles } from './mobs.js?v=20260427b';
+        import { Mob, updateProjectiles } from './mobs.js?v=20260501a';
 
         import { Input } from './Input.js';
+        import { initTouchControls, isTouchDevice } from './touch.js';
+        import { migrateSave, stampSaveVersion } from './saveMigrations.js';
+        import { Game } from './Game.js'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js';
         import { PlayerInteraction } from './PlayerInteraction.js';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js';
@@ -74,21 +77,21 @@
                     gameStarted = true;
                     currentSaveName = name;
                     document.getElementById('save-input').value = name;
-                    
+
+                    // Sprint 6: Migration zentralisiert via saveMigrations.js
+                    // Vorher war die Inventory-Migration hier inline + oldInventoryMap aus inventory.js.
+                    // Jetzt: ein Aufruf, alle nötigen Versions-Schritte werden angewendet.
+                    data = migrateSave(data);
+
                     const playerPos = camera.position;
                     playerPos.set(data.pos.x, data.pos.y, data.pos.z);
                     window.player.health = data.health;
                     window.player.hunger = data.hunger;
                     time = data.time;
                     spawning = false;
-                    
-                    // Migration: Falls altes Inventar-Format (Objekt) geladen wird
-                    if (data.inventory && !Array.isArray(data.inventory)) {
-                        for (const [oldType, count] of Object.entries(data.inventory)) {
-                            const slotIdx = oldInventoryMap[oldType];
-                            if (slotIdx !== undefined) inventorySlots[slotIdx] = { type: parseInt(oldType), count: count };
-                        }
-                    } else if (Array.isArray(data.inventory)) {
+
+                    // Nach migrateSave ist data.inventory garantiert ein Array (v1+).
+                    if (Array.isArray(data.inventory)) {
                         data.inventory.forEach((item, i) => inventorySlots[i] = item);
                     }
                     
@@ -129,10 +132,75 @@
             sunriseZ: new THREE.Color().setHSL(0.6, 0.5, 0.25),
             dayH: new THREE.Color().setHSL(0.55, 0.5, 0.7),
             dayZ: new THREE.Color().setHSL(0.58, 0.8, 0.45),
+            bloodMoonH: new THREE.Color().setHSL(0.0, 0.8, 0.15),   // Blutmond-Horizont: dunkelrot
+            bloodMoonZ: new THREE.Color().setHSL(0.02, 0.6, 0.05),  // Blutmond-Zenit: schwarz-rot
             hColor: new THREE.Color(),
             zColor: new THREE.Color(),
             underwaterColor: new THREE.Color(0x003060)
         };
+        const BLOOD_MOON_INTERVAL = CONFIG.GAMEPLAY.BLOOD_MOON_INTERVAL || 3;
+
+        // ============================================================
+        // Damage-Feedback (Sprint 5)
+        // ============================================================
+        // Visuelles + akustisches Feedback bei Player-Schaden:
+        //   - Roter Vignette-Flash (fadet 250ms)
+        //   - Subtiler Pain-Sound (water_splash bei tieferem Pitch)
+        //   - Camera-Shake (kurze Pitch/Yaw-Pertubation, 150ms)
+        // Cooldown 250ms verhindert Visual-Spam bei kontinuierlichem Zombie-Damage.
+        //
+        // WICHTIG: State + Funktionen MÜSSEN vor `animate()`-Aufruf deklariert sein,
+        // sonst TDZ — animate() ruft applyCameraShake() bereits im ersten Tick.
+        const _damageFx = { lastAt: 0, flashEl: null, shakeUntil: 0, shakeMag: 0 };
+        function ensureDamageFlashDOM() {
+            if (_damageFx.flashEl) return _damageFx.flashEl;
+            const el = document.createElement('div');
+            el.id = 'damage-flash';
+            el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:200;opacity:0;background:radial-gradient(ellipse at center, transparent 35%, rgba(180,0,0,0.55) 100%);transition:opacity 250ms ease-out;';
+            document.body.appendChild(el);
+            _damageFx.flashEl = el;
+            return el;
+        }
+        function triggerDamageFeedback(amount) {
+            const now = performance.now();
+            if (now - _damageFx.lastAt < 250) return;
+            _damageFx.lastAt = now;
+            const el = ensureDamageFlashDOM();
+            const intensity = Math.min(1, amount / 8);
+            el.style.opacity = String(0.4 + 0.5 * intensity);
+            requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = '0'; }));
+            try {
+                if (window.SoundManager && window.SoundManager.playSound) {
+                    window.SoundManager.playSound('water_splash', 0.5, 0.6 + Math.random() * 0.15, { skipCooldown: true });
+                }
+            } catch (e) { /* sound-system optional */ }
+            _damageFx.shakeUntil = now + 150;
+            _damageFx.shakeMag = 0.025 * intensity;
+        }
+        function applyCameraShake() {
+            // Shake wird über CSS-Transform am Canvas gemacht, NICHT über Three.js-Camera-Rotation.
+            //
+            // WARUM CSS statt camera.rotation.z?
+            //   PointerLockControls nutzt intern Euler-Order 'YXZ' und überschreibt bei jedem
+            //   Mausbewegen `camera.quaternion` via `setFromEuler(setFromQuaternion(...))`.
+            //   Der Z-Anteil (Roll) wird dabei aus der Quaternion extrahiert und wieder
+            //   zurückgeschrieben — d.h. ein einmal gesetzter Roll WÄCHST mit jeder Mausbewegung
+            //   weiter, weil die XYZ↔YXZ-Konvertierung nicht winkeltreu ist.
+            //   Resultat: Welt verdreht sich beim Mausbewegen.
+            //   Mit CSS-Transform am Canvas-Element passiert das alles außerhalb von Three.js
+            //   und kann sauber via leerem `transform`-String zurückgesetzt werden.
+            const canvas = renderer && renderer.domElement;
+            if (!canvas) return;
+            const now = performance.now();
+            if (now >= _damageFx.shakeUntil || _damageFx.shakeMag <= 0) {
+                if (canvas.style.transform) canvas.style.transform = '';
+                return;
+            }
+            const remain = (_damageFx.shakeUntil - now) / 150;
+            const m = _damageFx.shakeMag * remain;
+            const angle = Math.sin(now * 0.05) * m * 0.5; // rad
+            canvas.style.transform = `rotate(${angle}rad)`;
+        }
 
         Input.init(isInventoryOpened);
         setupInventoryEvents();
@@ -229,13 +297,59 @@
             window.starsMesh = new THREE.Points(starsGeo, window.starsMat);
             scene.add(window.starsMesh);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
             renderer.domElement.id = 'game-canvas';
             renderer.setPixelRatio(window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
+            // WebGL Context-Loss Handling: tritt auf bei Tab-Wechsel auf Mobile, GPU-Reset, oder
+            // wenn der Browser den Context wegen Inaktivität freigibt. Ohne preventDefault wird
+            // der Context NIE wiederhergestellt → Canvas bleibt schwarz für immer.
+            window.webglContextLost = false;
+            renderer.domElement.addEventListener('webglcontextlost', (e) => {
+                e.preventDefault();
+                window.webglContextLost = true;
+                console.warn('[WebGL] Context lost — pausing render loop, awaiting restore.');
+                let overlay = document.getElementById('webgl-context-lost-overlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.id = 'webgl-context-lost-overlay';
+                    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.85);color:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:99999;font-family:sans-serif;text-align:center;padding:20px;';
+                    const h = document.createElement('h2'); h.textContent = 'Grafik-Kontext verloren'; h.style.marginBottom = '10px';
+                    const p = document.createElement('p'); p.textContent = 'Der Browser hat den WebGL-Kontext freigegeben (z.B. nach Tab-Wechsel oder GPU-Reset). Versuche, das Spiel automatisch wiederherzustellen…'; p.style.marginBottom = '20px'; p.style.maxWidth = '500px';
+                    const btn = document.createElement('button'); btn.textContent = 'Spiel neu laden'; btn.style.cssText = 'padding:12px 24px;font-size:16px;cursor:pointer;background:#e74c3c;color:#fff;border:none;border-radius:4px;';
+                    btn.addEventListener('click', () => window.location.reload());
+                    overlay.appendChild(h); overlay.appendChild(p); overlay.appendChild(btn);
+                    document.body.appendChild(overlay);
+                } else {
+                    overlay.style.display = 'flex';
+                }
+            }, false);
+
+            renderer.domElement.addEventListener('webglcontextrestored', () => {
+                console.warn('[WebGL] Context restored — rebuilding chunk meshes.');
+                window.webglContextLost = false;
+                const overlay = document.getElementById('webgl-context-lost-overlay');
+                if (overlay) overlay.style.display = 'none';
+                // Chunk-Meshes neu aufbauen — alte BufferGeometries sind nach Context-Loss ungültig.
+                if (window.world && window.world.chunks) {
+                    for (const chunk of window.world.chunks.values()) {
+                        chunk.mesh = null;
+                        chunk.waterMesh = null;
+                        window.world.requestMesh(chunk.cx, chunk.cz);
+                    }
+                }
+            }, false);
+
             window.player = new Player(scene, camera, document.body, CONFIG);
             controls = window.player.controls;
+
+            // Sicherheits-Reset: Falls aus einem früheren Sprint-5-Bug-Run noch ein roll-Drift
+            // in der Camera-Quaternion saß (Sprint 5 setzte camera.rotation.z direkt), hier
+            // einmalig komplett aufräumen. PointerLockControls würde sonst den Drift via
+            // Quaternion-Roundtrip beim ersten Mausbewegen reaktivieren.
+            camera.rotation.set(0, 0, 0);
+            camera.quaternion.setFromEuler(camera.rotation);
             // Empfindlichkeit anpassen: Wir verstärken die Drehung durch einen Multiplikator
             // Three.js PointerLockControls nutzt intern camera.rotation. 
             // Ein einfacher Weg: Wir hängen uns an den PointerLock-Mechanismus.
@@ -257,6 +371,24 @@
                     }
                 });
             }
+
+            // Sprint 6: Game-Over-"Neu starten" → Reload (alter Inline-onclick-Handler ist weg)
+            const restartBtn = document.getElementById('game-over-restart');
+            if (restartBtn) {
+                restartBtn.addEventListener('click', () => window.location.reload());
+            }
+
+            // Sprint 6: Auto-Load-Hint nach Reload (gesetzt vom Death-Overlay-Save-Klick)
+            try {
+                const autoLoadName = sessionStorage.getItem('butzcraft.autoLoad');
+                if (autoLoadName) {
+                    sessionStorage.removeItem('butzcraft.autoLoad');
+                    // Asynchron auslösen, damit der DOM-Init zuerst durchläuft
+                    setTimeout(() => {
+                        if (typeof window.loadGame === 'function') window.loadGame(autoLoadName);
+                    }, 100);
+                }
+            } catch (e) { /* sessionStorage disabled */ }
 
             const inst = document.getElementById('instructions');
             inst.addEventListener('click', () => { 
@@ -280,6 +412,35 @@
             scene.add(camera); // Kamera muss in die Szene, da sie nun Kinder hat
 
             world = new World(scene);
+            window.world = world;
+
+            // --- Render Distance Setting (persistiert in localStorage) ---
+            const RD_STORAGE_KEY = 'butzcraft.renderDistance';
+            const RD_ALLOWED = [2, 4, 6, 8, 12];
+            const applyRenderDistance = (value) => {
+                const n = parseInt(value, 10);
+                if (!RD_ALLOWED.includes(n)) return;
+                CONFIG.WORLD.RENDER_DIST = n;
+                try { localStorage.setItem(RD_STORAGE_KEY, String(n)); } catch (e) { /* QuotaExceeded etc. ignorieren */ }
+                // Sofort wirksam machen, wenn Spieler bereits in der Welt ist
+                if (window.player && window.player.controls) {
+                    const p = window.player.controls.getObject().position;
+                    world.updateVisibleChunks(p.x, p.z);
+                }
+            };
+            window.applyRenderDistance = applyRenderDistance;
+            // Initial-Apply: aus localStorage laden, falls vorhanden
+            try {
+                const stored = localStorage.getItem(RD_STORAGE_KEY);
+                if (stored) applyRenderDistance(stored);
+            } catch (e) { /* Storage disabled (Privacy-Mode) */ }
+            // UI-Verdrahtung
+            const rdSelect = document.getElementById('render-distance-select');
+            if (rdSelect) {
+                rdSelect.value = String(CONFIG.WORLD.RENDER_DIST);
+                rdSelect.addEventListener('change', (e) => applyRenderDistance(e.target.value));
+            }
+
             window.playerInteractions = new PlayerInteraction(camera, scene, world, mobs, SoundManager, {
                 getSelectedSlot: getSelectedSlot,
                 getInventorySlots: () => inventorySlots,
@@ -288,7 +449,19 @@
                 updateUI: updateUI
             });
             window.playerInteractions.init(controls, () => gameActive, () => spawning);
+
+            // Touch-Controls: nur auf Touch-Devices aktiv. Setzt window.touchActive=true,
+            // damit der PointerLock-Pause-Mechanismus übersprungen wird.
+            initTouchControls({
+                camera,
+                controls,
+                isInventoryOpenedProvider: isInventoryOpened
+            });
             window.addEventListener('keydown', e => {
+                // Wenn ein Textfeld fokussiert ist, keine Spielsteuerung auslösen
+                const tag = document.activeElement?.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+
                 if (e.code === 'KeyE') { toggleInventory(gameStarted, spawning, controls); return; }
                 if (isInventoryOpened()) return;
 
@@ -320,16 +493,59 @@
             DOM.healthFill.style.width = Math.max(0, window.player.health) + '%';
             DOM.hungerFill.style.width = Math.max(0, window.player.hunger) + '%';
             const tm = Math.floor((time / DAY_DURATION) * 1440), hh = Math.floor(tm / 60) % 24, mm = tm % 60, dd = Math.floor(time / DAY_DURATION) + 1;
-            DOM.timeInfo.innerText = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}`;
-            if (window.player.health <= 0 && gameActive && !spawning) { 
-                gameActive = false; 
-                controls.unlock(); 
-                DOM.gameOver.style.display = 'flex'; 
+            const dayRatioUI = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
+            const dayCountUI = Math.floor(time / DAY_DURATION);
+            const isBloodMoonUI = dayCountUI % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1);
+            const bloodMoonWarning = isBloodMoonUI && dayRatioUI > 0.65 && dayRatioUI <= 0.80 ? ' | \u{1F534} Blutmond!' : '';
+            const bloodMoonActive = isBloodMoonUI && (dayRatioUI > 0.80 || dayRatioUI < 0.20) ? ' | \u{1F7E5} BLUTMOND' : '';
+            DOM.timeInfo.innerText = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}${bloodMoonWarning}${bloodMoonActive}`;
+            if (window.player.health <= 0 && gameActive && !spawning) {
+                gameActive = false;
+                controls.unlock();
+                DOM.gameOver.style.display = 'flex';
+                // Sprint 6: Death-Overlay um "Spielstand laden"-Liste erweitern.
+                // Lädt asynchron — User muss nicht warten, falls die Server-Liste leer ist.
+                populateGameOverSaveList();
             }
+        }
+
+        // Füllt die Save-Liste im Game-Over-Overlay.
+        // Klick auf Save-Eintrag → window.location.reload() + danach loadGame() aufrufen.
+        // (Reload ist nötig, weil der Spielzustand nach Tod inkonsistent sein kann; Per-Click-Reload ist
+        //  einfacher und sicherer als Welt/Player partiell zu resetten.)
+        function populateGameOverSaveList() {
+            const section = document.getElementById('game-over-load-section');
+            const list = document.getElementById('game-over-save-list');
+            if (!section || !list) return;
+            list.innerHTML = '';
+            fetch('/api/saves')
+                .then(r => r.json())
+                .then(names => {
+                    if (!Array.isArray(names) || names.length === 0) {
+                        section.style.display = 'none';
+                        return;
+                    }
+                    section.style.display = 'flex';
+                    for (const name of names) {
+                        const btn = document.createElement('button');
+                        btn.textContent = '🎮 ' + name;
+                        btn.style.cssText = 'padding:10px 20px; font-size:14px; cursor:pointer; background:#27ae60; color:white; border:none; border-radius:4px;';
+                        btn.addEventListener('click', () => {
+                            // Reload + nach Load loadGame triggern via sessionStorage-Hint
+                            try { sessionStorage.setItem('butzcraft.autoLoad', name); } catch(e) {}
+                            window.location.reload();
+                        });
+                        list.appendChild(btn);
+                    }
+                })
+                .catch(() => { section.style.display = 'none'; });
         }
 
         function animate() {
             requestAnimationFrame(animate);
+            // Bei verlorenem WebGL-Context: prevTime trotzdem aktualisieren,
+            // damit nach Restore kein riesiger delta-Spike entsteht (würde Wall-Phasing auslösen).
+            if (window.webglContextLost) { prevTime = performance.now(); return; }
             const now = performance.now();
             const delta = Math.min((now - prevTime) / 1000, 0.02);
             prevTime = now;
@@ -339,16 +555,30 @@
             // Shader-Zeit für Wellen & Wind aktualisieren
             world.update(now * 0.001);
 
+            // Audio-Listener auf Kamera ausrichten (für 3D-Spatial-Sounds: Distanz-Falloff + Stereo-Pan).
+            // Kamera ist Child der controls.getObject(), aber ihre Position ist relativ — wir verwenden
+            // die Camera direkt, weil PointerLockControls ihre yaw/pitch via Quaternion auf der Kamera setzen.
+            SoundManager.updateListener(camera);
+
+            // Camera-Shake bei aktivem Damage-Feedback (Sprint 5).
+            applyCameraShake();
+
             // 1. VOID PROTECTION (Immer aktiv)
             window.player.updateWaterAndVoid(world, SoundManager);
             // 3. SKY & HUD (Immer aktiv)
             const dayRatio = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
+            const dayCount = Math.floor(time / DAY_DURATION);
+            const isBloodMoon = dayCount % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1); // Erste Nächte friedlich
             sunGroup.rotation.x = dayRatio * Math.PI * 2 + Math.PI;
+
+            // Nacht-Farben: normal oder Blutmond
+            const nightH = isBloodMoon ? SKY.bloodMoonH : SKY.nightH;
+            const nightZ = isBloodMoon ? SKY.bloodMoonZ : SKY.nightZ;
 
             // Sky-Colors: Wiederverwendung gecachter Color-Objekte (0 Allokationen pro Frame)
             let skyInty = 1.0;
-            if (dayRatio >= 0.20 && dayRatio < 0.25) { 
-                const f = (dayRatio - 0.20) / 0.05; SKY.hColor.lerpColors(SKY.nightH, SKY.sunriseH, f); SKY.zColor.lerpColors(SKY.nightZ, SKY.sunriseZ, f); skyInty = 0.05 + f * 0.35;
+            if (dayRatio >= 0.20 && dayRatio < 0.25) {
+                const f = (dayRatio - 0.20) / 0.05; SKY.hColor.lerpColors(nightH, SKY.sunriseH, f); SKY.zColor.lerpColors(nightZ, SKY.sunriseZ, f); skyInty = 0.05 + f * 0.35;
             } else if (dayRatio >= 0.25 && dayRatio < 0.30) {
                 const f = (dayRatio - 0.25) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, SKY.dayH, f); SKY.zColor.lerpColors(SKY.sunriseZ, SKY.dayZ, f); skyInty = 0.4 + f * 0.6;
             } else if (dayRatio >= 0.30 && dayRatio <= 0.70) {
@@ -356,8 +586,8 @@
             } else if (dayRatio > 0.70 && dayRatio <= 0.75) {
                 const f = (dayRatio - 0.70) / 0.05; SKY.hColor.lerpColors(SKY.dayH, SKY.sunriseH, f); SKY.zColor.lerpColors(SKY.dayZ, SKY.sunriseZ, f); skyInty = 1.0 - f * 0.6;
             } else if (dayRatio > 0.75 && dayRatio <= 0.80) {
-                const f = (dayRatio - 0.75) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, SKY.nightH, f); SKY.zColor.lerpColors(SKY.sunriseZ, SKY.nightZ, f); skyInty = 0.4 - f * 0.35;
-            } else { SKY.hColor.copy(SKY.nightH); SKY.zColor.copy(SKY.nightZ); skyInty = 0.05; }
+                const f = (dayRatio - 0.75) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, nightH, f); SKY.zColor.lerpColors(SKY.sunriseZ, nightZ, f); skyInty = 0.4 - f * 0.35;
+            } else { SKY.hColor.copy(nightH); SKY.zColor.copy(nightZ); skyInty = 0.05; }
             sun.intensity = skyInty;
 
             if (window.player.inWater) {
@@ -375,7 +605,8 @@
 
             // 4. SIMULATION (Nur wenn nicht pausiert)
             // Fix: Während spawning=true pausieren wir niemals automatisch
-            const isPaused = !gameStarted || (!controls.isLocked && !spawning);
+            // Touch-Mode kennt keinen PointerLock — touchActive zählt als "im Spiel aktiv".
+            const isPaused = !gameStarted || (!controls.isLocked && !spawning && !window.touchActive);
             if (!isPaused) {
                 time += delta;
                                 if (spawning) {
@@ -396,18 +627,27 @@
                     }
                 }
 
-                mobs.forEach(m => { 
+                // Wrapped onDamage: appliziert Schaden UND triggert Feedback (Flash + Pain-Sound + Shake).
+                // _lastPainAt verhindert Sound-Spam bei kontinuierlichem Zombie-Damage (≤ 1 Sound/300ms).
+                const onPlayerDamage = (d) => {
+                    if (d <= 0) return;
+                    window.player.health -= d;
+                    triggerDamageFeedback(d);
+                };
+                mobs.forEach(m => {
                     if ((dayRatio < 0.25 || dayRatio > 0.75) === false && (m.type === 'zombie' || m.type === 'skeleton')) m.isDead = true;
-                    else m.update(delta, playerPos, world, (d) => window.player.health -= d);
+                    else m.update(delta, playerPos, world, onPlayerDamage, dayRatio);
                 });
                 for (let i = mobs.length - 1; i >= 0; i--) { if (mobs[i].isDead) { scene.remove(mobs[i].group); mobs.splice(i, 1); } }
-                updateProjectiles(delta, playerPos, world, (d) => window.player.health -= d);
+                updateProjectiles(delta, playerPos, world, onPlayerDamage);
 
                 // --- Mob Spawning (optimiert: eine Schleife statt 3x filter) ---
-                let landMobsCount = 0, waterMobsCount = 0;
+                let landMobsCount = 0, waterMobsCount = 0, geistCount = 0, parrotCount = 0;
                 for (let i = 0; i < mobs.length; i++) {
                     if (mobs[i].isDead) continue;
-                    if (mobs[i].type === 'fish' || mobs[i].type === 'octopus') waterMobsCount++;
+                    if (mobs[i].type === 'fish' || mobs[i].type === 'octopus' || mobs[i].type === 'turtle') waterMobsCount++;
+                    else if (mobs[i].type === 'geist') geistCount++;
+                    else if (mobs[i].type === 'parrot') parrotCount++;
                     else landMobsCount++;
                 }
                 
@@ -435,41 +675,95 @@
                             }
                             if (waterNearby) break;
                         }
+                        // Geister spawnen jede Nacht (nicht beim Blutmond), unabhängig von Terrain
+                        const isNight = (dayRatio < 0.25 || dayRatio > 0.75);
+                        if (isNight && !isBloodMoon && geistCount < 6 && spawnY > 0) {
+                            mobs.push(new Mob(scene, 'geist', ox, spawnY + 5, oz));
+                        }
+
                         if (spawnY <= 46) {
                             if (isWaterSpawn && waterMobsCount < 15) {
                                 const WEIGHT_FISH = CONFIG.MOBS.WEIGHT_FISH || 40;
                                 const WEIGHT_OCTOPUS = CONFIG.MOBS.WEIGHT_OCTOPUS || 1;
-                                const totalW = WEIGHT_FISH + WEIGHT_OCTOPUS;
-                                if (Math.random() * totalW < WEIGHT_FISH) mobs.push(new Mob(scene, 'fish', ox, spawnY, oz));
+                                const WEIGHT_TURTLE = CONFIG.MOBS.WEIGHT_TURTLE || 15;
+                                const totalW = WEIGHT_FISH + WEIGHT_OCTOPUS + WEIGHT_TURTLE;
+                                const roll = Math.random() * totalW;
+                                if (roll < WEIGHT_FISH) mobs.push(new Mob(scene, 'fish', ox, spawnY, oz));
+                                else if (roll < WEIGHT_FISH + WEIGHT_TURTLE) mobs.push(new Mob(scene, 'turtle', ox, spawnY, oz));
                                 else mobs.push(new Mob(scene, 'octopus', ox, spawnY, oz));
                             } else if (!waterNearby && landMobsCount < MAX_COUNT) {
-                                if (dayRatio < 0.25 || dayRatio > 0.75) {
+                                if (isNight && isBloodMoon) {
+                                    // Blutmond-Nacht: Zombies & Skelette spawnen
                                     if (Math.random() < 0.5) mobs.push(new Mob(scene, 'zombie', ox, spawnY, oz));
                                     else mobs.push(new Mob(scene, 'skeleton', ox, spawnY, oz));
                                 }
-                                else {
-                                    const totalWeight = WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP + WEIGHT_CHICKEN;
-                                    const r = Math.random() * totalWeight;
-                                    if (r < WEIGHT_COW) mobs.push(new Mob(scene, 'cow', ox, spawnY, oz));
-                                    else if (r < WEIGHT_COW + WEIGHT_PIG) mobs.push(new Mob(scene, 'pig', ox, spawnY, oz));
-                                    else if (r < WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP) mobs.push(new Mob(scene, 'sheep', ox, spawnY, oz));
-                                    else mobs.push(new Mob(scene, 'chicken', ox, spawnY, oz));
+                                else if (dayRatio >= 0.25 && dayRatio <= 0.75) {
+                                    // Papageien: tagsüber, in der Nähe von Bäumen (Blätter im Umkreis)
+                                    let leavesNearby = false;
+                                    if (parrotCount < 5) {
+                                        outer: for (let dy = -2; dy <= 6; dy++) {
+                                            for (let dx = -4; dx <= 4; dx += 2) {
+                                                for (let dz = -4; dz <= 4; dz += 2) {
+                                                    const b = world.getBlock(Math.floor(ox + dx), Math.floor(spawnY + dy), Math.floor(oz + dz));
+                                                    if (b === 6 || b === 14 || b === 16) { leavesNearby = true; break outer; }
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (leavesNearby && Math.random() < 0.35) {
+                                        mobs.push(new Mob(scene, 'parrot', ox, spawnY + 4, oz));
+                                    } else {
+                                        const totalWeight = WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP + WEIGHT_CHICKEN;
+                                        const r = Math.random() * totalWeight;
+                                        if (r < WEIGHT_COW) mobs.push(new Mob(scene, 'cow', ox, spawnY, oz));
+                                        else if (r < WEIGHT_COW + WEIGHT_PIG) mobs.push(new Mob(scene, 'pig', ox, spawnY, oz));
+                                        else if (r < WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP) mobs.push(new Mob(scene, 'sheep', ox, spawnY, oz));
+                                        else mobs.push(new Mob(scene, 'chicken', ox, spawnY, oz));
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
+                // Drop-Item-Update mit TTL + Hard-Cap (Sprint 5: Memory-Sicherheit).
+                // - DROP_TTL: nicht-aufgesammelte Drops verschwinden nach 90s (RAM + scene-Mesh-Leak vermeiden)
+                // - DROP_HARD_CAP: globaler Cap. Wenn überschritten → ältester Drop wird entfernt (LRU)
+                const DROP_TTL = 90; // Sekunden
+                const DROP_HARD_CAP = 150;
+                const disposeDrop = (item) => {
+                    if (item.mesh) {
+                        scene.remove(item.mesh);
+                        if (item.mesh.geometry) item.mesh.geometry.dispose();
+                        if (item.mesh.material) {
+                            // Drops verwenden eigene MeshPhongMaterial-Instanzen → safe to dispose
+                            if (Array.isArray(item.mesh.material)) item.mesh.material.forEach(m => m.dispose());
+                            else item.mesh.material.dispose();
+                        }
+                    }
+                };
                 const updateItems = (items) => {
+                    // Hard-Cap durchsetzen: ältester (= [0]) entfernt, bis unter Cap.
+                    while (items.length > DROP_HARD_CAP) {
+                        disposeDrop(items[0]);
+                        items.shift();
+                    }
                     for (let i = items.length - 1; i >= 0; i--) {
                         const item = items[i]; const ip = item.mesh.position;
+                        // TTL-Tracking: age in Sekunden; falls fehlt (alter Drop), jetzt initialisieren.
+                        item.age = (item.age || 0) + delta;
+                        if (item.age > DROP_TTL) {
+                            disposeDrop(item);
+                            items.splice(i, 1);
+                            continue;
+                        }
                         item.velocityY -= 9.8 * delta; ip.y += item.velocityY * delta;
                         const bB = world.getBlock(Math.floor(ip.x), Math.floor(ip.y - 0.1), Math.floor(ip.z));
                         if (bB !== 0 && bB !== 4 && bB !== 8 && bB !== 9 && item.velocityY < 0) { ip.y = Math.floor(ip.y - 0.1) + 1.0; item.velocityY = 0; }
-                        if (Math.hypot(ip.x - playerPos.x, ip.z - playerPos.z) < 2.0 && Math.abs(ip.y - playerPos.y) < 2.5) { 
-                            scene.remove(item.mesh); 
-                            items.splice(i, 1); 
-                            addItemToInventory(item.blockType, 1); 
+                        if (Math.hypot(ip.x - playerPos.x, ip.z - playerPos.z) < 2.0 && Math.abs(ip.y - playerPos.y) < 2.5) {
+                            disposeDrop(item);
+                            items.splice(i, 1);
+                            addItemToInventory(item.blockType, 1);
                         }
                     }
                 };
@@ -560,7 +854,7 @@
             if(!name) { alert("Bitte einen Namen eingeben!"); return; }
             
             const playerPos = camera.position;
-            const gameData = {
+            const gameData = stampSaveVersion({
                 pos: { x: playerPos.x, y: playerPos.y, z: playerPos.z },
                 health: window.player.health,
                 hunger: window.player.hunger,
@@ -569,7 +863,7 @@
                 collectedEggs: collectedEggs,
                 collectedWool: collectedWool,
                 modifiedBlocks: world.modifiedBlocks
-            };
+            });
             
             fetch('/api/save', {
                 method: 'POST',

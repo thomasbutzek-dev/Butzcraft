@@ -1,27 +1,21 @@
 /* js/crafting.js - Butzcraft Crafting System Logic */
-import { craftingRecipes } from './recipes.js';
+import { craftingRecipes, matchRecipe } from './recipes.js';
 
-export let craftingGridData = Array.from({ length: 4 }, () => ({ type: 0, count: 0 }));
+// User-facing Grid bleibt 2×2 (4 Slots). Erweiterung auf 3×3 erfordert separates UI-Refactor.
+const CRAFTING_GRID_SIZE = 2;
+
+export let craftingGridData = Array.from({ length: CRAFTING_GRID_SIZE * CRAFTING_GRID_SIZE }, () => ({ type: 0, count: 0 }));
 export let craftingResultData = { type: 0, count: 0 };
 
 export function checkCrafting() {
-    // Aktuelles Pattern bauen, leere Slots als 0
     const currentPattern = craftingGridData.map(slot => slot.count > 0 ? slot.type : 0);
-    
-    craftingResultData.type = 0;
-    craftingResultData.count = 0;
-    
-    for (const recipe of craftingRecipes) {
-        let match = true;
-        for (let i = 0; i < 4; i++) {
-            if (recipe.pattern[i] !== currentPattern[i]) {
-                match = false; break;
-            }
-        }
-        if (match) {
-            craftingResultData.type = recipe.result.type;
-            craftingResultData.count = recipe.result.count;
-            break;
-        }
+
+    const result = matchRecipe(currentPattern, CRAFTING_GRID_SIZE, craftingRecipes);
+    if (result) {
+        craftingResultData.type = result.type;
+        craftingResultData.count = result.count;
+    } else {
+        craftingResultData.type = 0;
+        craftingResultData.count = 0;
     }
 }
