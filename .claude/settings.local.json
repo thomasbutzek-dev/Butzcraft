@@ -44,7 +44,8 @@
       "PowerShell(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress, LocalPort, OwningProcess; Get-Process -Id \\(Get-NetTCPConnection -LocalPort 3000 -State Listen\\).OwningProcess -ErrorAction SilentlyContinue | Select-Object Id, ProcessName)",
       "Bash(curl -s -o /dev/null -w \"HTTP Status: %{http_code}\\\\nResponse Time: %{time_total}s\\\\n\" http://localhost:3000/)",
       "Bash(curl -s http://localhost:3000/)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
