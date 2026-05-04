@@ -2,7 +2,14 @@ import * as THREE from 'three';
 
 export const BLOCK_TYPES = {
         AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, WATER: 4, WOOD: 5, LEAVES: 6, SAND: 7, CLOUD: 8, FLOWER_RED: 9, FLOWER_YELLOW: 10, SNOW: 11, ICE: 12, JUNGLE_WOOD: 13, JUNGLE_LEAVES: 14, PALM_WOOD: 15, PALM_LEAVES: 16, EGG: 17, MILK: 18, WOOL: 19, BEDROCK: 20, FISH: 21, RAW_MEAT: 22, RAW_CHICKEN: 23, ROTTEN_FLESH: 24, MUTTON: 25, PLANKS: 26, STICK: 27, WORKBENCH: 28, STONE_BRICK: 29, SANDSTONE: 30, BONE: 31, WINDOW: 32, DOOR_BOTTOM: 33, DOOR_TOP: 34, WORKBENCH_SIDE: 36, BED_HEAD: 38, BED_FOOT: 39,
-        BERRY_BUSH: 43, TALL_GRASS: 44, CACTUS: 45, DEAD_BUSH: 46, MUSHROOM_RED: 47, MUSHROOM_BROWN: 48, SUGARCANE: 49, FERN: 50, BERRIES: 51, BERRY_BUSH_EMPTY: 52, SEAGRASS: 54, TURTLE_MEAT: 55
+        BERRY_BUSH: 43, TALL_GRASS: 44, CACTUS: 45, DEAD_BUSH: 46, MUSHROOM_RED: 47, MUSHROOM_BROWN: 48, SUGARCANE: 49, FERN: 50, BERRIES: 51, BERRY_BUSH_EMPTY: 52, SEAGRASS: 54, TURTLE_MEAT: 55,
+        COAL_ORE: 56, IRON_ORE: 57, GOLD_ORE: 58, FURNACE: 59,
+        COAL: 60, IRON_INGOT: 61, GOLD_INGOT: 62,
+        WOOD_PICKAXE: 63, STONE_PICKAXE: 64, IRON_PICKAXE: 65, GOLD_PICKAXE: 66,
+        WOOD_AXE: 67, STONE_AXE: 68, IRON_AXE: 69, GOLD_AXE: 70,
+        WOOD_SHOVEL: 71, STONE_SHOVEL: 72, IRON_SHOVEL: 73, GOLD_SHOVEL: 74,
+        CHEST: 75,
+        SNOW_BLOCK: 77, ICE_BLOCK: 78, PRESSURE_PLATE: 79, MINE_RAIL: 80, MINE_SUPPORT: 81, SANDSTONE_CARVED: 82
         };
 
         export const BLOCK_COLORS = {
@@ -14,7 +21,14 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.PLANKS]: 0xCD853F, [BLOCK_TYPES.STICK]: 0x8B4513, [BLOCK_TYPES.WORKBENCH]: 0xA0522D, [BLOCK_TYPES.STONE_BRICK]: 0x696969, [BLOCK_TYPES.SANDSTONE]: 0xF4A460, [BLOCK_TYPES.BONE]: 0xFFFFFF,
             [BLOCK_TYPES.WINDOW]: 0x88CCEE, [BLOCK_TYPES.DOOR_BOTTOM]: 0xA0724A, [BLOCK_TYPES.DOOR_TOP]: 0xA0724A, [BLOCK_TYPES.BED_HEAD]: 0xCC3333, [BLOCK_TYPES.BED_FOOT]: 0xCC3333,
             [BLOCK_TYPES.WORKBENCH_SIDE]: 0xA0522D,
-            [BLOCK_TYPES.BERRY_BUSH]: 0x2E7D32, [BLOCK_TYPES.TALL_GRASS]: 0x4CAF50, [BLOCK_TYPES.CACTUS]: 0x2E7D32, [BLOCK_TYPES.DEAD_BUSH]: 0x8D6E63, [BLOCK_TYPES.MUSHROOM_RED]: 0xE53935, [BLOCK_TYPES.MUSHROOM_BROWN]: 0x795548, [BLOCK_TYPES.SUGARCANE]: 0x81C784, [BLOCK_TYPES.FERN]: 0x388E3C, [BLOCK_TYPES.BERRIES]: 0xE53935, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 0x33691E, [BLOCK_TYPES.SEAGRASS]: 0x2E8B57, [BLOCK_TYPES.TURTLE_MEAT]: 0x4A7A3D
+            [BLOCK_TYPES.BERRY_BUSH]: 0x2E7D32, [BLOCK_TYPES.TALL_GRASS]: 0x4CAF50, [BLOCK_TYPES.CACTUS]: 0x2E7D32, [BLOCK_TYPES.DEAD_BUSH]: 0x8D6E63, [BLOCK_TYPES.MUSHROOM_RED]: 0xE53935, [BLOCK_TYPES.MUSHROOM_BROWN]: 0x795548, [BLOCK_TYPES.SUGARCANE]: 0x81C784, [BLOCK_TYPES.FERN]: 0x388E3C, [BLOCK_TYPES.BERRIES]: 0xE53935, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 0x33691E, [BLOCK_TYPES.SEAGRASS]: 0x2E8B57, [BLOCK_TYPES.TURTLE_MEAT]: 0x4A7A3D,
+            [BLOCK_TYPES.COAL_ORE]: 0x666666, [BLOCK_TYPES.IRON_ORE]: 0x8C7A6B, [BLOCK_TYPES.GOLD_ORE]: 0x9B8A00, [BLOCK_TYPES.FURNACE]: 0x5A5A5A,
+            [BLOCK_TYPES.COAL]: 0x222222, [BLOCK_TYPES.IRON_INGOT]: 0xC0C0C0, [BLOCK_TYPES.GOLD_INGOT]: 0xFFD700,
+            [BLOCK_TYPES.WOOD_PICKAXE]: 0xCD853F, [BLOCK_TYPES.STONE_PICKAXE]: 0x808080, [BLOCK_TYPES.IRON_PICKAXE]: 0xC0C0C0, [BLOCK_TYPES.GOLD_PICKAXE]: 0xFFD700,
+            [BLOCK_TYPES.WOOD_AXE]: 0xCD853F, [BLOCK_TYPES.STONE_AXE]: 0x808080, [BLOCK_TYPES.IRON_AXE]: 0xC0C0C0, [BLOCK_TYPES.GOLD_AXE]: 0xFFD700,
+            [BLOCK_TYPES.WOOD_SHOVEL]: 0xCD853F, [BLOCK_TYPES.STONE_SHOVEL]: 0x808080, [BLOCK_TYPES.IRON_SHOVEL]: 0xC0C0C0, [BLOCK_TYPES.GOLD_SHOVEL]: 0xFFD700,
+            [BLOCK_TYPES.CHEST]: 0xA0724A,
+            [BLOCK_TYPES.SNOW_BLOCK]: 0xF0F0F0, [BLOCK_TYPES.ICE_BLOCK]: 0x99DDEE, [BLOCK_TYPES.PRESSURE_PLATE]: 0x999999, [BLOCK_TYPES.MINE_RAIL]: 0x888888, [BLOCK_TYPES.MINE_SUPPORT]: 0x6B4226, [BLOCK_TYPES.SANDSTONE_CARVED]: 0xD2A85A
         };
 
         export const BLOCK_TEX = {
@@ -25,7 +39,14 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.FLOWER_RED]: 15, [BLOCK_TYPES.FLOWER_YELLOW]: 16,
             [BLOCK_TYPES.PLANKS]: 27, [BLOCK_TYPES.STICK]: 28, [BLOCK_TYPES.WORKBENCH]: 29, [BLOCK_TYPES.STONE_BRICK]: 30, [BLOCK_TYPES.SANDSTONE]: 31, [BLOCK_TYPES.BONE]: 32, [BLOCK_TYPES.WORKBENCH_SIDE]: 36,
             [BLOCK_TYPES.WINDOW]: 38, [BLOCK_TYPES.DOOR_BOTTOM]: 39, [BLOCK_TYPES.DOOR_TOP]: 40, [BLOCK_TYPES.BED_HEAD]: 41, [BLOCK_TYPES.BED_FOOT]: 42,
-            [BLOCK_TYPES.BERRY_BUSH]: 43, [BLOCK_TYPES.TALL_GRASS]: 44, [BLOCK_TYPES.CACTUS]: 45, [BLOCK_TYPES.DEAD_BUSH]: 46, [BLOCK_TYPES.MUSHROOM_RED]: 47, [BLOCK_TYPES.MUSHROOM_BROWN]: 48, [BLOCK_TYPES.SUGARCANE]: 49, [BLOCK_TYPES.FERN]: 50, [BLOCK_TYPES.BERRIES]: 51, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 52, [BLOCK_TYPES.SEAGRASS]: 54
+            [BLOCK_TYPES.BERRY_BUSH]: 43, [BLOCK_TYPES.TALL_GRASS]: 44, [BLOCK_TYPES.CACTUS]: 45, [BLOCK_TYPES.DEAD_BUSH]: 46, [BLOCK_TYPES.MUSHROOM_RED]: 47, [BLOCK_TYPES.MUSHROOM_BROWN]: 48, [BLOCK_TYPES.SUGARCANE]: 49, [BLOCK_TYPES.FERN]: 50, [BLOCK_TYPES.BERRIES]: 51, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 52, [BLOCK_TYPES.SEAGRASS]: 54,
+            [BLOCK_TYPES.COAL_ORE]: 56, [BLOCK_TYPES.IRON_ORE]: 57, [BLOCK_TYPES.GOLD_ORE]: 58, [BLOCK_TYPES.FURNACE]: 59,
+            [BLOCK_TYPES.COAL]: 60, [BLOCK_TYPES.IRON_INGOT]: 61, [BLOCK_TYPES.GOLD_INGOT]: 62,
+            [BLOCK_TYPES.WOOD_PICKAXE]: 63, [BLOCK_TYPES.STONE_PICKAXE]: 64, [BLOCK_TYPES.IRON_PICKAXE]: 65, [BLOCK_TYPES.GOLD_PICKAXE]: 66,
+            [BLOCK_TYPES.WOOD_AXE]: 67, [BLOCK_TYPES.STONE_AXE]: 68, [BLOCK_TYPES.IRON_AXE]: 69, [BLOCK_TYPES.GOLD_AXE]: 70,
+            [BLOCK_TYPES.WOOD_SHOVEL]: 71, [BLOCK_TYPES.STONE_SHOVEL]: 72, [BLOCK_TYPES.IRON_SHOVEL]: 73, [BLOCK_TYPES.GOLD_SHOVEL]: 74,
+            [BLOCK_TYPES.CHEST]: 75,
+            [BLOCK_TYPES.SNOW_BLOCK]: 8, [BLOCK_TYPES.ICE_BLOCK]: 9, [BLOCK_TYPES.PRESSURE_PLATE]: 79, [BLOCK_TYPES.MINE_RAIL]: 80, [BLOCK_TYPES.MINE_SUPPORT]: 81, [BLOCK_TYPES.SANDSTONE_CARVED]: 82
         };
 
 // --- TEXTURE GENERATOR ---
@@ -895,6 +916,233 @@ export const BLOCK_TYPES = {
                 const grad = c.createLinearGradient(0, 0, 0, 64);
                 grad.addColorStop(0, 'rgba(255,255,255,0.05)'); grad.addColorStop(1, 'rgba(0,0,0,0.1)');
                 c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
+            });
+
+            // === NEUE BLÖCKE (IDs 56-82) ===
+
+            // KOHLE-ERZ (Tile 56) – Stein mit schwarzen Kohle-Einschlüssen
+            drawTile(56, 0, (c) => {
+                const grays = ['#808080','#767676','#8A8A8A','#6F6F6F'];
+                pixelDraw(c, 64, 64, 4, () => grays[Math.floor(Math.random()*grays.length)]);
+                for (let i = 0; i < 14; i++) {
+                    c.fillStyle = ['#111','#000','#222'][Math.floor(Math.random()*3)];
+                    const ox = Math.floor(Math.random()*14)*4, oy = Math.floor(Math.random()*14)*4;
+                    const sz = (Math.floor(Math.random()*2)+1)*4;
+                    c.fillRect(ox, oy, sz, sz);
+                }
+            });
+
+            // EISEN-ERZ (Tile 57) – Stein mit orangebeigen Eisen-Punkten
+            drawTile(57, 0, (c) => {
+                const grays = ['#808080','#767676','#8A8A8A'];
+                pixelDraw(c, 64, 64, 4, () => grays[Math.floor(Math.random()*grays.length)]);
+                for (let i = 0; i < 12; i++) {
+                    c.fillStyle = ['#C0896B','#B07050','#D09A7A'][Math.floor(Math.random()*3)];
+                    const ox = Math.floor(Math.random()*14)*4, oy = Math.floor(Math.random()*14)*4;
+                    const sz = (Math.floor(Math.random()*2)+1)*4;
+                    c.fillRect(ox, oy, sz, sz);
+                }
+            });
+
+            // GOLD-ERZ (Tile 58) – Stein mit gelben Gold-Punkten
+            drawTile(58, 0, (c) => {
+                const grays = ['#808080','#767676','#8A8A8A'];
+                pixelDraw(c, 64, 64, 4, () => grays[Math.floor(Math.random()*grays.length)]);
+                for (let i = 0; i < 10; i++) {
+                    c.fillStyle = ['#FFD700','#DAA520','#FFC200'][Math.floor(Math.random()*3)];
+                    const ox = Math.floor(Math.random()*14)*4, oy = Math.floor(Math.random()*14)*4;
+                    const sz = (Math.floor(Math.random()*2)+1)*4;
+                    c.fillRect(ox, oy, sz, sz);
+                }
+            });
+
+            // OFEN (Tile 59) – Dunkler Stein mit Ofenöffnung
+            drawTile(59, 0, (c) => {
+                const stones = ['#606060','#585858','#686868','#505050'];
+                pixelDraw(c, 64, 64, 4, () => stones[Math.floor(Math.random()*stones.length)]);
+                c.fillStyle = '#1A1A1A';
+                c.fillRect(16, 20, 32, 28); // Ofenöffnung
+                c.fillStyle = '#FF6600';
+                c.fillRect(20, 28, 24, 16); // Glut innen
+                c.fillStyle = '#FF4400';
+                for (let i=0; i<4; i++) { c.fillRect(20+i*6, 34, 4, 8); } // Flammen
+                c.fillStyle = '#444';
+                c.fillRect(16, 48, 32, 4); // Ascheboden
+            });
+
+            // KOHLE (Tile 60) – Schwarzes glänzendes Mineral
+            drawTile(60, 0, (c) => {
+                c.fillStyle = '#1A1A1A'; c.fillRect(0,0,64,64);
+                for (let i=0; i<20; i++) {
+                    c.fillStyle = ['#2A2A2A','#111','#333','#0A0A0A'][Math.floor(Math.random()*4)];
+                    c.fillRect(Math.random()*56, Math.random()*56, 4+Math.random()*8, 4+Math.random()*8);
+                }
+                c.fillStyle = 'rgba(255,255,255,0.15)';
+                c.fillRect(12,8,6,6); c.fillRect(40,20,4,4); // Glanzpunkte
+            });
+
+            // EISENBARREN (Tile 61) – Silbrig metallisch
+            drawTile(61, 0, (c) => {
+                c.fillStyle = '#888'; c.fillRect(0,0,64,64);
+                const grad = c.createLinearGradient(0,0,64,64);
+                grad.addColorStop(0,'#D0D0D0'); grad.addColorStop(0.4,'#A8A8A8'); grad.addColorStop(1,'#686868');
+                c.fillStyle = grad; c.fillRect(8,16,48,32);
+                c.strokeStyle='#555'; c.lineWidth=2; c.strokeRect(8,16,48,32);
+                c.fillStyle='rgba(255,255,255,0.4)'; c.fillRect(10,18,12,4);
+            });
+
+            // GOLDBARREN (Tile 62) – Golden glänzend
+            drawTile(62, 0, (c) => {
+                c.fillStyle = '#A07800'; c.fillRect(0,0,64,64);
+                const grad = c.createLinearGradient(0,0,64,64);
+                grad.addColorStop(0,'#FFE566'); grad.addColorStop(0.4,'#FFD700'); grad.addColorStop(1,'#B8960A');
+                c.fillStyle = grad; c.fillRect(8,16,48,32);
+                c.strokeStyle='#8B6914'; c.lineWidth=2; c.strokeRect(8,16,48,32);
+                c.fillStyle='rgba(255,255,255,0.5)'; c.fillRect(10,18,12,4);
+            });
+
+            // HOLZ-SPITZHACKE (Tile 63)
+            drawTile(63, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(24,40,8,24); // Stiel
+                c.fillStyle = '#CD853F';
+                c.fillRect(8,20,48,16); // Kopf
+                c.fillRect(8,20,12,24); // linke Spitze
+                c.fillRect(44,20,12,24); // rechte Spitze
+                c.fillStyle='#A06020'; c.fillRect(10,22,8,4); c.fillRect(46,22,8,4);
+            });
+
+            // STEIN-SPITZHACKE (Tile 64)
+            drawTile(64, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(24,40,8,24);
+                c.fillStyle = '#888';
+                c.fillRect(8,20,48,16);
+                c.fillRect(8,20,12,24);
+                c.fillRect(44,20,12,24);
+                c.fillStyle='#666'; c.fillRect(10,22,8,4); c.fillRect(46,22,8,4);
+            });
+
+            // EISEN-SPITZHACKE (Tile 65)
+            drawTile(65, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(24,40,8,24);
+                c.fillStyle = '#B8B8B8';
+                c.fillRect(8,20,48,16);
+                c.fillRect(8,20,12,24);
+                c.fillRect(44,20,12,24);
+                c.fillStyle='rgba(255,255,255,0.4)'; c.fillRect(10,22,8,4); c.fillRect(46,22,8,4);
+            });
+
+            // GOLD-SPITZHACKE (Tile 66)
+            drawTile(66, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(24,40,8,24);
+                c.fillStyle = '#FFD700';
+                c.fillRect(8,20,48,16);
+                c.fillRect(8,20,12,24);
+                c.fillRect(44,20,12,24);
+                c.fillStyle='rgba(255,255,255,0.5)'; c.fillRect(10,22,8,4); c.fillRect(46,22,8,4);
+            });
+
+            // HOLZ-AXT (Tile 67)
+            drawTile(67, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(28,36,8,28);
+                c.fillStyle = '#CD853F';
+                c.fillRect(12,12,28,24); // Axtkopf
+                c.fillRect(12,12,8,36);  // Schneide unten
+            });
+
+            // STEIN-AXT (Tile 68)
+            drawTile(68, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(28,36,8,28);
+                c.fillStyle = '#888'; c.fillRect(12,12,28,24); c.fillRect(12,12,8,36);
+            });
+
+            // EISEN-AXT (Tile 69)
+            drawTile(69, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(28,36,8,28);
+                c.fillStyle = '#B8B8B8'; c.fillRect(12,12,28,24); c.fillRect(12,12,8,36);
+            });
+
+            // GOLD-AXT (Tile 70)
+            drawTile(70, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(28,36,8,28);
+                c.fillStyle = '#FFD700'; c.fillRect(12,12,28,24); c.fillRect(12,12,8,36);
+            });
+
+            // HOLZ-SCHAUFEL (Tile 71)
+            drawTile(71, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(28,28,8,36);
+                c.fillStyle = '#CD853F'; c.fillRect(16,8,32,24);
+                c.fillStyle = '#A06020'; c.fillRect(18,10,28,4);
+            });
+
+            // STEIN-SCHAUFEL (Tile 72)
+            drawTile(72, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(28,28,8,36);
+                c.fillStyle = '#888'; c.fillRect(16,8,32,24);
+            });
+
+            // EISEN-SCHAUFEL (Tile 73)
+            drawTile(73, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(28,28,8,36);
+                c.fillStyle = '#B8B8B8'; c.fillRect(16,8,32,24);
+                c.fillStyle='rgba(255,255,255,0.4)'; c.fillRect(18,10,12,4);
+            });
+
+            // GOLD-SCHAUFEL (Tile 74)
+            drawTile(74, 0, (c) => {
+                c.fillStyle = '#8B6914'; c.fillRect(28,28,8,36);
+                c.fillStyle = '#FFD700'; c.fillRect(16,8,32,24);
+                c.fillStyle='rgba(255,255,255,0.5)'; c.fillRect(18,10,12,4);
+            });
+
+            // TRUHE (Tile 75) – Holztruhe mit Eisenbeschlägen
+            drawTile(75, 0, (c) => {
+                const woods = ['#A0724A','#8A6238','#B07E50'];
+                pixelDraw(c, 64, 64, 4, () => woods[Math.floor(Math.random()*woods.length)]);
+                c.fillStyle = '#7A4A1A'; c.fillRect(0,28,64,8); // Trennlinie
+                c.fillStyle = '#888'; // Beschläge
+                c.fillRect(4,4,8,24); c.fillRect(52,4,8,24);
+                c.fillRect(4,36,8,24); c.fillRect(52,36,8,24);
+                c.fillStyle = '#BBB'; c.fillRect(28,24,8,16); // Schloss
+                c.fillStyle = '#888'; c.fillRect(30,28,4,8);
+            });
+
+            // DRUCKPLATTE (Tile 79) – Flache Steinplatte
+            drawTile(79, 0, (c) => {
+                const grays = ['#999','#888','#AAA'];
+                pixelDraw(c, 64, 64, 4, () => grays[Math.floor(Math.random()*grays.length)]);
+                c.strokeStyle = '#555'; c.lineWidth = 3;
+                c.strokeRect(6, 6, 52, 52);
+            });
+
+            // MINENGLEIS (Tile 80) – Metallschiene
+            drawTile(80, 0, (c) => {
+                c.fillStyle = '#5A4A3A'; c.fillRect(0,0,64,64); // Holzuntergrund
+                c.fillStyle = '#888'; // Schienen
+                c.fillRect(8,0,10,64); c.fillRect(46,0,10,64);
+                c.fillStyle = '#666'; // Schwellen
+                for (let y=4; y<64; y+=16) { c.fillRect(0,y,64,8); }
+            });
+
+            // MINENBALKEN (Tile 81) – Holzstützbalken
+            drawTile(81, 0, (c) => {
+                const woods = ['#6B4226','#5C3A1E','#7A4C2C'];
+                pixelDraw(c, 64, 64, 4, () => woods[Math.floor(Math.random()*woods.length)]);
+                c.fillStyle = '#3A2010'; // Holzmaserung
+                for (let i=0; i<3; i++) {
+                    c.fillRect(0, 20+i*8, 64, 2);
+                }
+            });
+
+            // GRAVIERTER SANDSTEIN (Tile 82) – Sandstein mit Reliefmuster
+            drawTile(82, 0, (c) => {
+                const sands = ['#D2A85A','#C9A050','#DEB06A'];
+                pixelDraw(c, 64, 64, 4, () => sands[Math.floor(Math.random()*sands.length)]);
+                c.fillStyle = '#A07030'; // Gravurlinien
+                c.fillRect(8,8,48,4); c.fillRect(8,52,48,4);
+                c.fillRect(8,8,4,48); c.fillRect(52,8,4,48);
+                c.fillRect(24,20,16,24);
+                c.fillStyle = '#F0D090';
+                c.fillRect(26,22,12,20);
             });
 
             atlasDataURL = canvas.toDataURL("image/png");

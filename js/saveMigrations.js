@@ -15,10 +15,9 @@
  */
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 1;
+export const CURRENT_SAVE_VERSION = 2;
 
 // Migration v0 → v1: Inventory-Format vom Objekt {type: count} auf Array<{type, count}>
-// Vorher in inventory.js als oldInventoryMap hartcodiert. Hier zentralisiert.
 const OLD_INVENTORY_MAP = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
 
 function migrateV0toV1(data) {
@@ -35,10 +34,29 @@ function migrateV0toV1(data) {
     return data;
 }
 
+// Migration v1 → v2: Tür-Rotation aus gepackten Block-Werten in blockMeta auslagern.
+// Vorher: modifiedBlocks["x,y,z"] = 33|(rotation<<6) = 97/161/225.
+// Jetzt:  modifiedBlocks["x,y,z"] = 33, blockMeta["x,y,z"] = rotation.
+function migrateV1toV2(data) {
+    if (!data.blockMeta) data.blockMeta = {};
+    if (!data.chestContents) data.chestContents = {};
+    if (data.modifiedBlocks) {
+        for (const key in data.modifiedBlocks) {
+            const val = data.modifiedBlocks[key];
+            const baseId = val & 0x3f;
+            if ((baseId === 33 || baseId === 34) && val > 63) {
+                data.modifiedBlocks[key] = baseId;
+                data.blockMeta[key] = (val >> 6) & 0x3;
+            }
+        }
+    }
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
-    1: migrateV0toV1
-    // 2: migrateV1toV2,  ← künftige Migrations hier registrieren
+    1: migrateV0toV1,
+    2: migrateV1toV2
 };
 
 /**

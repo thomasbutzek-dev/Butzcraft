@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260427b';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260504a';
 
 // RENDER_DIST wird NICHT destrukturiert, damit Laufzeit-Änderungen via Settings sofort wirken.
 // CHUNK_SIZE/HEIGHT etc. sind hingegen statisch und werden beim Welt-Load fest verdrahtet.
@@ -37,6 +37,8 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 this.scene = scene;
                 this.chunks = new Map();
                 this.modifiedBlocks = {};
+                this.blockMeta = {};    // "x,y,z" → metadata byte (Tür-Rotation etc.)
+                this.chestContents = {}; // "chest,x,y,z" → Array<{type,count}>
                 this.uTime = { value: 0 };
                 this.pendingMeshes = new Set(); // Verhindert doppelte Mesh-Requests
                 
@@ -299,8 +301,18 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 // Kopie der Center-Daten erstellen (da Transferables den Buffer neutrieren)
                 const centerCopy = chunk.data.buffer.slice(0);
 
+                // blockMeta für den Chunk-Bereich + 1 Block Rand (für Tür-Rendering an Grenzen)
+                const chunkMeta = {};
+                const x0 = cx * CHUNK_SIZE - 1, x1 = (cx + 1) * CHUNK_SIZE + 1;
+                const z0 = cz * CHUNK_SIZE - 1, z1 = (cz + 1) * CHUNK_SIZE + 1;
+                for (const key in this.blockMeta) {
+                    const parts = key.split(',');
+                    const bx = +parts[0], bz = +parts[2];
+                    if (bx >= x0 && bx < x1 && bz >= z0 && bz < z1) chunkMeta[key] = this.blockMeta[key];
+                }
+
                 this.worker.postMessage(
-                    { type: 'mesh', cx, cz, centerData: centerCopy, neighbors },
+                    { type: 'mesh', cx, cz, centerData: centerCopy, neighbors, blockMeta: chunkMeta },
                     [centerCopy, ...neighbors.map(n => n.data)]
                 );
             }

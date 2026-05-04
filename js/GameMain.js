@@ -2,9 +2,9 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import { CONFIG } from '../config.js';
         import { SoundManager } from './sound.js';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260427b';
-        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260427b';
-        import { Mob, updateProjectiles } from './mobs.js?v=20260501a';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260504a';
+        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260504a';
+        import { Mob, updateProjectiles } from './mobs.js?v=20260504a';
 
         import { Input } from './Input.js';
         import { initTouchControls, isTouchDevice } from './touch.js';
@@ -13,13 +13,18 @@
         import { Player } from './Player.js';
         import { PlayerInteraction } from './PlayerInteraction.js';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js';
         window.addItemToInventory = addItemToInventory;
         window.inventorySlots = inventorySlots;
         window.updateInventoryUI = updateInventoryUI;
         window.getSelectedSlot = getSelectedSlot;
-        
+        window.setSelectedSlot = setSelectedSlot;
+        window.getBiomeAt = getBiomeAt;
+
         window.SoundManager = SoundManager;
         window.BLOCK_TYPES = BLOCK_TYPES;
+        window.BLOCK_TEX = BLOCK_TEX;
+        window._blockTexData = { BLOCK_TEX, atlasDataURL };
         
 
 
@@ -101,6 +106,8 @@
                     
                     if(data.modifiedBlocks) {
                         world.modifiedBlocks = data.modifiedBlocks;
+                        world.blockMeta = data.blockMeta || {};
+                        world.chestContents = data.chestContents || {};
                         world.chunks.forEach(c => {
                             if (c.mesh) scene.remove(c.mesh);
                             if (c.waterMesh) scene.remove(c.waterMesh);
@@ -441,14 +448,15 @@
                 rdSelect.addEventListener('change', (e) => applyRenderDistance(e.target.value));
             }
 
-            window.playerInteractions = new PlayerInteraction(camera, scene, world, mobs, SoundManager, {
+            window.playerInteraction = new PlayerInteraction(camera, scene, world, mobs, SoundManager, {
                 getSelectedSlot: getSelectedSlot,
                 getInventorySlots: () => inventorySlots,
                 addItemToInventory: addItemToInventory,
                 updateInventoryUI: updateInventoryUI,
                 updateUI: updateUI
             });
-            window.playerInteractions.init(controls, () => gameActive, () => spawning);
+            window.playerInteractions = window.playerInteraction; // Alias für Backwards-Compat
+            window.playerInteraction.init(controls, () => gameActive, () => spawning);
 
             // Touch-Controls: nur auf Touch-Devices aktiv. Setzt window.touchActive=true,
             // damit der PointerLock-Pause-Mechanismus übersprungen wird.
@@ -462,7 +470,14 @@
                 const tag = document.activeElement?.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-                if (e.code === 'KeyE') { toggleInventory(gameStarted, spawning, controls); return; }
+                if (e.code === 'KeyE') {
+                    // Ofen/Truhe zuerst schließen
+                    const furnaceOverlay = document.getElementById('furnace-overlay');
+                    const chestOverlay = document.getElementById('chest-overlay');
+                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
+                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
+                    toggleInventory(gameStarted, spawning, controls); return;
+                }
                 if (isInventoryOpened()) return;
 
                 // Space logik in Input.js
@@ -620,7 +635,7 @@
                         const bt = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z));
                         if (bt !== 0 && bt !== 8 && bt !== 9 && bt !== 10) {
                             spawning = false;
-                            if (!controls.isLocked) {
+                            if (!controls.isLocked && !window.touchActive) {
                                 controls.lock();
                             }
                         }
@@ -773,7 +788,13 @@
                 window.player.updatePhysics(delta, Input, world, SoundManager);
                 window.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (window.player.hunger <= 0) { window.player.hunger = 0; window.player.health -= 2 * delta; }
                 if (window.player.hunger > REGEN_THRESHOLD && window.player.health < MAX_HEALTH) window.player.health += REGEN_RATE * delta;
+
+                // Druckplatten-Schaden
+                if (window.playerInteraction) window.playerInteraction.checkPressurePlates(playerPos.x, playerPos.y, playerPos.z);
             }
+
+            // Ofen-Tick (auch wenn pausiert, solange UI offen)
+            tickFurnace(controls);
 
             world.updateVisibleChunks(playerPos.x, playerPos.z);
             window.player.updateSword(delta);
@@ -862,7 +883,9 @@
                 inventory: inventorySlots,
                 collectedEggs: collectedEggs,
                 collectedWool: collectedWool,
-                modifiedBlocks: world.modifiedBlocks
+                modifiedBlocks: world.modifiedBlocks,
+                blockMeta: world.blockMeta,
+                chestContents: world.chestContents
             });
             
             fetch('/api/save', {

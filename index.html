@@ -39,7 +39,7 @@
             <div style="display: flex; flex-direction: column; align-items: flex-start; pointer-events: auto;">
                 <div id="stats">Lädt...</div>
                 
-                <div style="font-size: 9px; color: #aaa; margin-top: 2px;">(ESC drücken für Maus)</div>
+                <div id="esc-hint" style="font-size: 9px; color: #aaa; margin-top: 2px;">(ESC drücken für Maus)</div>
             </div>
             <div id="time-info">Tag 1 | 08:00</div>
         </div>
@@ -112,10 +112,10 @@
     <div id="inventory-overlay">
         <div id="inventory-title">Inventar</div>
         
-        <!-- NEUES CRAFTING AREA -->
+        <!-- NEUES CRAFTING AREA (3×3) -->
         <div id="crafting-area" style="display: flex; gap: 20px; align-items: center; justify-content: center; margin-bottom: 20px;">
-            <div id="crafting-grid" style="display: grid; grid-template-columns: repeat(2, 60px); grid-template-rows: repeat(2, 60px); gap: 5px;">
-                <!-- Wird dynamisch mit inv-slot für Crafting gefüllt -->
+            <div id="crafting-grid" style="display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px); gap: 5px;">
+                <!-- Wird dynamisch mit 9 inv-slot für Crafting gefüllt -->
             </div>
             <div style="font-size: 24px; color: white;">➔</div>
             <div id="crafting-result" style="width: 60px; height: 60px;">
@@ -127,6 +127,44 @@
             <!-- Wird dynamisch gefüllt -->
         </div>
         <p style="color: #aaa; font-size: 12px; margin-top: 15px;">Klicke auf Items, um sie zu nehmen/abzulegen. Rechtsklick teilt Stacks. 'E' zum Schließen.</p>
+    </div>
+
+    <!-- OFEN-UI OVERLAY -->
+    <div id="furnace-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center;">
+        <div style="background:#2a2a2a; border:2px solid #555; border-radius:8px; padding:24px; min-width:340px; color:white; font-family:monospace;">
+            <div style="text-align:center; font-size:18px; margin-bottom:16px; color:#ff9900;">🔥 Ofen</div>
+            <div style="display:flex; gap:16px; align-items:center; justify-content:center; margin-bottom:16px;">
+                <div style="text-align:center;">
+                    <div style="font-size:11px; color:#aaa; margin-bottom:4px;">Schmelzen</div>
+                    <div id="furnace-input-slot" class="inv-slot" style="width:60px;height:60px;"></div>
+                </div>
+                <div style="text-align:center;">
+                    <div style="font-size:11px; color:#aaa; margin-bottom:4px;">Brennstoff</div>
+                    <div id="furnace-fuel-slot" class="inv-slot" style="width:60px;height:60px;"></div>
+                </div>
+                <div style="font-size:24px;">➔</div>
+                <div style="text-align:center;">
+                    <div style="font-size:11px; color:#aaa; margin-bottom:4px;">Ergebnis</div>
+                    <div id="furnace-output-slot" class="inv-slot" style="width:60px;height:60px;"></div>
+                </div>
+            </div>
+            <div id="furnace-progress" style="background:#444; border-radius:4px; height:12px; margin-bottom:12px; overflow:hidden;">
+                <div id="furnace-progress-bar" style="background:#ff6600; height:100%; width:0%; transition:width 0.5s;"></div>
+            </div>
+            <div id="furnace-status" style="text-align:center; font-size:12px; color:#aaa; margin-bottom:16px;">Bereit</div>
+            <button onclick="window.closeFurnace && window.closeFurnace()" style="display:block; margin:0 auto; padding:8px 24px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Schließen (E)</button>
+        </div>
+    </div>
+
+    <!-- TRUHEN-UI OVERLAY -->
+    <div id="chest-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center;">
+        <div style="background:#2a2a2a; border:2px solid #555; border-radius:8px; padding:24px; color:white; font-family:monospace;">
+            <div style="text-align:center; font-size:18px; margin-bottom:16px; color:#c8a060;">📦 Truhe</div>
+            <div id="chest-grid" style="display:grid; grid-template-columns:repeat(5,60px); gap:5px; margin-bottom:16px;">
+                <!-- Wird per JS befüllt -->
+            </div>
+            <button onclick="window.closeChest && window.closeChest()" style="display:block; margin:0 auto; padding:8px 24px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Schließen (E)</button>
+        </div>
     </div>
 
     <!-- CUSTOM CURSOR ITEM -->
@@ -144,7 +182,7 @@
         }
     </script>
 
-    <script type="module" src="./js/GameMain.js?v=20260501a"></script>
+    <script type="module" src="./js/GameMain.js?v=20260504a"></script>
 </body>
 
 </html>

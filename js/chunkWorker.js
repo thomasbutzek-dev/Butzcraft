@@ -11,7 +11,8 @@ let BLOCK_TEX = {};
 const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW: 'Schneefeld', PLAINS: 'Grasland' };
 
 // Transparente/Nicht-solide Block-IDs (Faces gegen diese werden gezeichnet)
-const TRANSPARENT_IDS = new Set([0, -1, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54]);
+// 79=Druckplatte, 80=Minengleis: dünn, Nachbarn sollen sichtbar sein
+const TRANSPARENT_IDS = new Set([0, -1, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80]);
 
 // 2D-Pflanzen (Stern-Mesh statt Würfel)
 const PLANT_2D_IDS = new Set([9, 10, 27, 43, 44, 46, 47, 48, 49, 50, 52, 54]);
@@ -147,6 +148,106 @@ function spawnPalm(data, x, h, z, rng) {
     }
 }
 
+// ============================================================
+// Prozedurale Strukturen
+// ============================================================
+
+// Schreibt einen Block in die Chunk-Data — ignoriert Koordinaten außerhalb des Chunks
+function setBlockLocal(data, lx, ly, lz, blockId) {
+    if (lx < 0 || lx >= CHUNK_SIZE || lz < 0 || lz >= CHUNK_SIZE || ly < 0 || ly >= CHUNK_HEIGHT) return;
+    data[(ly * CHUNK_SIZE * CHUNK_SIZE) + (lz * CHUNK_SIZE) + lx] = blockId;
+}
+
+// Verlassene Mine: 3×3-Korridor der Länge 20 Blöcke, mit Truhe am Ende
+function spawnMine(data, x, y, z) {
+    for (let i = 0; i < 20; i++) {
+        for (let dy = 0; dy < 3; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                setBlockLocal(data, x + dx, y + dy, z + i, 0); // Korridor aushöhlen
+            }
+        }
+        // Balken alle 4 Blöcke
+        if (i % 4 === 0) {
+            setBlockLocal(data, x - 1, y + 2, z + i, 81); // MINE_SUPPORT links oben
+            setBlockLocal(data, x + 1, y + 2, z + i, 81); // MINE_SUPPORT rechts oben
+            setBlockLocal(data, x,     y + 2, z + i, 81); // MINE_SUPPORT Mitte oben
+        }
+        // Gleise auf dem Boden
+        setBlockLocal(data, x, y, z + i, 80); // MINE_RAIL
+    }
+    // Truhe am Ende
+    setBlockLocal(data, x, y + 1, z + 20, 75); // CHEST
+}
+
+// Wüstentempel: 11×11 Sandstein-Pyramide mit versteckter Kammer
+function spawnDesertTemple(data, x, y, z) {
+    const size = 11;
+    // Pyramide Schicht für Schicht
+    for (let level = 0; level < 6; level++) {
+        const half = Math.floor(size / 2) - level;
+        if (half < 0) break;
+        for (let dx = -half; dx <= half; dx++) {
+            for (let dz = -half; dz <= half; dz++) {
+                const isEdge = (Math.abs(dx) === half || Math.abs(dz) === half);
+                setBlockLocal(data, x + dx, y + level, z + dz, isEdge ? 82 : 30); // SANDSTONE_CARVED / SANDSTONE
+            }
+        }
+    }
+    // Versteckte Kammer im Innern (y-1 bis y+2)
+    for (let dy = -2; dy < 3; dy++) {
+        for (let dx = -2; dx <= 2; dx++) {
+            for (let dz = -2; dz <= 2; dz++) {
+                setBlockLocal(data, x + dx, y + dy, z + dz, 0); // Hohlraum
+            }
+        }
+    }
+    // Boden der Kammer aus Sandstein
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+            setBlockLocal(data, x + dx, y - 3, z + dz, 30);
+        }
+    }
+    // Druckplatten-Falle (Eingang)
+    setBlockLocal(data, x, y - 2, z + 3, 79);  // PRESSURE_PLATE Eingang
+    // Truhe in der Kammer
+    setBlockLocal(data, x, y - 2, z - 2, 75); // CHEST
+}
+
+// Iglu: Halbkuppel Radius 5, Schnee-Kuppel, Eis-Boden, Bett + Truhe innen
+function spawnIgloo(data, x, y, z) {
+    const r = 5;
+    for (let dx = -r; dx <= r; dx++) {
+        for (let dz = -r; dz <= r; dz++) {
+            for (let dy = 0; dy <= r; dy++) {
+                const dist = Math.sqrt(dx * dx + dz * dz + dy * dy);
+                if (dist >= r - 0.5 && dist <= r + 0.5) {
+                    setBlockLocal(data, x + dx, y + dy, z + dz, 77); // SNOW_BLOCK Kuppel
+                }
+            }
+        }
+    }
+    // Innenraum aushöhlen
+    for (let dx = -(r - 1); dx <= r - 1; dx++) {
+        for (let dz = -(r - 1); dz <= r - 1; dz++) {
+            for (let dy = 1; dy <= r - 1; dy++) {
+                if (Math.sqrt(dx * dx + dz * dz + dy * dy) < r - 0.5) {
+                    setBlockLocal(data, x + dx, y + dy, z + dz, 0);
+                }
+            }
+        }
+    }
+    // Eisboden
+    for (let dx = -(r - 1); dx <= r - 1; dx++) {
+        for (let dz = -(r - 1); dz <= r - 1; dz++) {
+            setBlockLocal(data, x + dx, y, z + dz, 78); // ICE_BLOCK
+        }
+    }
+    // Bett und Truhe innen
+    setBlockLocal(data, x - 2, y + 1, z, 38);  // BED_HEAD
+    setBlockLocal(data, x - 1, y + 1, z, 39);  // BED_FOOT
+    setBlockLocal(data, x + 2, y + 1, z, 75);  // CHEST
+}
+
 function generateTerrain(cx, cz, buffer) {
     const data = new Uint8Array(buffer);
     data.fill(0);
@@ -183,7 +284,17 @@ function generateTerrain(cx, cz, buffer) {
                     }
                 }
                 if (y === 1 && rng() < 0.5) { data[idx] = 20; continue; }
-                if (y < h - 4) data[idx] = 3;
+                if (y < h - 4) {
+                    data[idx] = 3;
+                    // Erz-Generierung im Stone-Layer
+                    if (y > 1 && y < h - 5) {
+                        const oreRng = mulberry32(wx * 7411 + wz * 3319 + y * 1237);
+                        const r = oreRng();
+                        if (r < 0.018) data[idx] = 56;       // COAL_ORE (häufig, alle Tiefen)
+                        else if (r < 0.028 && y < 24) data[idx] = 57; // IRON_ORE (mittel, bis y<24)
+                        else if (r < 0.033 && y < 14) data[idx] = 58; // GOLD_ORE (selten, tief)
+                    }
+                }
                 else if (y < h - 1) data[idx] = (biome === BIOMES.DESERT) ? 7 : 2;
                 else if (y === h - 1) {
                     if (biome === BIOMES.SNOW) data[idx] = 11;
@@ -251,6 +362,55 @@ function generateTerrain(cx, cz, buffer) {
             }
         }
     }
+
+    // Prozedurale Strukturen: Im 3×3-Nachbar-Chunk-Bereich prüfen, ob eine Struktur startet,
+    // die in diesen Chunk hineinragt. Jede Struktur wird deterministisch am Quell-Chunk platziert.
+    for (let scx = cx - 1; scx <= cx + 1; scx++) {
+        for (let scz = cz - 1; scz <= cz + 1; scz++) {
+            const srng = mulberry32(scx * 88317 + scz * 23497);
+            const wx0 = scx * CHUNK_SIZE, wz0 = scz * CHUNK_SIZE;
+
+            // Verlassene Mine (Spawn-Chance 4%, nur in Plains/Jungle/Snow)
+            if (srng() < 0.04) {
+                const mx = wx0 + Math.floor(srng() * CHUNK_SIZE);
+                const mz = wz0 + Math.floor(srng() * CHUNK_SIZE);
+                const mb = getBiomeAt(mx, mz);
+                if (mb !== BIOMES.DESERT && mb !== BIOMES.OCEAN) {
+                    const mh = Math.floor(noise2D(mx, mz) + 38);
+                    const my = Math.max(4, mh - 8 - Math.floor(srng() * 4));
+                    // Lokale Koordinaten im aktuellen Chunk
+                    const lx = mx - cx * CHUNK_SIZE;
+                    const lz = mz - cz * CHUNK_SIZE;
+                    spawnMine(data, lx, my, lz);
+                }
+            }
+
+            // Wüstentempel (Spawn-Chance 3%, nur in Desert)
+            if (srng() < 0.03) {
+                const tx = wx0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
+                const tz = wz0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
+                if (getBiomeAt(tx, tz) === BIOMES.DESERT) {
+                    const th = Math.floor(noise2D(tx, tz) + 38 + Math.sin(tx * 0.2) * 2);
+                    const lx = tx - cx * CHUNK_SIZE;
+                    const lz = tz - cz * CHUNK_SIZE;
+                    spawnDesertTemple(data, lx, th, lz);
+                }
+            }
+
+            // Iglu (Spawn-Chance 3%, nur in Snow)
+            if (srng() < 0.03) {
+                const ix = wx0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
+                const iz = wz0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
+                if (getBiomeAt(ix, iz) === BIOMES.SNOW) {
+                    const ih = Math.floor(noise2D(ix, iz) + 38);
+                    const lx = ix - cx * CHUNK_SIZE;
+                    const lz = iz - cz * CHUNK_SIZE;
+                    spawnIgloo(data, lx, ih, lz);
+                }
+            }
+        }
+    }
+
     return data;
 }
 
@@ -281,13 +441,13 @@ function makeGetBlock(centerData, neighbors, cx, cz) {
 
 // Prüft ob ein Block "solid" ist (für AO-Berechnung)
 function isSolidForAO(blockType) {
-    const masked = blockType & 0x3f;
-    if (masked <= 0) return false;
+    if (blockType <= 0) return false;
     // Wasser, Pflanzen, Wolken etc. erzeugen kein AO
-    return !TRANSPARENT_IDS.has(masked);
+    return !TRANSPARENT_IDS.has(blockType);
 }
 
-function buildMesh(cx, cz, getBlock, isWater) {
+function buildMesh(cx, cz, getBlock, isWater, blockMeta) {
+    blockMeta = blockMeta || {};
     // Pre-allokierte Arrays (dynamisch, da wir die Größe nicht vorhersagen können)
     const pos = [];
     const col = [];
@@ -324,7 +484,7 @@ function buildMesh(cx, cz, getBlock, isWater) {
                 const wx = cx * CHUNK_SIZE + x;
                 const wz = cz * CHUNK_SIZE + z;
                 const t = getBlock(wx, y, wz);
-                const blockType = t & 0x3f;
+                const blockType = t;
                 if (blockType === 0 || (blockType === 4) !== isWater) continue;
 
                 // Farb-Berechnung
@@ -406,7 +566,7 @@ function buildMesh(cx, cz, getBlock, isWater) {
                 // TÜREN (schmale Wand)
                 // ==============================
                 if (blockType === 33 || blockType === 34) {
-                    const rotation = (t >> 6) & 0x3;
+                    const rotation = blockMeta[wx + ',' + y + ',' + wz] || 0;
                     const dR = 1, dG = 1, dB = 1;
                     const texIdx = BLOCK_TEX[blockType] || 0;
                     const u0 = (texIdx % 16) / 16, v0 = 1 - (Math.floor(texIdx / 16) + 1) / 16;
@@ -450,6 +610,26 @@ function buildMesh(cx, cz, getBlock, isWater) {
                     sway.push(0, 0, 0, 0);
                     pushAtlasSentinel(4);
                     idx.push(st, st + 1, st + 2, st, st + 2, st + 3); vc += 4;
+                    continue;
+                }
+
+                // ==============================
+                // DRUCKPLATTE (sehr dünne Platte, 0.1 hoch)
+                // ==============================
+                if (blockType === 79) {
+                    const pR = 0.6, pG = 0.6, pB = 0.6;
+                    const texIdx = BLOCK_TEX[79] || 2;
+                    const u0 = (texIdx % 16) / 16, v0 = 1 - (Math.floor(texIdx / 16) + 1) / 16;
+                    const u1 = u0 + 1 / 16, v1 = v0 + 1 / 16;
+                    const ph = 0.1, inset = 0.05; // leicht eingerückt
+                    // Oberseite
+                    let st = vc;
+                    pos.push(x+inset, y+ph, z+1-inset,  x+1-inset, y+ph, z+1-inset,  x+1-inset, y+ph, z+inset,  x+inset, y+ph, z+inset);
+                    col.push(pR,pG,pB, pR,pG,pB, pR,pG,pB, pR,pG,pB);
+                    norm.push(0,1,0, 0,1,0, 0,1,0, 0,1,0);
+                    uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                    sway.push(0,0,0,0); pushAtlasSentinel(4);
+                    idx.push(st,st+1,st+2, st,st+2,st+3); vc+=4;
                     continue;
                 }
 
@@ -517,7 +697,7 @@ function buildMesh(cx, cz, getBlock, isWater) {
                     const f = CUBE_FACES[fi];
                     const nx = wx + f.d[0], ny = y + f.d[1], nz = wz + f.d[2];
                     const neigh = getBlock(nx, ny, nz);
-                    const neighType = neigh & 0x3f;
+                    const neighType = neigh;
 
                     let shouldDraw = false;
                     if (isWater) {
@@ -757,7 +937,7 @@ self.onmessage = function (e) {
     }
 
     if (e.data.type === 'mesh') {
-        const { cx, cz, centerData, neighbors } = e.data;
+        const { cx, cz, centerData, neighbors, blockMeta } = e.data;
 
         // Nachbar-Daten in ein Lookup-Objekt umwandeln
         const neighborMap = {};
@@ -771,9 +951,9 @@ self.onmessage = function (e) {
         const getBlock = makeGetBlock(centerArr, neighborMap, cx, cz);
 
         // Opaque Mesh
-        const opaque = buildMesh(cx, cz, getBlock, false);
+        const opaque = buildMesh(cx, cz, getBlock, false, blockMeta || {});
         // Water Mesh
-        const water = buildMesh(cx, cz, getBlock, true);
+        const water = buildMesh(cx, cz, getBlock, true, blockMeta || {});
 
         const transferables = [];
         const result = { type: 'meshResult', cx, cz, opaque: null, water: null };

@@ -1,8 +1,7 @@
 /* js/crafting.js - Butzcraft Crafting System Logic */
 import { craftingRecipes, matchRecipe } from './recipes.js';
 
-// User-facing Grid bleibt 2×2 (4 Slots). Erweiterung auf 3×3 erfordert separates UI-Refactor.
-const CRAFTING_GRID_SIZE = 2;
+const CRAFTING_GRID_SIZE = 3;
 
 export let craftingGridData = Array.from({ length: CRAFTING_GRID_SIZE * CRAFTING_GRID_SIZE }, () => ({ type: 0, count: 0 }));
 export let craftingResultData = { type: 0, count: 0 };

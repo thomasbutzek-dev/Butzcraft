@@ -49,7 +49,13 @@ const TRANSLATIONS = {
     'WINDOW': 'Fenster', 'DOOR_BOTTOM': 'Tür', 'DOOR_TOP': 'Tür-Oberteil', 'BED_HEAD': 'Bett', 'BED_FOOT': 'Bett-Fußteil',
     'BERRY_BUSH': 'Beerenbusch', 'TALL_GRASS': 'Hohes Gras', 'CACTUS': 'Kaktus', 'DEAD_BUSH': 'Toter Strauch',
     'MUSHROOM_RED': 'Roter Pilz', 'MUSHROOM_BROWN': 'Brauner Pilz', 'SUGARCANE': 'Zuckerrohr',
-    'FERN': 'Farn', 'BERRIES': 'Beeren', 'BERRY_BUSH_EMPTY': 'Leerer Beerenbusch', 'SEAGRASS': 'Seegras', 'TURTLE_MEAT': 'Schildkrötenfleisch'
+    'FERN': 'Farn', 'BERRIES': 'Beeren', 'BERRY_BUSH_EMPTY': 'Leerer Beerenbusch', 'SEAGRASS': 'Seegras', 'TURTLE_MEAT': 'Schildkrötenfleisch',
+    'COAL_ORE': 'Kohle-Erz', 'IRON_ORE': 'Eisen-Erz', 'GOLD_ORE': 'Gold-Erz', 'FURNACE': 'Ofen',
+    'COAL': 'Kohle', 'IRON_INGOT': 'Eisenbarren', 'GOLD_INGOT': 'Goldbarren',
+    'WOOD_PICKAXE': 'Holz-Spitzhacke', 'STONE_PICKAXE': 'Stein-Spitzhacke', 'IRON_PICKAXE': 'Eisen-Spitzhacke', 'GOLD_PICKAXE': 'Gold-Spitzhacke',
+    'WOOD_AXE': 'Holz-Axt', 'STONE_AXE': 'Stein-Axt', 'IRON_AXE': 'Eisen-Axt', 'GOLD_AXE': 'Gold-Axt',
+    'WOOD_SHOVEL': 'Holz-Schaufel', 'STONE_SHOVEL': 'Stein-Schaufel', 'IRON_SHOVEL': 'Eisen-Schaufel', 'GOLD_SHOVEL': 'Gold-Schaufel',
+    'CHEST': 'Truhe', 'SNOW_BLOCK': 'Schneeblock', 'ICE_BLOCK': 'Eisblock', 'PRESSURE_PLATE': 'Druckplatte', 'MINE_RAIL': 'Minengleis', 'MINE_SUPPORT': 'Minenbalken', 'SANDSTONE_CARVED': 'Gravierter Sandstein'
 };
 
 
@@ -96,7 +102,8 @@ export function updateInventoryUI() {
         if (type === 24) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🧟</div>`;
         if (type === 25) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍖</div>`;
 
-        const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31);
+        const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
+            || (type >= 60 && type <= 74)); // Kohle, Barren, Werkzeuge als 2D-Icons
         let texIdx = 0;
         if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
         const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
@@ -191,9 +198,9 @@ function handleSlotClick(e, sType, index) {
                 cursorItem.count += itemObj.count;
                 itemObj.count = 0;
                 itemObj.type = 0;
-                
-                for (let i = 0; i < 4; i++) {
-                    if (craftingGridData[i].count > 0) {
+
+                for (let i = 0; i < 9; i++) {
+                    if (craftingGridData[i] && craftingGridData[i].count > 0) {
                         craftingGridData[i].count--;
                         if (craftingGridData[i].count <= 0) craftingGridData[i].type = 0;
                     }
@@ -302,7 +309,7 @@ export function initInventoryGrid() {
     const cResult = document.getElementById('crafting-result');
     cGrid.innerHTML = ''; cResult.innerHTML = '';
     
-    for (let i = 0; i < 4; i++) cGrid.appendChild(createSlotElement(i, 'crafting'));
+    for (let i = 0; i < 9; i++) cGrid.appendChild(createSlotElement(i, 'crafting'));
     cResult.appendChild(createSlotElement(0, 'result'));
 
     const hbTitle = document.createElement('div');
@@ -340,16 +347,30 @@ export function toggleInventory(gameStarted, spawning, controls) {
     
     document.getElementById('inventory-overlay').style.display = inventoryOpened ? 'flex' : 'none';
     if (inventoryOpened) {
-        controls.unlock();
+        if (!window.touchActive) controls.unlock();
         initInventoryGrid();
         updateInventoryUI();
     } else {
-        controls.lock();
+        if (!window.touchActive) controls.lock();
     }
     return inventoryOpened;
 }
 
 export function setupInventoryEvents() {
+    // Hotbar-Slot per Klick/Tap auswählen (funktioniert auf Desktop und Mobile)
+    const hotbarEl = document.getElementById('inventory');
+    if (hotbarEl) {
+        hotbarEl.addEventListener('click', (e) => {
+            const slotEl = e.target.closest('.slot[data-slot]');
+            if (!slotEl) return;
+            const idx = parseInt(slotEl.dataset.slot, 10);
+            if (!isNaN(idx) && idx >= 0 && idx < 8) {
+                selectedSlot = idx;
+                updateInventoryUI();
+            }
+        });
+    }
+
     document.addEventListener('mousemove', (e) => {
         if (!inventoryOpened) return;
         const cursorEl = document.getElementById('cursor-item');

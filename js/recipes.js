@@ -25,9 +25,25 @@ export const craftingRecipes = [
     { pattern: [27, 26, 27, 26], result: { type: 33, count: 1 } },   // STICK+PLANKS -> DOOR
     { pattern: [19, 19, 26, 26], result: { type: 38, count: 1 } },   // WOOL+PLANKS -> BED
 
-    // Beispiele für die neue Schema-Form (kommentiert, aktiv-bei-Bedarf):
-    // { kind: 'shapeless', ingredients: [13, 13], result: { type: 26, count: 4 } }, // 2x JUNGLE_WOOD egal wo
-    // { kind: 'shaped', gridSize: 2, pattern: [27, 27, 0, 27], result: { type: 31, count: 1 } }, // L-Form Knochen
+    // Neue 3×3-Rezepte: Werkzeuge
+    // Schema: pattern[0..8] = Zeile0-2, Spalte0-2
+    // Spitzhacken (3 Material oben, 2 Stöcke Mitte/unten)
+    { kind: 'shaped', gridSize: 3, pattern: [26,26,26, 0,27,0, 0,27,0], result: { type: 63, count: 1 } }, // Holz-Spitzhacke
+    { kind: 'shaped', gridSize: 3, pattern: [3, 3, 3,  0,27,0, 0,27,0], result: { type: 64, count: 1 } }, // Stein-Spitzhacke
+    { kind: 'shaped', gridSize: 3, pattern: [61,61,61, 0,27,0, 0,27,0], result: { type: 65, count: 1 } }, // Eisen-Spitzhacke
+    { kind: 'shaped', gridSize: 3, pattern: [62,62,62, 0,27,0, 0,27,0], result: { type: 66, count: 1 } }, // Gold-Spitzhacke
+    // Äxte (L-Form: 2 Material + 1 Material, 1 Stock, 1 Stock)
+    { kind: 'shaped', gridSize: 3, pattern: [26,26,0, 26,27,0, 0,27,0], result: { type: 67, count: 1 } }, // Holz-Axt
+    { kind: 'shaped', gridSize: 3, pattern: [3, 3, 0, 3, 27,0, 0,27,0], result: { type: 68, count: 1 } }, // Stein-Axt
+    { kind: 'shaped', gridSize: 3, pattern: [61,61,0, 61,27,0, 0,27,0], result: { type: 69, count: 1 } }, // Eisen-Axt
+    { kind: 'shaped', gridSize: 3, pattern: [62,62,0, 62,27,0, 0,27,0], result: { type: 70, count: 1 } }, // Gold-Axt
+    // Schaufeln (1 Material oben, 2 Stöcke)
+    { kind: 'shaped', gridSize: 3, pattern: [0,26,0, 0,27,0, 0,27,0], result: { type: 71, count: 1 } }, // Holz-Schaufel
+    { kind: 'shaped', gridSize: 3, pattern: [0, 3,0, 0,27,0, 0,27,0], result: { type: 72, count: 1 } }, // Stein-Schaufel
+    { kind: 'shaped', gridSize: 3, pattern: [0,61,0, 0,27,0, 0,27,0], result: { type: 73, count: 1 } }, // Eisen-Schaufel
+    { kind: 'shaped', gridSize: 3, pattern: [0,62,0, 0,27,0, 0,27,0], result: { type: 74, count: 1 } }, // Gold-Schaufel
+    // Ofen (8x Stein im Ring)
+    { kind: 'shaped', gridSize: 3, pattern: [3,3,3, 3,0,3, 3,3,3], result: { type: 59, count: 1 } }, // Ofen
 ];
 
 /**
