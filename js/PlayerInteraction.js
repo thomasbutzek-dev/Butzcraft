@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { rollLoot } from './structures.js';
 import { openFurnace } from './furnace.js';
+import { createBlockHTML, getItemName } from './inventory.js';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
@@ -246,6 +247,7 @@ export class PlayerInteraction {
                         if (item && item.count > 0) this.context.addItemToInventory(item.type, item.count);
                     }
                     delete this.world.chestContents[chestKey];
+                    this.world.lootedChests.delete(chestKey); // Abgebaute Kiste zurücksetzen
                     this.context.addItemToInventory(75, 1);
                 // TOTER STRAUCH
                 } else if (brokenType === 46) {
@@ -397,13 +399,16 @@ export class PlayerInteraction {
     // Truhe öffnen und Loot lazy generieren
     _openChest(x, y, z) {
         const key = `chest,${x},${y},${z}`;
-        if (!this.world.chestContents[key]) {
+        // Loot nur einmal generieren: lootedChests merkt sich alle je geöffneten Kisten.
+        // Auch nach Save/Load wird kein Loot mehr nachgefüllt.
+        if (!this.world.lootedChests.has(key)) {
             // Biom-Typ bestimmen
             const biome = window.getBiomeAt ? window.getBiomeAt(x, z) : 'Grasland';
             const biomeType = (biome === 'Wüste') ? 'temple' : (biome === 'Schneefeld') ? 'igloo' : 'mine';
             this.world.chestContents[key] = rollLoot(biomeType, x * 7013 + y * 3517 + z * 1223);
+            this.world.lootedChests.add(key);
         }
-        const contents = this.world.chestContents[key];
+        const contents = this.world.chestContents[key] || [];
 
         // Truhen-UI befüllen
         const grid = document.getElementById('chest-grid');
@@ -415,15 +420,26 @@ export class PlayerInteraction {
                 slot.style.width = '60px'; slot.style.height = '60px'; slot.style.position = 'relative';
                 const item = contents[i];
                 if (item && item.count > 0) {
-                    const { BLOCK_TEX: BT, atlasDataURL: AU } = window._blockTexData || {};
-                    const texIdx = BT ? (BT[item.type] || 0) : 0;
-                    const u = (texIdx % 16) * 100 / 15;
-                    const v = Math.floor(texIdx / 16) * 100 / 15;
-                    slot.innerHTML = `<div style="width:100%;height:100%;background-image:url('${AU||''}');background-position:${u}% ${v}%;background-size:1600%;"></div><span style="position:absolute;bottom:2px;right:4px;font-size:11px;color:#fff;text-shadow:1px 1px 0 #000;">${item.count > 1 ? item.count : ''}</span>`;
+                    const iconWrap = document.createElement('div');
+                    iconWrap.className = 'slot-color-preview';
+                    iconWrap.style.pointerEvents = 'none';
+                    iconWrap.style.background = 'none';
+                    iconWrap.style.display = 'flex';
+                    iconWrap.style.justifyContent = 'center';
+                    iconWrap.innerHTML = createBlockHTML(item.type);
+                    const countEl = document.createElement('span');
+                    countEl.className = 'slot-count';
+                    countEl.style.pointerEvents = 'none';
+                    countEl.textContent = item.count > 1 ? item.count : '';
+                    slot.append(iconWrap, countEl);
+                    slot.title = getItemName(item.type);
+                    slot.style.cursor = 'pointer';
                     slot.onclick = () => {
                         this.context.addItemToInventory(item.type, item.count);
                         contents[i] = { type: 0, count: 0 };
                         slot.innerHTML = '';
+                        slot.title = '';
+                        slot.style.cursor = '';
                         this.context.updateInventoryUI();
                     };
                 }

@@ -158,8 +158,8 @@ function setBlockLocal(data, lx, ly, lz, blockId) {
     data[(ly * CHUNK_SIZE * CHUNK_SIZE) + (lz * CHUNK_SIZE) + lx] = blockId;
 }
 
-// Verlassene Mine: 3×3-Korridor der Länge 20 Blöcke, mit Truhe am Ende
-function spawnMine(data, x, y, z) {
+// Verlassene Mine: 3×3-Korridor der Länge 20 Blöcke, mit Truhe am Ende + sichtbarer Eingang
+function spawnMine(data, x, y, z, surfaceY) {
     for (let i = 0; i < 20; i++) {
         for (let dy = 0; dy < 3; dy++) {
             for (let dx = -1; dx <= 1; dx++) {
@@ -177,6 +177,20 @@ function spawnMine(data, x, y, z) {
     }
     // Truhe am Ende
     setBlockLocal(data, x, y + 1, z + 20, 75); // CHEST
+    // Senkschacht zur Oberfläche (1×1, mit Holzrahmen oben als Marker)
+    if (surfaceY !== undefined) {
+        for (let sy = y + 3; sy < surfaceY; sy++) {
+            setBlockLocal(data, x, sy, z, 0);
+        }
+        setBlockLocal(data, x - 1, surfaceY,     z,     26); // PLANKS Eingangsrahmen
+        setBlockLocal(data, x + 1, surfaceY,     z,     26);
+        setBlockLocal(data, x,     surfaceY,     z - 1, 26);
+        setBlockLocal(data, x,     surfaceY,     z + 1, 26);
+        setBlockLocal(data, x - 1, surfaceY - 1, z,     26);
+        setBlockLocal(data, x + 1, surfaceY - 1, z,     26);
+        setBlockLocal(data, x,     surfaceY - 1, z - 1, 26);
+        setBlockLocal(data, x,     surfaceY - 1, z + 1, 26);
+    }
 }
 
 // Wüstentempel: 11×11 Sandstein-Pyramide mit versteckter Kammer
@@ -370,30 +384,34 @@ function generateTerrain(cx, cz, buffer) {
             const srng = mulberry32(scx * 88317 + scz * 23497);
             const wx0 = scx * CHUNK_SIZE, wz0 = scz * CHUNK_SIZE;
 
-            // Verlassene Mine (Spawn-Chance 4%, nur in Plains/Jungle/Snow)
-            if (srng() < 0.04) {
+            // Verlassene Mine (Spawn-Chance 10%, nur in Plains/Jungle/Snow)
+            if (srng() < 0.10) {
                 const mx = wx0 + Math.floor(srng() * CHUNK_SIZE);
                 const mz = wz0 + Math.floor(srng() * CHUNK_SIZE);
                 const mb = getBiomeAt(mx, mz);
                 if (mb !== BIOMES.DESERT && mb !== BIOMES.OCEAN) {
                     const mh = Math.floor(noise2D(mx, mz) + 38);
-                    const my = Math.max(4, mh - 8 - Math.floor(srng() * 4));
-                    // Lokale Koordinaten im aktuellen Chunk
-                    const lx = mx - cx * CHUNK_SIZE;
-                    const lz = mz - cz * CHUNK_SIZE;
-                    spawnMine(data, lx, my, lz);
+                    if (mh > WATER_LEVEL) {
+                        const my = Math.max(4, mh - 5 - Math.floor(srng() * 3));
+                        // Lokale Koordinaten im aktuellen Chunk
+                        const lx = mx - cx * CHUNK_SIZE;
+                        const lz = mz - cz * CHUNK_SIZE;
+                        spawnMine(data, lx, my, lz, mh - 1);
+                    }
                 }
             }
 
-            // Wüstentempel (Spawn-Chance 3%, nur in Desert)
-            if (srng() < 0.03) {
+            // Wüstentempel (Spawn-Chance 7%, nur in Desert)
+            if (srng() < 0.07) {
                 const tx = wx0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
                 const tz = wz0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
                 if (getBiomeAt(tx, tz) === BIOMES.DESERT) {
                     const th = Math.floor(noise2D(tx, tz) + 38 + Math.sin(tx * 0.2) * 2);
-                    const lx = tx - cx * CHUNK_SIZE;
-                    const lz = tz - cz * CHUNK_SIZE;
-                    spawnDesertTemple(data, lx, th, lz);
+                    if (th > WATER_LEVEL) {
+                        const lx = tx - cx * CHUNK_SIZE;
+                        const lz = tz - cz * CHUNK_SIZE;
+                        spawnDesertTemple(data, lx, th, lz);
+                    }
                 }
             }
 
@@ -403,9 +421,11 @@ function generateTerrain(cx, cz, buffer) {
                 const iz = wz0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
                 if (getBiomeAt(ix, iz) === BIOMES.SNOW) {
                     const ih = Math.floor(noise2D(ix, iz) + 38);
-                    const lx = ix - cx * CHUNK_SIZE;
-                    const lz = iz - cz * CHUNK_SIZE;
-                    spawnIgloo(data, lx, ih, lz);
+                    if (ih > WATER_LEVEL) {
+                        const lx = ix - cx * CHUNK_SIZE;
+                        const lz = iz - cz * CHUNK_SIZE;
+                        spawnIgloo(data, lx, ih, lz);
+                    }
                 }
             }
         }

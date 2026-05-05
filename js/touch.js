@@ -50,6 +50,10 @@ export function initTouchControls(ctx) {
         </div>
         <div id="touch-look-area"></div>
         <div id="touch-button-stack">
+            <div id="touch-slot-switch">
+                <button id="touch-btn-slot-prev" class="touch-btn touch-btn-small" aria-label="Slot zurück">◀</button>
+                <button id="touch-btn-slot-next" class="touch-btn touch-btn-small" aria-label="Slot vor">▶</button>
+            </div>
             <button id="touch-btn-pause" class="touch-btn touch-btn-small" aria-label="Pause">⏸</button>
             <button id="touch-btn-inv" class="touch-btn touch-btn-small" aria-label="Inventar">📦</button>
             <button id="touch-btn-jump" class="touch-btn" aria-label="Springen">⤒</button>
@@ -115,6 +119,9 @@ function _injectTouchStyles() {
         }
         .touch-btn-small { width: 48px; height: 48px; font-size: 18px; opacity: 0.8; }
         .touch-btn:active { background: rgba(255,255,255,0.4); }
+        #touch-slot-switch {
+            display: flex; flex-direction: row; gap: 8px; justify-content: center;
+        }
         /* Bei Desktop-Browsern ist Touch-UI versteckt (Erkennung über CSS-Media falls JS-Detection irrt) */
         @media (hover: hover) and (pointer: fine) {
             #touch-overlay { display: none; }
@@ -252,6 +259,27 @@ function _bindActionButtons(ctx) {
             e.preventDefault();
             const evt = new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', bubbles: true });
             window.dispatchEvent(evt);
+        }, { passive: false });
+    }
+
+    // Slot-Wechsel ◀ ▶: navigiert durch die 8 Hotbar-Slots.
+    // Nutzt window.getSelectedSlot / window.setSelectedSlot (aus GameMain.js exponiert).
+    const slotPrev = document.getElementById('touch-btn-slot-prev');
+    const slotNext = document.getElementById('touch-btn-slot-next');
+    if (slotPrev) {
+        slotPrev.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const cur = window.getSelectedSlot ? window.getSelectedSlot() : 0;
+            if (window.setSelectedSlot) window.setSelectedSlot((cur + 7) % 8);
+            if (window.updateInventoryUI) window.updateInventoryUI();
+        }, { passive: false });
+    }
+    if (slotNext) {
+        slotNext.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            const cur = window.getSelectedSlot ? window.getSelectedSlot() : 0;
+            if (window.setSelectedSlot) window.setSelectedSlot((cur + 1) % 8);
+            if (window.updateInventoryUI) window.updateInventoryUI();
         }, { passive: false });
     }
 

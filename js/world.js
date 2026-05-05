@@ -39,6 +39,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 this.modifiedBlocks = {};
                 this.blockMeta = {};    // "x,y,z" → metadata byte (Tür-Rotation etc.)
                 this.chestContents = {}; // "chest,x,y,z" → Array<{type,count}>
+                this.lootedChests = new Set(); // Keys von Kisten, die bereits einmal geöffnet wurden
                 this.uTime = { value: 0 };
                 this.pendingMeshes = new Set(); // Verhindert doppelte Mesh-Requests
                 

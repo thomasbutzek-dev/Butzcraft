@@ -108,6 +108,7 @@
                         world.modifiedBlocks = data.modifiedBlocks;
                         world.blockMeta = data.blockMeta || {};
                         world.chestContents = data.chestContents || {};
+                        world.lootedChests = new Set(data.lootedChests || []);
                         world.chunks.forEach(c => {
                             if (c.mesh) scene.remove(c.mesh);
                             if (c.waterMesh) scene.remove(c.waterMesh);
@@ -414,7 +415,10 @@
                 }
             });
             scene.add(controls.getObject());
-            
+
+            // Browser-Kontextmenü bei Rechtsklick unterdrücken (stört Spiel-Interaktion)
+            document.addEventListener('contextmenu', (e) => { e.preventDefault(); });
+
             // Schwert an Kamera binden
             scene.add(camera); // Kamera muss in die Szene, da sie nun Kinder hat
 
@@ -885,7 +889,8 @@
                 collectedWool: collectedWool,
                 modifiedBlocks: world.modifiedBlocks,
                 blockMeta: world.blockMeta,
-                chestContents: world.chestContents
+                chestContents: world.chestContents,
+                lootedChests: [...world.lootedChests]
             });
             
             fetch('/api/save', {

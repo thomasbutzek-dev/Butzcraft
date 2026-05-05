@@ -696,13 +696,21 @@ body { user-select: none; -webkit-user-select: none; }
 
 .recipe-ingredients {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
     gap: 2px;
+    flex-shrink: 0;
+}
+
+.recipe-ingredients.grid-2x2 {
+    grid-template-columns: repeat(2, 28px);
+}
+
+.recipe-ingredients.grid-3x3 {
+    grid-template-columns: repeat(3, 22px);
 }
 
 .mini-slot {
-    width: 24px;
-    height: 24px;
+    width: 28px;
+    height: 28px;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 3px;
@@ -710,6 +718,34 @@ body { user-select: none; -webkit-user-select: none; }
     justify-content: center;
     align-items: center;
     position: relative;
+    overflow: hidden;
+}
+
+.recipe-ingredients.grid-3x3 .mini-slot {
+    width: 22px;
+    height: 22px;
+}
+
+.mini-slot.result-slot {
+    width: 36px;
+    height: 36px;
+    border-color: rgba(255, 224, 102, 0.25);
+}
+
+.mini-icon {
+    width: 100%;
+    height: 100%;
+    background-size: 1600% 1600%;
+    image-rendering: pixelated;
+    flex-shrink: 0;
+}
+
+.mini-emoji {
+    font-size: 14px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .recipe-arrow {
@@ -737,4 +773,65 @@ body { user-select: none; -webkit-user-select: none; }
     font-size: 10px;
     color: #ffe066;
     font-weight: bold;
+}
+
+/* ===== MOBILE / TOUCH RESPONSIVE ===== */
+
+/* ESC-Hinweis nur auf Geräten ohne Maus sinnlos */
+@media (pointer: coarse) {
+    #esc-hint { display: none !important; }
+}
+
+/* Inventar-Overlay auf kleinen Bildschirmen */
+@media (max-width: 560px) {
+    #inventory-overlay {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        transform: none !important;
+        width: 100% !important;
+        height: 100% !important;
+        max-height: 100vh !important;
+        border-radius: 0 !important;
+        padding: 10px !important;
+        box-sizing: border-box !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+        align-items: flex-start !important;
+    }
+
+    /* 4-spaltige Slots statt 8 — passt auf 360px+ */
+    #inventory-grid {
+        grid-template-columns: repeat(4, 50px) !important;
+        gap: 5px !important;
+    }
+
+    .inv-slot {
+        width: 50px !important;
+        height: 50px !important;
+    }
+
+    .inv-section-title { grid-column: span 4 !important; }
+    #inventory-divider  { grid-column: span 4 !important; }
+
+    /* Crafting-Bereich kompakter */
+    #crafting-area { gap: 10px !important; }
+    #crafting-grid {
+        grid-template-columns: repeat(2, 50px) !important;
+        grid-template-rows: repeat(2, 50px) !important;
+    }
+    #crafting-result { width: 50px !important; height: 50px !important; }
+
+    /* Inventar-Notiz: Rechtsklick-Hinweis verstecken */
+    #inventory-overlay > p { display: none !important; }
+}
+
+/* Start-Menü auf sehr kleinen Screens */
+@media (max-width: 400px) {
+    #start-menu-content {
+        padding: 20px;
+        width: 95%;
+    }
+    .menu-btn { min-width: 180px; font-size: 15px; }
+    .logo-img { max-width: 200px; }
 }

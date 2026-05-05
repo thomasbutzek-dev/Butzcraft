@@ -1,14 +1,19 @@
 import { normalizeRecipe } from './recipes.js';
 
 export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS) {
-    const createBlockHTML = (type) => {
-        const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31);
+    const EMOJI_MAP = { 21: '🐟', 22: '🥩', 23: '🍗', 24: '🧟', 25: '🍖' };
+
+    const createMiniHTML = (type) => {
+        if (type === 0) return '';
+        if (EMOJI_MAP[type]) return `<span class="mini-emoji">${EMOJI_MAP[type]}</span>`;
         let texIdx = 0;
-        if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
-        const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
-        const bgPos = `${u}% ${v}%`;
-        if (is2D) return `<div class="flat-icon" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div>`;
-        else return `<div class="mc-cube"><div class="mc-face mc-top" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div><div class="mc-face mc-front" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div><div class="mc-face mc-right" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div></div>`;
+        if (type === 17) texIdx = 21;
+        else if (type === 18) texIdx = 23;
+        else if (type === 19) texIdx = 26;
+        else texIdx = BLOCK_TEX[type] || 0;
+        const u = (texIdx % 16) * 100 / 15;
+        const v = Math.floor(texIdx / 16) * 100 / 15;
+        return `<div class="mini-icon" style="background-image:url('${atlasDataURL}');background-position:${u}% ${v}%;"></div>`;
     };
 
     // Blocknamen-Helfer
@@ -75,13 +80,15 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             entry.className = 'recipe-entry';
 
             // Zutaten-Grid erstellen
+            const gs = recipe.gridSize || 2;
             const ingredientsDiv = document.createElement('div');
-            ingredientsDiv.className = 'recipe-ingredients';
+            ingredientsDiv.className = `recipe-ingredients grid-${gs}x${gs}`;
 
             let cells;
             if (recipe.kind === 'shapeless') {
-                cells = [...recipe.ingredients.slice(0, 4)];
-                while (cells.length < 4) cells.push(0);
+                cells = [...recipe.ingredients];
+                while (cells.length < gs * gs) cells.push(0);
+                cells = cells.slice(0, gs * gs);
             } else {
                 cells = recipe.pattern;
             }
@@ -90,9 +97,8 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
                 const slot = document.createElement('div');
                 slot.className = 'mini-slot';
                 if (type !== 0) {
-                    slot.innerHTML = createBlockHTML(type);
-                    const name = getBlockName(type);
-                    slot.dataset.tooltipText = name;
+                    slot.innerHTML = createMiniHTML(type);
+                    slot.dataset.tooltipText = getBlockName(type);
                 }
                 ingredientsDiv.appendChild(slot);
             });
@@ -110,23 +116,16 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             const translatedName = TRANSLATIONS[bName] || bName;
             const formattedName = translatedName.toLowerCase().split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
-            const bID = recipe.result.type;
-            const texIdx = BLOCK_TEX[bID] !== undefined ? BLOCK_TEX[bID] : 0;
-            const u = (texIdx % 16) * 100 / 15;
-            const v = Math.floor(texIdx / 16) * 100 / 15;
-            const bgPos = `${u}% ${v}%`;
-
             const resultSlot = document.createElement('div');
-            resultSlot.className = 'mini-slot';
+            resultSlot.className = 'mini-slot result-slot';
             resultSlot.dataset.tooltipText = translatedName + (recipe.result.count > 1 ? ' x' + recipe.result.count : '');
-            resultSlot.innerHTML = `
-                <div class="mc-cube" style="transform: translate(-50%, -50%) rotateX(-30deg) rotateY(45deg) scale(0.8);">
-                    <div class="mc-face mc-top" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div>
-                    <div class="mc-face mc-front" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div>
-                    <div class="mc-face mc-right" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div>
-                </div>
-                ${recipe.result.count > 1 ? `<div class="recipe-count">${recipe.result.count}</div>` : ''}
-            `;
+            resultSlot.innerHTML = createMiniHTML(recipe.result.type);
+            if (recipe.result.count > 1) {
+                const countEl = document.createElement('div');
+                countEl.className = 'recipe-count';
+                countEl.textContent = recipe.result.count;
+                resultSlot.appendChild(countEl);
+            }
 
             const nameDiv = document.createElement('div');
             nameDiv.className = 'recipe-name';

@@ -13,7 +13,7 @@ export const BLOCK_TYPES = {
         };
 
         export const BLOCK_COLORS = {
-            [BLOCK_TYPES.GRASS]: 0x5d9943, [BLOCK_TYPES.DIRT]: 0x8B4513, [BLOCK_TYPES.STONE]: 0x808080, [BLOCK_TYPES.WATER]: 0x40a4df,
+            [BLOCK_TYPES.GRASS]: 0x3B8C1E, [BLOCK_TYPES.DIRT]: 0x5C3F28, [BLOCK_TYPES.STONE]: 0x808080, [BLOCK_TYPES.WATER]: 0x40a4df,
             [BLOCK_TYPES.WOOD]: 0x5D4037, [BLOCK_TYPES.LEAVES]: 0x2e5e22, [BLOCK_TYPES.SAND]: 0xEDC9AF, [BLOCK_TYPES.CLOUD]: 0xffffff,
             [BLOCK_TYPES.FLOWER_RED]: 0xff0000, [BLOCK_TYPES.FLOWER_YELLOW]: 0xffff00, [BLOCK_TYPES.SNOW]: 0xffffff,
             [BLOCK_TYPES.ICE]: 0xa5f2f3, [BLOCK_TYPES.JUNGLE_WOOD]: 0x3d2b1f, [BLOCK_TYPES.JUNGLE_LEAVES]: 0x1a4a15,
@@ -99,12 +99,12 @@ export const BLOCK_TYPES = {
             // GRAS OBEN (Tile 0) – Komplett grüne Pixeltextur wie Minecraft
             drawTile(0, 0, (c) => {
                 const grassPalette = {
-                    '1': '#5B9C2E', // Hell-Grün
-                    '2': '#4E8C25', // Mittel-Grün
-                    '3': '#6BAD38', // Satt-Grün
-                    '4': '#3D7A1C', // Dunkel-Grün
-                    '5': '#52A028', // Leucht-Grün
-                    '6': '#468B20'  // Schatten-Grün
+                    '1': '#3B8C1E', // Satt-Grün
+                    '2': '#2E7A18', // Mittel-Grün
+                    '3': '#4A9928', // Leucht-Grün
+                    '4': '#266B12', // Dunkel-Grün
+                    '5': '#389020', // Kräftig-Grün
+                    '6': '#2F7A16'  // Schatten-Grün
                 };
                 const grassMap = [
                     "1234512345123451",
@@ -126,9 +126,9 @@ export const BLOCK_TYPES = {
                 ];
                 pixelMapDraw(c, grassMap, grassPalette);
             });
-            // ERDE (Warmes Braun mit Steinkrümeln und Wurzel-Details)
+            // ERDE (Dunkles Braun mit Steinkrümeln und Wurzel-Details)
             drawTile(1, 0, (c) => {
-                const browns = ['#8B6B4A', '#7A5C3A', '#6D4C33', '#7F6040', '#5C3D2E'];
+                const browns = ['#6B4F35', '#5C3F28', '#4F3320', '#604030', '#3E2618'];
                 pixelDraw(c, 64, 64, 2, (x, y) => browns[Math.floor(Math.random() * browns.length)]);
                 // Kleine Steinchen
                 for (let i = 0; i < 8; i++) {
@@ -883,7 +883,7 @@ export const BLOCK_TYPES = {
             // GRAS SEITE (Tile 53) – Oben Grasüberhang, unten exakt dieselbe Erde wie DIRT-Block
             drawTile(53, 0, (c) => {
                 // 1) Erdbasis identisch zum DIRT-Block (Tile 1) – garantiert farbgleich
-                const browns = ['#8B6B4A', '#7A5C3A', '#6D4C33', '#7F6040', '#5C3D2E'];
+                const browns = ['#6B4F35', '#5C3F28', '#4F3320', '#604030', '#3E2618'];
                 pixelDraw(c, 64, 64, 2, (x, y) => browns[Math.floor(Math.random() * browns.length)]);
                 // Steinkrümel wie im DIRT-Block
                 for (let i = 0; i < 8; i++) {
@@ -892,7 +892,7 @@ export const BLOCK_TYPES = {
                 }
 
                 // 2) Grasüberhang oben mit gezacktem Rand (~oberes Viertel)
-                const grassPalette = ['#5B9C2E', '#4E8C25', '#3D7A1C', '#6BAD38', '#52A028'];
+                const grassPalette = ['#3B8C1E', '#2E7A18', '#266B12', '#4A9928', '#389020'];
                 const px = 4; // 16x16 Pixel-Raster
                 // Vollflächiges Gras in den obersten 3 Reihen
                 for (let row = 0; row < 3; row++) {

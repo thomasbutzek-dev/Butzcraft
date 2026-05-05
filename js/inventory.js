@@ -94,23 +94,31 @@ export function addItemToInventory(type, count) {
     updateInventoryUI();
 }
 
-export function updateInventoryUI() {
-        const createBlockHTML = (type) => {
-        if (type === 21) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🐟</div>`;
-        if (type === 22) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🥩</div>`;
-        if (type === 23) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍗</div>`;
-        if (type === 24) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🧟</div>`;
-        if (type === 25) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍖</div>`;
+// Erzeugt HTML für ein Block-/Item-Icon (2D flat oder 3D Cube)
+export function createBlockHTML(type) {
+    if (type === 21) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🐟</div>`;
+    if (type === 22) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🥩</div>`;
+    if (type === 23) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍗</div>`;
+    if (type === 24) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🧟</div>`;
+    if (type === 25) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍖</div>`;
 
-        const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
-            || (type >= 60 && type <= 74)); // Kohle, Barren, Werkzeuge als 2D-Icons
-        let texIdx = 0;
-        if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
-        const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
-        const bgPos = `${u}% ${v}%`;
-        if (is2D) return `<div class="flat-icon" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div>`;
-        else return `<div class="mc-cube"><div class="mc-face mc-top" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div><div class="mc-face mc-front" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div><div class="mc-face mc-right" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div></div>`;
-    };
+    const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
+        || (type >= 60 && type <= 74)); // Kohle, Barren, Werkzeuge als 2D-Icons
+    let texIdx = 0;
+    if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
+    const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
+    const bgPos = `${u}% ${v}%`;
+    if (is2D) return `<div class="flat-icon" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div>`;
+    else return `<div class="mc-cube"><div class="mc-face mc-top" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div><div class="mc-face mc-front" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div><div class="mc-face mc-right" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div></div>`;
+}
+
+// Gibt den deutschen Namen eines Block-Types zurück
+export function getItemName(type) {
+    const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === type) || '';
+    return TRANSLATIONS[bName] || bName;
+}
+
+export function updateInventoryUI() {
 
     const hotbarSlots = document.querySelectorAll('#inventory .slot');
     hotbarSlots.forEach((slot, i) => {
@@ -379,15 +387,8 @@ export function setupInventoryEvents() {
             cursorEl.style.left = e.clientX + 'px';
             cursorEl.style.top = e.clientY + 'px';
             
-            const is2D = (cursorItem.type === 9 || cursorItem.type === 10 || cursorItem.type === 17 || cursorItem.type === 18 || cursorItem.type === 19);
-            let texIdx = 0;
-            if (cursorItem.type === 17) texIdx = 21; else if (cursorItem.type === 18) texIdx = 23; else if (cursorItem.type === 19) texIdx = 26; else texIdx = BLOCK_TEX[cursorItem.type] || 0;
-            const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
-            const bgPos = `${u}% ${v}%`;
-            
             const iconDiv = cursorEl.querySelector('.cursor-icon');
-            iconDiv.innerHTML = is2D ? `<div class="flat-icon" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div>` 
-                                     : `<div class="mc-cube"><div class="mc-face mc-top" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div><div class="mc-face mc-front" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div><div class="mc-face mc-right" style="background-image: url('${atlasDataURL}'); background-position: ${bgPos};"></div></div>`;
+            iconDiv.innerHTML = createBlockHTML(cursorItem.type);
             cursorEl.querySelector('.cursor-count').textContent = cursorItem.count > 1 ? cursorItem.count : '';
         } else {
             cursorEl.style.display = 'none';

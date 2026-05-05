@@ -18,7 +18,7 @@ if exist server.log del server.log
 
 :: Server starten — Fenster bleibt SICHTBAR, damit Fehler erkennbar sind.
 :: Output zusaetzlich in server.log umleiten.
-start "Butzcraft Server" cmd /c "cd /d "%~dp0" && node server.js > server.log 2>&1"
+start /min "Butzcraft Server" cmd /c "cd /d "%~dp0" && node server.js > server.log 2>&1"
 
 :: Warte aktiv bis Server auf Port 3000 hoert (max 15 Sekunden)
 echo Warte auf Server-Start...

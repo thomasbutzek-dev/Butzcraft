@@ -1,5 +1,6 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260504a';
+import { createBlockHTML, getItemName } from './inventory.js';
 
 // Schmelz-Rezepte: Input-Block → Output-Item
 const SMELT_RECIPES = {
@@ -51,19 +52,22 @@ function renderFurnaceUI() {
         if (!el) return;
         el.innerHTML = '';
         if (item && item.count > 0) {
-            const icon = document.createElement('div');
-            icon.style.cssText = 'width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:11px;color:#fff;';
-            const texIdx = BLOCK_TEX[item.type] || 0;
-            const u = (texIdx % 16) * 100 / 15;
-            const v = Math.floor(texIdx / 16) * 100 / 15;
-            icon.style.backgroundImage = `url('${atlasDataURL}')`;
-            icon.style.backgroundPosition = `${u}% ${v}%`;
-            icon.style.backgroundSize = '1600%';
+            const iconWrap = document.createElement('div');
+            iconWrap.className = 'slot-color-preview';
+            iconWrap.style.pointerEvents = 'none';
+            iconWrap.style.background = 'none';
+            iconWrap.style.display = 'flex';
+            iconWrap.style.justifyContent = 'center';
+            iconWrap.innerHTML = createBlockHTML(item.type);
             const cnt = document.createElement('span');
+            cnt.className = 'slot-count';
+            cnt.style.pointerEvents = 'none';
             cnt.textContent = item.count > 1 ? item.count : '';
-            cnt.style.cssText = 'position:absolute;bottom:2px;right:4px;font-size:11px;color:#fff;text-shadow:1px 1px 0 #000;';
             el.style.position = 'relative';
-            el.appendChild(icon); el.appendChild(cnt);
+            el.appendChild(iconWrap); el.appendChild(cnt);
+            el.title = getItemName(item.type);
+        } else {
+            el.title = '';
         }
         el.onclick = () => handleFurnaceSlotClick(elId);
     };
