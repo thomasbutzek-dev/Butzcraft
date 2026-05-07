@@ -74,6 +74,19 @@
         window.__butzcraftStartRequested = false;
         window.__butzcraftLastStartPress = 0;
         window.__butzcraftLastStartError = '';
+        window.__butzcraftRefreshStartStatus = function(message) {
+            const status = document.getElementById('mobile-start-status');
+            const startButton = document.getElementById('start-button');
+            if (status) {
+                status.textContent = message;
+                status.style.display = 'block';
+                status.style.color = '#ffd966';
+            }
+            if (startButton) {
+                startButton.textContent = 'Engine lädt...';
+                startButton.disabled = true;
+            }
+        };
         window.__butzcraftShowStartError = function(message) {
             window.__butzcraftLastStartError = message;
             const status = document.getElementById('mobile-start-status');
@@ -88,6 +101,15 @@
                 startButton.disabled = false;
             }
             window.__butzcraftStartRequested = false;
+        };
+        window.__butzcraftStartWhenReady = function() {
+            if (typeof window.startNewGame === 'function') {
+                window.startNewGame();
+                return true;
+            }
+            window.__butzcraftStartRequested = true;
+            window.__butzcraftRefreshStartStatus('Engine wird geladen. Das Spiel startet automatisch...');
+            return false;
         };
         window.addEventListener('error', (event) => {
             const msg = event.message || 'Unbekannter JavaScript-Fehler';
@@ -114,26 +136,10 @@
             if (status) {
                 status.textContent = 'Spiel wird geladen...';
                 status.style.display = 'block';
+                status.style.color = '#ffd966';
             }
 
-            if (typeof window.startNewGame === 'function') {
-                window.startNewGame();
-            } else {
-                window.setTimeout(() => {
-                    if (window.__butzcraftStartRequested && typeof window.startNewGame !== 'function') {
-                        const lateStatus = document.getElementById('mobile-start-status');
-                        const lateButton = document.getElementById('start-button');
-                        if (lateStatus) {
-                            lateStatus.textContent = 'Startmodul lädt noch. Bitte in 2 Sekunden erneut tippen.';
-                            lateStatus.style.display = 'block';
-                        }
-                        if (lateButton) {
-                            lateButton.textContent = 'Erneut versuchen';
-                            lateButton.disabled = false;
-                        }
-                    }
-                }, 2500);
-            }
+            window.__butzcraftStartWhenReady();
             return false;
         };
     </script>

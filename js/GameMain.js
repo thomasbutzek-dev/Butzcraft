@@ -118,15 +118,18 @@
 
         window.startNewGame = function() {
             console.log("DEBUG: startNewGame starting...");
-            window.__butzcraftStartRequested = false;
             document.getElementById('start-menu').style.display = 'none';
             currentSaveName = null;
             SoundManager.init();
             lockControlsForDesktop();
             gameStarted = true;
+            window.__butzcraftStartRequested = false;
             console.log("DEBUG: startNewGame finished, gameStarted set to true");
         };
         window.__butzcraftStartFunctionReady = true;
+        if (window.__butzcraftStartRequested && window.__butzcraftRefreshStartStatus) {
+            window.__butzcraftRefreshStartStatus('Engine bereit. Welt wird vorbereitet...');
+        }
 
         window.loadGame = function(name) {
             console.log("DEBUG: loadGame starting for", name);
@@ -477,10 +480,7 @@
                 }
             });
 
-            if (window.__butzcraftStartRequested) {
-                window.__butzcraftStartRequested = false;
-                window.startNewGame();
-            }
+            if (window.__butzcraftStartRequested) window.startNewGame();
 
             // Sprint 6: Game-Over-"Neu starten" → Reload (alter Inline-onclick-Handler ist weg)
             const restartBtn = document.getElementById('game-over-restart');
