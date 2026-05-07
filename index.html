@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Butzcraft - Survival & Mobs</title>
-    <link rel="stylesheet" href="style.css?v=20260507g">
+    <link rel="stylesheet" href="style.css?v=20260507h">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -280,12 +280,11 @@
         }
     </script>
 
-    <script type="module">
-        import('./js/GameMain.js?v=20260507g').catch((err) => {
-            const message = err && (err.message || String(err));
-            window.__butzcraftShowStartError('Modulfehler: ' + (message || 'GameMain konnte nicht geladen werden'));
-        });
-    </script>
+    <script
+        type="module"
+        src="./js/GameMain.js?v=20260507h"
+        onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
+    ></script>
 </body>
 
 </html>
