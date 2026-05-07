@@ -42,6 +42,7 @@ export class WeatherSystem {
         this.lightningTimer = 0;
         this.lightningFlash = 0;    // Countdown für weißen Flash (Sekunden)
         this.lightningActive = false;
+        this.rainCyclesWithoutStorm = 0;
 
         // Regen-Sound
         this.rainSoundPlaying = false;
@@ -182,15 +183,17 @@ export class WeatherSystem {
             }
         } else if (prev === 'rain') {
             // Regen → Gewitter oder Klar
-            if (Math.random() < W.STORM_CHANCE) {
+            if (Math.random() < this._getStormChance()) {
                 this.state = 'thunderstorm';
                 this.stateTimer = this._randomDuration('storm');
                 this.targetIntensity = 0.8 + Math.random() * 0.2;
                 this.lightningTimer = W.LIGHTNING_MIN + Math.random() * (W.LIGHTNING_MAX - W.LIGHTNING_MIN);
+                this.rainCyclesWithoutStorm = 0;
             } else {
                 this.state = 'clear';
                 this.stateTimer = this._randomDuration('clear');
                 this.targetIntensity = 0;
+                this.rainCyclesWithoutStorm += 1;
             }
         } else if (prev === 'thunderstorm') {
             // Gewitter → Klar
@@ -204,6 +207,12 @@ export class WeatherSystem {
             this.stateTimer = this._randomDuration('clear');
             this.targetIntensity = 0;
         }
+    }
+
+    _getStormChance() {
+        const increment = W.STORM_CHANCE_INCREMENT ?? 0;
+        const maxChance = W.STORM_CHANCE_MAX ?? 1;
+        return Math.min(maxChance, W.STORM_CHANCE + this.rainCyclesWithoutStorm * increment);
     }
 
     _randomDuration(type) {
@@ -315,7 +324,8 @@ export class WeatherSystem {
             stateTimer: this.stateTimer,
             intensity: this.intensity,
             targetIntensity: this.targetIntensity,
-            lightningTimer: this.lightningTimer
+            lightningTimer: this.lightningTimer,
+            rainCyclesWithoutStorm: this.rainCyclesWithoutStorm
         };
     }
 
@@ -326,6 +336,7 @@ export class WeatherSystem {
         this.intensity = data.intensity ?? 0;
         this.targetIntensity = data.targetIntensity ?? 0;
         this.lightningTimer = data.lightningTimer ?? 10;
+        this.rainCyclesWithoutStorm = data.rainCyclesWithoutStorm ?? 0;
     }
 
     /**

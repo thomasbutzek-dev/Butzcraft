@@ -64,4 +64,31 @@ describe('WeatherSystem transitions', () => {
         expect(weather.getState()).toBe('snow');
         expect(weather.targetIntensity).toBeGreaterThan(0);
     });
+
+    it('raises storm chance after rainy cycles without thunderstorms', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.4);
+        const weather = createWeather();
+
+        weather.state = 'rain';
+        weather._transitionState(BIOMES.PLAINS);
+
+        expect(weather.getState()).toBe('clear');
+        expect(weather.rainCyclesWithoutStorm).toBe(1);
+
+        weather.state = 'rain';
+        weather._transitionState(BIOMES.PLAINS);
+
+        expect(weather.getState()).toBe('thunderstorm');
+        expect(weather.rainCyclesWithoutStorm).toBe(0);
+    });
+
+    it('persists rainy cycles without thunderstorms', () => {
+        const weather = createWeather();
+        weather.rainCyclesWithoutStorm = 2;
+
+        const restored = createWeather();
+        restored.deserialize(weather.serialize());
+
+        expect(restored.rainCyclesWithoutStorm).toBe(2);
+    });
 });

@@ -97,7 +97,9 @@ export const CONFIG = {
         STORM_MAX: 60,          // Max. Gewitter-Dauer
         SNOW_MIN: 60,           // Min. Schneefall-Dauer
         SNOW_MAX: 120,          // Max. Schneefall-Dauer
-        STORM_CHANCE: 0.3,      // Chance dass Regen → Gewitter eskaliert
+        STORM_CHANCE: 0.3,      // Basis-Chance dass Regen → Gewitter eskaliert
+        STORM_CHANCE_INCREMENT: 0.25, // Zusatz-Chance pro Regen ohne Gewitter
+        STORM_CHANCE_MAX: 0.85, // Max. Eskalations-Chance nach Pechsträhne
         RAIN_PARTICLES: 1500,   // Regen-Partikel (Desktop)
         SNOW_PARTICLES: 800,    // Schnee-Partikel (Desktop)
         LIGHTNING_MIN: 5,       // Min. Abstand zwischen Blitzen (Sekunden)
