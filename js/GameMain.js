@@ -117,9 +117,9 @@
 
         window.startNewGame = function() {
             console.log("DEBUG: startNewGame starting...");
-            SoundManager.init();
             document.getElementById('start-menu').style.display = 'none';
             currentSaveName = null;
+            SoundManager.init();
             lockControlsForDesktop();
             gameStarted = true;
             console.log("DEBUG: startNewGame finished, gameStarted set to true");
@@ -464,6 +464,11 @@
                     console.error("CRITICAL: window.startNewGame is not a function!");
                 }
             });
+
+            if (window.__butzcraftStartRequested) {
+                window.__butzcraftStartRequested = false;
+                window.startNewGame();
+            }
 
             // Sprint 6: Game-Over-"Neu starten" → Reload (alter Inline-onclick-Handler ist weg)
             const restartBtn = document.getElementById('game-over-restart');

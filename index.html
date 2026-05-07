@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Butzcraft - Survival & Mobs</title>
-    <link rel="stylesheet" href="style.css?v=20260507c">
+    <link rel="stylesheet" href="style.css?v=20260507d">
     <link rel="icon" type="image/png" href="favicon.png">
 </head>
 
@@ -19,6 +19,30 @@
             </div>
         </div>
     </div>
+    <script>
+        (() => {
+            const startButton = document.getElementById('start-button');
+            if (!startButton) return;
+            let lastStartPress = 0;
+            const requestStart = (event) => {
+                const now = performance.now();
+                if (now - lastStartPress < 350) return;
+                lastStartPress = now;
+                if (event && event.cancelable) event.preventDefault();
+                window.__butzcraftStartRequested = true;
+                if (typeof window.startNewGame === 'function') {
+                    window.startNewGame();
+                }
+            };
+            startButton.addEventListener('click', requestStart);
+            startButton.addEventListener('touchstart', requestStart, { passive: false });
+            startButton.addEventListener('touchend', requestStart, { passive: false });
+            startButton.addEventListener('pointerup', (event) => {
+                if (event.pointerType === 'mouse') return;
+                requestStart(event);
+            });
+        })();
+    </script>
     <div id="underwater-overlay">
         <div id="underwater-label">≈ Unter Wasser ≈</div>
     </div>
@@ -193,7 +217,7 @@
         }
     </script>
 
-    <script type="module" src="./js/GameMain.js?v=20260507c"></script>
+    <script type="module" src="./js/GameMain.js?v=20260507d"></script>
 </body>
 
 </html>
