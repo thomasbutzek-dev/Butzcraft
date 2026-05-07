@@ -5,11 +5,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Butzcraft - Survival & Mobs</title>
-    <link rel="stylesheet" href="style.css?v=20260507f">
+    <link rel="stylesheet" href="style.css?v=20260507g">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
         window.__butzcraftLastStartPress = 0;
+        window.__butzcraftShowStartError = function(message) {
+            const status = document.getElementById('mobile-start-status');
+            const startButton = document.getElementById('start-button');
+            if (status) {
+                status.textContent = message;
+                status.style.display = 'block';
+                status.style.color = '#ff8a80';
+            }
+            if (startButton) {
+                startButton.textContent = 'Erneut versuchen';
+                startButton.disabled = false;
+            }
+            window.__butzcraftStartRequested = false;
+        };
+        window.addEventListener('error', (event) => {
+            const msg = event.message || 'Unbekannter JavaScript-Fehler';
+            window.__butzcraftShowStartError('Fehler: ' + msg);
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            const reason = event.reason && (event.reason.message || String(event.reason));
+            window.__butzcraftShowStartError('Fehler: ' + (reason || 'Promise abgebrochen'));
+        });
         window.__butzcraftPressStart = function(event) {
             const now = performance.now();
             if (now - window.__butzcraftLastStartPress < 350) return false;
@@ -258,7 +280,12 @@
         }
     </script>
 
-    <script type="module" src="./js/GameMain.js?v=20260507f"></script>
+    <script type="module">
+        import('./js/GameMain.js?v=20260507g').catch((err) => {
+            const message = err && (err.message || String(err));
+            window.__butzcraftShowStartError('Modulfehler: ' + (message || 'GameMain konnte nicht geladen werden'));
+        });
+    </script>
 </body>
 
 </html>
