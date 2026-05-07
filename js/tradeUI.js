@@ -5,8 +5,8 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { NPC_PROFESSIONS } from './npc.js';
-import { createBlockHTML, getItemName } from './inventory.js';
+import { NPC_PROFESSIONS } from './npc.js?v=20260507b';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260507b';
 
 let currentNPC = null;
 

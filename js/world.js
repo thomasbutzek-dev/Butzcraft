@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260504a';
+import { CONFIG } from '../config.js?v=20260507b';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260507b';
 
 // RENDER_DIST wird NICHT destrukturiert, damit Laufzeit-Änderungen via Settings sofort wirken.
 // CHUNK_SIZE/HEIGHT etc. sind hingegen statisch und werden beim Welt-Load fest verdrahtet.
@@ -115,7 +115,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 // URL statt String-Pfad: Vite kann den Worker so in dist/ mitnehmen.
                 // Im Dev/Express-Modus bleibt er weiterhin relativ zu world.js auflösbar.
                 const workerUrl = new URL('./chunkWorker.js', import.meta.url);
-                if (import.meta.env?.DEV) workerUrl.search = 'v=' + Date.now();
+                workerUrl.search = import.meta.env?.DEV ? 'v=' + Date.now() : 'v=20260507b';
                 this.worker = new Worker(workerUrl);
                 // Init: Sende Config + Block-Daten an Worker
                 this.worker.postMessage({

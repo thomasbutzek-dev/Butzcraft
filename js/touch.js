@@ -13,7 +13,7 @@
  *  Look-Empfindlichkeit: 0.005 rad pro Pixel — Daumen-tauglich, nicht wackelig.
  */
 
-import { Input } from './Input.js';
+import { Input } from './Input.js?v=20260507b';
 
 const LOOK_SENSITIVITY = 0.005;
 const JOYSTICK_DEADZONE = 0.18;
@@ -41,6 +41,8 @@ export function initTouchControls(ctx) {
     if (document.getElementById('touch-overlay')) return; // schon initialisiert
 
     window.touchActive = true;
+    document.documentElement.classList.add('touch-device');
+    document.body.classList.add('touch-device');
 
     const overlay = document.createElement('div');
     overlay.id = 'touch-overlay';
@@ -75,10 +77,16 @@ function _injectTouchStyles() {
             position: fixed; inset: 0; z-index: 500;
             pointer-events: none;
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+            --touch-safe-bottom: max(16px, env(safe-area-inset-bottom));
+            --touch-safe-left: max(16px, env(safe-area-inset-left));
+            --touch-safe-right: max(16px, env(safe-area-inset-right));
         }
         #touch-joystick-base {
-            position: absolute; left: 30px; bottom: 30px;
-            width: 140px; height: 140px;
+            position: absolute;
+            left: var(--touch-safe-left);
+            bottom: var(--touch-safe-bottom);
+            width: clamp(108px, 18vw, 140px);
+            height: clamp(108px, 18vw, 140px);
             background: rgba(255,255,255,0.12);
             border: 2px solid rgba(255,255,255,0.35);
             border-radius: 50%;
@@ -97,30 +105,79 @@ function _injectTouchStyles() {
         }
         #touch-look-area {
             position: absolute; right: 0; top: 0;
-            width: 50%; height: 100%;
+            width: 58%; height: 100%;
             pointer-events: auto;
             touch-action: none;
         }
         #touch-button-stack {
-            position: absolute; right: 25px; bottom: 25px;
-            display: flex; flex-direction: column; gap: 12px;
+            position: absolute;
+            right: var(--touch-safe-right);
+            bottom: var(--touch-safe-bottom);
+            display: grid;
+            grid-template-columns: repeat(2, clamp(48px, 9vw, 64px));
+            grid-auto-rows: clamp(48px, 9vw, 64px);
+            gap: clamp(8px, 1.5vw, 12px);
+            align-items: center;
+            justify-items: center;
             pointer-events: auto;
         }
         .touch-btn {
-            width: 64px; height: 64px;
+            width: 100%; height: 100%;
             border-radius: 50%;
             background: rgba(255,255,255,0.18);
             border: 2px solid rgba(255,255,255,0.45);
             color: white;
-            font-size: 24px;
+            font-size: clamp(18px, 4vw, 24px);
             font-weight: bold;
             -webkit-tap-highlight-color: transparent;
             touch-action: manipulation;
         }
-        .touch-btn-small { width: 48px; height: 48px; font-size: 18px; opacity: 0.8; }
+        .touch-btn-small { font-size: clamp(15px, 3vw, 18px); opacity: 0.85; }
         .touch-btn:active { background: rgba(255,255,255,0.4); }
         #touch-slot-switch {
-            display: flex; flex-direction: row; gap: 8px; justify-content: center;
+            grid-column: 1 / span 2;
+            display: grid;
+            grid-template-columns: repeat(2, clamp(48px, 9vw, 64px));
+            gap: clamp(8px, 1.5vw, 12px);
+            width: 100%;
+            justify-content: center;
+        }
+        #touch-btn-pause { grid-column: 1; }
+        #touch-btn-inv { grid-column: 2; }
+        #touch-btn-jump { grid-column: 1; }
+        #touch-btn-place { grid-column: 2; }
+        #touch-btn-dig { grid-column: 2; }
+        @media (orientation: portrait) and (max-width: 560px) {
+            #touch-button-stack {
+                grid-template-columns: repeat(2, 52px);
+                grid-auto-rows: 52px;
+            }
+            #touch-slot-switch {
+                grid-template-columns: repeat(2, 52px);
+            }
+            #touch-joystick-base {
+                width: 116px;
+                height: 116px;
+            }
+        }
+        @media (orientation: landscape) and (max-height: 460px) {
+            #touch-button-stack {
+                grid-template-columns: repeat(3, 50px);
+                grid-auto-rows: 50px;
+            }
+            #touch-slot-switch {
+                grid-column: 1 / span 2;
+                grid-template-columns: repeat(2, 50px);
+            }
+            #touch-btn-pause { grid-column: 3; grid-row: 1; }
+            #touch-btn-inv { grid-column: 1; grid-row: 2; }
+            #touch-btn-jump { grid-column: 2; grid-row: 2; }
+            #touch-btn-place { grid-column: 3; grid-row: 2; }
+            #touch-btn-dig { grid-column: 3; grid-row: 3; }
+            #touch-joystick-base {
+                width: 104px;
+                height: 104px;
+            }
         }
         /* Bei Desktop-Browsern ist Touch-UI versteckt (Erkennung über CSS-Media falls JS-Detection irrt) */
         @media (hover: hover) and (pointer: fine) {
@@ -236,6 +293,18 @@ function _bindActionButtons(ctx) {
     const placeBtn = document.getElementById('touch-btn-place');
     const invBtn = document.getElementById('touch-btn-inv');
     const pauseBtn = document.getElementById('touch-btn-pause');
+    const pauseOverlay = document.getElementById('instructions');
+
+    if (pauseOverlay) {
+        pauseOverlay.addEventListener('click', (e) => {
+            const btn = e.target.closest('button');
+            if (!btn || !window.touchActive) return;
+            if (btn.textContent && btn.textContent.includes('Weiter')) {
+                e.stopPropagation();
+                pauseOverlay.style.display = 'none';
+            }
+        });
+    }
 
     // Sprung als Holdable: Während Touch aktiv ist, Input.moveUp = true.
     const holdJump = (down) => { Input.moveUp = down; };

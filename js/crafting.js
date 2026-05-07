@@ -1,5 +1,5 @@
 /* js/crafting.js - Butzcraft Crafting System Logic */
-import { craftingRecipes, matchRecipe } from './recipes.js';
+import { craftingRecipes, matchRecipe } from './recipes.js?v=20260507b';
 
 const CRAFTING_GRID_SIZE = 3;
 

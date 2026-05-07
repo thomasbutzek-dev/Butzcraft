@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-import { Physics } from './Physics.js?v=1775830882304';
+import { Physics } from './Physics.js?v=20260507b';
 
 export class Player {
     constructor(scene, camera, domElement, CONFIG) {

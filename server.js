@@ -129,10 +129,10 @@ app.post('/api/tester/log', (req, res) => {
     });
 });
 
-// Statisches Routing – Kein Cache für JS-Dateien!
+// Statisches Routing: Einstiegspunkte nicht cachen, damit neue Deploys sofort sichtbar sind.
 app.use(express.static(__dirname, {
     setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.js')) {
+        if (filePath.endsWith('.html') || filePath.endsWith('.css') || filePath.endsWith('.js')) {
             res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
             res.set('Pragma', 'no-cache');
             res.set('Expires', '0');

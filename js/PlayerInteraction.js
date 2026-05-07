@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js';
-import { rollLoot } from './structures.js';
-import { openFurnace } from './furnace.js';
-import { createBlockHTML, getItemName } from './inventory.js';
+import { CONFIG } from '../config.js?v=20260507b';
+import { rollLoot } from './structures.js?v=20260507b';
+import { openFurnace } from './furnace.js?v=20260507b';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260507b';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 

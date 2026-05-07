@@ -9,10 +9,10 @@
  *   // Im Render-Loop: weather.getState(), weather.getIntensity()
  */
 
-import { CONFIG } from '../config.js';
-import { ParticleSystem } from './particles.js';
-import { BIOMES } from './world.js';
-import { SoundManager } from './sound.js';
+import { CONFIG } from '../config.js?v=20260507b';
+import { ParticleSystem } from './particles.js?v=20260507b';
+import { BIOMES } from './world.js?v=20260507b';
+import { SoundManager } from './sound.js?v=20260507b';
 
 const W = CONFIG.WEATHER;
 

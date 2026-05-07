@@ -1,4 +1,4 @@
-import { normalizeRecipe } from './recipes.js';
+import { normalizeRecipe } from './recipes.js?v=20260507b';
 
 export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick) {
     const EMOJI_MAP = { 21: '🐟', 22: '🥩', 23: '🍗', 24: '🧟', 25: '🍖' };

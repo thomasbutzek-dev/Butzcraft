@@ -1,9 +1,9 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting } from './crafting.js';
-import { craftingRecipes } from './recipes.js';
-import { initRecipeBook } from './recipe_book.js';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js';
-import { SoundManager } from './sound.js';
+import { craftingGridData, craftingResultData, checkCrafting } from './crafting.js?v=20260507b';
+import { craftingRecipes } from './recipes.js?v=20260507b';
+import { initRecipeBook } from './recipe_book.js?v=20260507b';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
+import { SoundManager } from './sound.js?v=20260507b';
 
 // Sprint 6: Tooltip-Hint für essbare Items.
 // Quelle der Wahrheit für Hunger-Werte ist PlayerInteraction.handleInteraction (Type-Match-Switch).

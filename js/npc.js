@@ -10,8 +10,8 @@
  */
 
 import * as THREE from 'three';
-import { CONFIG } from '../config.js';
-import { Physics } from './Physics.js';
+import { CONFIG } from '../config.js?v=20260507b';
+import { Physics } from './Physics.js?v=20260507b';
 
 const NPC_CFG = CONFIG.NPC;
 const NAME_TAG_VISIBLE_DISTANCE = 8;

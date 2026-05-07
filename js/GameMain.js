@@ -1,22 +1,22 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-        import { CONFIG } from '../config.js';
-        import { SoundManager } from './sound.js';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260504a';
-        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260504a';
-        import { Mob, updateProjectiles } from './mobs.js?v=20260504a';
+        import { CONFIG } from '../config.js?v=20260507b';
+        import { SoundManager } from './sound.js?v=20260507b';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
+        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260507b';
+        import { Mob, updateProjectiles } from './mobs.js?v=20260507b';
 
-        import { Input } from './Input.js';
-        import { initTouchControls, isTouchDevice } from './touch.js';
-        import { migrateSave, stampSaveVersion } from './saveMigrations.js';
-        import { Game } from './Game.js'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
-        import { Player } from './Player.js';
-        import { PlayerInteraction } from './PlayerInteraction.js';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js';
-        import { WeatherSystem } from './weather.js';
-        import { NPC } from './npc.js';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js';
+        import { Input } from './Input.js?v=20260507b';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260507b';
+        import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260507b';
+        import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
+        import { Player } from './Player.js?v=20260507b';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260507b';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260507b';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260507b';
+        import { WeatherSystem } from './weather.js?v=20260507b';
+        import { NPC } from './npc.js?v=20260507b';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260507b';
         window.addItemToInventory = addItemToInventory;
         window.inventorySlots = inventorySlots;
         window.updateInventoryUI = updateInventoryUI;
