@@ -27,12 +27,19 @@ if (!fs.existsSync(savesDir)) {
     fs.mkdirSync(savesDir);
 }
 
-// Whitelist-Validierung für Spielstand-Namen: nur ASCII-Buchstaben, Ziffern, _ und -, max 64 Zeichen.
-// Verhindert Path Traversal (../), Null-Byte-Injection und Reservierte Windows-Namen (CON, PRN, …).
-const SAFE_SAVE_NAME = /^[A-Za-z0-9_\-]{1,64}$/;
+// Whitelist-Validierung fuer Spielstand-Namen: ASCII-Buchstaben, Ziffern,
+// Leerzeichen, _ und -, max 64 Zeichen. Leerzeichen sind erlaubt, weil alte
+// lokale Saves wie "Emy Test" sonst nicht mehr ladbar waeren.
+// Verhindert Path Traversal (../), Null-Byte-Injection und reservierte Windows-Namen.
+const SAFE_SAVE_NAME = /^[A-Za-z0-9 _-]{1,64}$/;
 const RESERVED_WIN_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
 function resolveSavePath(name) {
-    if (typeof name !== 'string' || !SAFE_SAVE_NAME.test(name) || RESERVED_WIN_NAMES.test(name)) {
+    if (
+        typeof name !== 'string' ||
+        name.trim() !== name ||
+        !SAFE_SAVE_NAME.test(name) ||
+        RESERVED_WIN_NAMES.test(name)
+    ) {
         return null;
     }
     const filePath = path.join(savesDir, `${name}.json`);
