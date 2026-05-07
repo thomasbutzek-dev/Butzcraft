@@ -77,6 +77,33 @@
             return isInventoryOpened() || visible('trade-overlay') || visible('furnace-overlay') || visible('chest-overlay');
         }
 
+        function shouldUseTouchMode() {
+            return Boolean(window.touchActive) || isTouchDevice();
+        }
+
+        function lockControlsForDesktop() {
+            if (shouldUseTouchMode()) return;
+            controls.lock();
+        }
+
+        function bindPress(el, handler) {
+            if (!el) return;
+            let lastRun = 0;
+            const run = (e) => {
+                const now = performance.now();
+                if (now - lastRun < 350) return;
+                lastRun = now;
+                if (e && e.cancelable) e.preventDefault();
+                handler(e);
+            };
+            el.addEventListener('click', run);
+            el.addEventListener('touchend', run, { passive: false });
+            el.addEventListener('pointerup', (e) => {
+                if (e.pointerType === 'mouse') return;
+                run(e);
+            });
+        }
+
         function updateVisibleChunksIfNeeded(playerPos, force = false) {
             const cx = Math.floor(playerPos.x / CHUNK_SIZE);
             const cz = Math.floor(playerPos.z / CHUNK_SIZE);
@@ -93,7 +120,7 @@
             SoundManager.init();
             document.getElementById('start-menu').style.display = 'none';
             currentSaveName = null;
-            controls.lock(); 
+            lockControlsForDesktop();
             gameStarted = true;
             console.log("DEBUG: startNewGame finished, gameStarted set to true");
         };
@@ -110,7 +137,7 @@
                     }
                     
                     document.getElementById('start-menu').style.display = 'none';
-                    controls.lock();
+                    lockControlsForDesktop();
                     gameStarted = true;
                     currentSaveName = name;
                     document.getElementById('save-input').value = name;
@@ -429,16 +456,14 @@
             
             // Start-Button Event-Listener
             const startBtn = document.getElementById('start-button');
-            if (startBtn) {
-                startBtn.addEventListener('click', () => {
-                    console.log("DEBUG: Start Button Click Event (ID-based)");
-                    if (typeof window.startNewGame === 'function') {
-                        window.startNewGame();
-                    } else {
-                        console.error("CRITICAL: window.startNewGame is not a function!");
-                    }
-                });
-            }
+            bindPress(startBtn, () => {
+                console.log("DEBUG: Start Button Press Event (ID-based)");
+                if (typeof window.startNewGame === 'function') {
+                    window.startNewGame();
+                } else {
+                    console.error("CRITICAL: window.startNewGame is not a function!");
+                }
+            });
 
             // Sprint 6: Game-Over-"Neu starten" → Reload (alter Inline-onclick-Handler ist weg)
             const restartBtn = document.getElementById('game-over-restart');
@@ -1027,7 +1052,7 @@
                 const btn = document.createElement('button');
                 btn.className = 'save-btn';
                 btn.textContent = 'Laden';
-                btn.addEventListener('click', () => window.loadGame(name));
+                bindPress(btn, () => window.loadGame(name));
                 item.appendChild(span);
                 item.appendChild(btn);
                 return item;

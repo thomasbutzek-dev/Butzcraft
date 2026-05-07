@@ -1089,6 +1089,13 @@ html.touch-device body {
     .menu-btn {
         min-width: 0;
         width: min(100%, 260px);
+        touch-action: manipulation;
+    }
+
+    #start-button,
+    .save-btn,
+    .save-item {
+        touch-action: manipulation;
     }
 
     #game-over {
