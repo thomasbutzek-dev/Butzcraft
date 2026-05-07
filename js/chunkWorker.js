@@ -458,6 +458,22 @@ function spawnDungeon(data, x, y, z, rng) {
     }
 }
 
+// Surface marker above a dungeon: a weathered stone plinth with a small flame.
+function spawnDungeonMarker(data, x, surfaceY, z) {
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+            const isCenter = dx === 0 && dz === 0;
+            const isCorner = Math.abs(dx) === 1 && Math.abs(dz) === 1;
+            const blockType = isCenter || isCorner ? 84 : 85;
+            setBlockLocal(data, x + dx, surfaceY, z + dz, blockType);
+        }
+    }
+
+    setBlockLocal(data, x, surfaceY + 1, z, 85);
+    setBlockLocal(data, x, surfaceY + 2, z, 84);
+    setBlockLocal(data, x, surfaceY + 3, z, 86);
+}
+
 // NPC-Dorf: Generiert ein kleines Dorf mit Häusern, Brunnen, Wegen
 // Gibt villageData zurück (für NPC-Spawning im Main-Thread)
 function spawnVillage(data, x, y, z, rng, worldX, worldZ) {
@@ -802,6 +818,11 @@ function generateTerrain(cx, cz, buffer) {
                     const lx = dx - cx * CHUNK_SIZE;
                     const lz = dz - cz * CHUNK_SIZE;
                     spawnDungeon(data, lx, dungeonY, lz, srng);
+
+                    const surfaceY = getTerrainHeightAt(dx, dz);
+                    if (surfaceY > WATER_LEVEL + 1) {
+                        spawnDungeonMarker(data, lx, surfaceY, lz);
+                    }
                 }
             }
 

@@ -117,6 +117,7 @@
         }
 
         window.startNewGame = function() {
+            if (gameStarted) return;
             console.log("DEBUG: startNewGame starting...");
             document.getElementById('start-menu').style.display = 'none';
             currentSaveName = null;
