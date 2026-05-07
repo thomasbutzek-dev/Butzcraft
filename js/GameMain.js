@@ -17,6 +17,7 @@
         import { WeatherSystem } from './weather.js?v=20260507b';
         import { NPC } from './npc.js?v=20260507b';
         import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260507b';
+        window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
         window.inventorySlots = inventorySlots;
         window.updateInventoryUI = updateInventoryUI;
@@ -125,6 +126,7 @@
             gameStarted = true;
             console.log("DEBUG: startNewGame finished, gameStarted set to true");
         };
+        window.__butzcraftStartFunctionReady = true;
 
         window.loadGame = function(name) {
             console.log("DEBUG: loadGame starting for", name);
@@ -297,10 +299,19 @@
             canvas.style.transform = `rotate(${angle}rad)`;
         }
 
-        Input.init(isInventoryOpened);
-        setupInventoryEvents();
-        init();
-        animate();
+        try {
+            Input.init(isInventoryOpened);
+            setupInventoryEvents();
+            init();
+            window.__butzcraftGameMainReady = true;
+            animate();
+        } catch (err) {
+            window.__butzcraftGameMainError = err && (err.stack || err.message || String(err));
+            if (window.__butzcraftShowStartError) {
+                window.__butzcraftShowStartError('GameMain Fehler: ' + (err && err.message ? err.message : String(err)));
+            }
+            throw err;
+        }
 
         function init() {
             scene = new THREE.Scene();

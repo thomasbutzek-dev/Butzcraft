@@ -73,7 +73,9 @@
     <script>
         window.__butzcraftStartRequested = false;
         window.__butzcraftLastStartPress = 0;
+        window.__butzcraftLastStartError = '';
         window.__butzcraftShowStartError = function(message) {
+            window.__butzcraftLastStartError = message;
             const status = document.getElementById('mobile-start-status');
             const startButton = document.getElementById('start-button');
             if (status) {
@@ -160,6 +162,9 @@
             const startButton = document.getElementById('start-button');
             const requestStart = window.__butzcraftPressStart;
             if (!startButton || typeof requestStart !== 'function') return;
+            if (window.__butzcraftLastStartError) {
+                window.__butzcraftShowStartError(window.__butzcraftLastStartError);
+            }
             startButton.addEventListener('click', requestStart);
             startButton.addEventListener('touchstart', requestStart, { passive: false });
             startButton.addEventListener('touchend', requestStart, { passive: false });
