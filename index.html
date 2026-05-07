@@ -171,6 +171,16 @@
             if (window.__butzcraftLastStartError) {
                 window.__butzcraftShowStartError(window.__butzcraftLastStartError);
             }
+            window.setTimeout(() => {
+                if (!window.__butzcraftStartRequested || typeof window.startNewGame === 'function') return;
+                if (window.__butzcraftGameMainEvaluating) {
+                    window.__butzcraftRefreshStartStatus('Engine initialisiert noch...');
+                } else if (window.__butzcraftEngineAssetLoaded) {
+                    window.__butzcraftShowStartError('Engine-Datei geladen, aber nicht ausgeführt');
+                } else {
+                    window.__butzcraftShowStartError('Engine-Datei wurde nicht geladen');
+                }
+            }, 6000);
             startButton.addEventListener('click', requestStart);
             startButton.addEventListener('touchstart', requestStart, { passive: false });
             startButton.addEventListener('touchend', requestStart, { passive: false });
