@@ -129,8 +129,15 @@ app.post('/api/tester/log', (req, res) => {
     });
 });
 
+const distDir = path.join(__dirname, 'dist');
+const staticRoots = [];
+if (process.env.NODE_ENV === 'production' && fs.existsSync(path.join(distDir, 'index.html'))) {
+    staticRoots.push(distDir);
+}
+staticRoots.push(__dirname);
+
 // Statisches Routing: Einstiegspunkte nicht cachen, damit neue Deploys sofort sichtbar sind.
-app.use(express.static(__dirname, {
+const staticOptions = {
     setHeaders: (res, filePath) => {
         if (filePath.endsWith('.html') || filePath.endsWith('.css') || filePath.endsWith('.js')) {
             res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -138,11 +145,18 @@ app.use(express.static(__dirname, {
             res.set('Expires', '0');
         }
     }
-}));
+};
+
+staticRoots.forEach(root => {
+    app.use(express.static(root, staticOptions));
+});
 
 // Weiterleitung von Root auf index.html falls nicht automatisch gefunden
 app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
+    const indexPath = fs.existsSync(path.join(distDir, 'index.html'))
+        ? path.join(distDir, 'index.html')
+        : path.join(__dirname, 'index.html');
+    res.sendFile(indexPath);
 });
 
 // Bind-Default: Localhost-only. Wer LAN-Zugriff (z.B. zum Testen vom Handy) braucht,
