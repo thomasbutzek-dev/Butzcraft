@@ -24,6 +24,10 @@ export const SoundManager = {
     activeVoices: [],
     lastPlayedAt: {},   // name -> performance.now() der letzten Wiedergabe
     listener: null,     // { pos: {x,y,z}, forward: {x,y,z}, right: {x,y,z} }
+    musicBuffer: null,
+    musicLoading: false,
+    musicTimer: null,
+    musicSource: null,
 
     init() {
         try {
@@ -110,19 +114,29 @@ export const SoundManager = {
     },
 
     startMusicLoop() {
-        if (!this.ctx || this.musicBuffer) return;
+        if (!this.ctx || this.musicBuffer || this.musicLoading || this.musicTimer || this.musicSource) return;
+        this.musicLoading = true;
         fetch('sounds/music.ogg')
             .then(res => res.arrayBuffer())
             .then(data => this.ctx.decodeAudioData(data))
             .then(buffer => {
                 this.musicBuffer = buffer;
-                setTimeout(() => this.playMusicSequence(), 5000);
+                this.musicLoading = false;
+                if (!this.musicTimer && !this.musicSource) {
+                    this.musicTimer = setTimeout(() => {
+                        this.musicTimer = null;
+                        this.playMusicSequence();
+                    }, 5000);
+                }
             })
-            .catch(err => console.warn("Konnte music.ogg nicht laden:", err));
+            .catch(err => {
+                this.musicLoading = false;
+                console.warn("Konnte music.ogg nicht laden:", err);
+            });
     },
 
     playMusicSequence() {
-        if (!this.ctx || !this.musicBuffer) return;
+        if (!this.ctx || !this.musicBuffer || this.musicSource) return;
         try {
             const source = this.ctx.createBufferSource();
             source.buffer = this.musicBuffer;
@@ -132,10 +146,18 @@ export const SoundManager = {
             gain.connect(this.ctx.destination);
             // Musik UMGEHT bewusst die Voice-Cap — sie soll nicht von Mob-Spam abgewürgt werden.
             source.onended = () => {
-                setTimeout(() => this.playMusicSequence(), 60000 + Math.random() * 180000);
+                if (this.musicSource === source) this.musicSource = null;
+                if (!this.musicTimer) {
+                    this.musicTimer = setTimeout(() => {
+                        this.musicTimer = null;
+                        this.playMusicSequence();
+                    }, 60000 + Math.random() * 180000);
+                }
             };
+            this.musicSource = source;
             source.start();
         } catch (e) {
+            this.musicSource = null;
             console.warn("Musik-Wiedergabe fehlgeschlagen:", e);
         }
     },
