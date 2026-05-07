@@ -5,15 +5,66 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Butzcraft - Survival & Mobs</title>
-    <link rel="stylesheet" href="style.css?v=20260507d">
+    <link rel="stylesheet" href="style.css?v=20260507e">
     <link rel="icon" type="image/png" href="favicon.png">
+    <script>
+        window.__butzcraftStartRequested = false;
+        window.__butzcraftLastStartPress = 0;
+        window.__butzcraftPressStart = function(event) {
+            const now = performance.now();
+            if (now - window.__butzcraftLastStartPress < 350) return false;
+            window.__butzcraftLastStartPress = now;
+            if (event && event.cancelable) event.preventDefault();
+
+            window.__butzcraftStartRequested = true;
+
+            const startButton = document.getElementById('start-button');
+            const status = document.getElementById('mobile-start-status');
+            if (startButton) {
+                startButton.textContent = 'Starte...';
+                startButton.disabled = true;
+            }
+            if (status) {
+                status.textContent = 'Spiel wird geladen...';
+                status.style.display = 'block';
+            }
+
+            if (typeof window.startNewGame === 'function') {
+                window.startNewGame();
+            } else {
+                window.setTimeout(() => {
+                    if (window.__butzcraftStartRequested && typeof window.startNewGame !== 'function') {
+                        const lateStatus = document.getElementById('mobile-start-status');
+                        const lateButton = document.getElementById('start-button');
+                        if (lateStatus) {
+                            lateStatus.textContent = 'Startmodul lädt noch. Bitte in 2 Sekunden erneut tippen.';
+                            lateStatus.style.display = 'block';
+                        }
+                        if (lateButton) {
+                            lateButton.textContent = 'Erneut versuchen';
+                            lateButton.disabled = false;
+                        }
+                    }
+                }, 2500);
+            }
+            return false;
+        };
+    </script>
 </head>
 
 <body>
     <div id="start-menu">
         <div id="start-menu-content">
             <img src="logo.png" alt="BUTZCRAFT" class="logo-img">
-            <button id="start-button" class="menu-btn">Neues Spiel starten</button>
+            <button
+                id="start-button"
+                class="menu-btn"
+                type="button"
+                ontouchstart="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
+                onpointerdown="if (event.pointerType !== 'mouse') return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
+                onclick="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
+            >Neues Spiel starten</button>
+            <div id="mobile-start-status" style="display:none; color:#ffd966; font-size:13px; text-align:center; min-height:18px;"></div>
             <div id="save-list">
                 <!-- Gespeicherte Spiele werden hier injected -->
             </div>
@@ -22,18 +73,8 @@
     <script>
         (() => {
             const startButton = document.getElementById('start-button');
-            if (!startButton) return;
-            let lastStartPress = 0;
-            const requestStart = (event) => {
-                const now = performance.now();
-                if (now - lastStartPress < 350) return;
-                lastStartPress = now;
-                if (event && event.cancelable) event.preventDefault();
-                window.__butzcraftStartRequested = true;
-                if (typeof window.startNewGame === 'function') {
-                    window.startNewGame();
-                }
-            };
+            const requestStart = window.__butzcraftPressStart;
+            if (!startButton || typeof requestStart !== 'function') return;
             startButton.addEventListener('click', requestStart);
             startButton.addEventListener('touchstart', requestStart, { passive: false });
             startButton.addEventListener('touchend', requestStart, { passive: false });
@@ -217,7 +258,7 @@
         }
     </script>
 
-    <script type="module" src="./js/GameMain.js?v=20260507d"></script>
+    <script type="module" src="./js/GameMain.js?v=20260507e"></script>
 </body>
 
 </html>

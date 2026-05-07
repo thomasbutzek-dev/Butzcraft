@@ -117,6 +117,7 @@
 
         window.startNewGame = function() {
             console.log("DEBUG: startNewGame starting...");
+            window.__butzcraftStartRequested = false;
             document.getElementById('start-menu').style.display = 'none';
             currentSaveName = null;
             SoundManager.init();
