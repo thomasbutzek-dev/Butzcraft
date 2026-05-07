@@ -36,7 +36,11 @@ export default defineConfig({
         outDir: 'dist',
         emptyOutDir: true,
         rollupOptions: {
-            input: 'index.html'
+            input: 'index.html',
+            external: [
+                'three',
+                /^three\/addons\//
+            ]
         }
     },
     // Vitest-Konfig wird von vitest.config.js übernommen, hier nicht doppeln.

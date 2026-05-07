@@ -17,8 +17,8 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
         export function getBiomeAt(x, z) {
             const temp = (Math.sin(x * 0.01) + Math.cos(z * 0.01)) * 0.5;
             const humidity = (Math.sin(x * 0.01 + 500) + Math.cos(z * 0.01 + 500)) * 0.5;
-            if (temp < -0.6) return BIOMES.SNOW;
-            if (temp > 0.5) return humidity < -0.3 ? BIOMES.DESERT : BIOMES.JUNGLE;
+            if (temp < -0.4) return BIOMES.SNOW;
+            if (temp > 0.2) return humidity < -0.15 ? BIOMES.DESERT : BIOMES.JUNGLE;
             return humidity < -0.25 ? BIOMES.OCEAN : BIOMES.PLAINS;
         }
 
@@ -40,6 +40,9 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 this.blockMeta = {};    // "x,y,z" → metadata byte (Tür-Rotation etc.)
                 this.chestContents = {}; // "chest,x,y,z" → Array<{type,count}>
                 this.lootedChests = new Set(); // Keys von Kisten, die bereits einmal geöffnet wurden
+                this.fireBlocks = new Map();    // "x,y,z" → { remaining: seconds } — aktive Feuer-Blöcke
+                this.spawnerMeta = {};           // "x,y,z" → { lastSpawn, mobCount } — Spawner-Zustand
+                this.villages = [];              // [{cx,cz,x,y,z}] — erkannte Dörfer für NPC-Spawn
                 this.uTime = { value: 0 };
                 this.pendingMeshes = new Set(); // Verhindert doppelte Mesh-Requests
                 
@@ -109,9 +112,11 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     );
                 };
 
-                // Cache-Buster: Browser cachen Web Worker aggressiv (Service-Worker-artige Logik),
-                // selbst bei Cache-Control: no-store. Bei jedem Page-Load eine neue URL erzwingen.
-                this.worker = new Worker('js/chunkWorker.js?v=' + Date.now());
+                // URL statt String-Pfad: Vite kann den Worker so in dist/ mitnehmen.
+                // Im Dev/Express-Modus bleibt er weiterhin relativ zu world.js auflösbar.
+                const workerUrl = new URL('./chunkWorker.js', import.meta.url);
+                if (import.meta.env?.DEV) workerUrl.search = 'v=' + Date.now();
+                this.worker = new Worker(workerUrl);
                 // Init: Sende Config + Block-Daten an Worker
                 this.worker.postMessage({
                     type: 'init',
@@ -167,6 +172,15 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                         this.requestMesh(cx + 1, cz - 1);
                         this.requestMesh(cx - 1, cz + 1);
                         this.requestMesh(cx + 1, cz + 1);
+
+                        // Tier 3: Village-Infos an Main-Thread weiterleiten
+                        if (msg.villageInfos && msg.villageInfos.length > 0) {
+                            for (const vInfo of msg.villageInfos) {
+                                this.villages.push(vInfo);
+                                // Custom-Event für NPC-Spawning
+                                window.dispatchEvent(new CustomEvent('villageGenerated', { detail: vInfo }));
+                            }
+                        }
                         return;
                     }
 

@@ -12,10 +12,11 @@ const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW: 'Schn
 
 // Transparente/Nicht-solide Block-IDs (Faces gegen diese werden gezeichnet)
 // 79=Druckplatte, 80=Minengleis: dünn, Nachbarn sollen sichtbar sein
-const TRANSPARENT_IDS = new Set([0, -1, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80]);
+const TRANSPARENT_IDS = new Set([0, -1, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80, 86]);
 
 // 2D-Pflanzen (Stern-Mesh statt Würfel)
-const PLANT_2D_IDS = new Set([9, 10, 27, 43, 44, 46, 47, 48, 49, 50, 52, 54]);
+const PLANT_2D_IDS = new Set([9, 10, 27, 43, 44, 46, 47, 48, 49, 50, 52, 54, 86]);
+const LOG_IDS = new Set([5, 13, 15]);
 
 // Würfel-Gesichter: direction + 4 Vertices
 const CUBE_FACES = [
@@ -106,9 +107,73 @@ function getFloatingIslandAt(wx, wz) {
 function getBiomeAt(x, z) {
     const temp = (Math.sin(x * 0.01) + Math.cos(z * 0.01)) * 0.5;
     const humidity = (Math.sin(x * 0.01 + 500) + Math.cos(z * 0.01 + 500)) * 0.5;
-    if (temp < -0.6) return BIOMES.SNOW;
-    if (temp > 0.5) return humidity < -0.3 ? BIOMES.DESERT : BIOMES.JUNGLE;
+    if (temp < -0.4) return BIOMES.SNOW;
+    if (temp > 0.2) return humidity < -0.15 ? BIOMES.DESERT : BIOMES.JUNGLE;
     return humidity < -0.25 ? BIOMES.OCEAN : BIOMES.PLAINS;
+}
+
+function getTerrainHeightAt(wx, wz) {
+    const biome = getBiomeAt(wx, wz);
+    const humidity = (Math.sin(wx * 0.01 + 500) + Math.cos(wz * 0.01 + 500)) * 0.5;
+    const oceanFactor = Math.max(0, Math.min(1, (-0.15 - humidity) / 0.4));
+    let baseH = noise2D(wx, wz) + 38;
+    baseH -= oceanFactor * 22;
+    if (biome === BIOMES.DESERT) baseH += Math.sin(wx * 0.2) * 2;
+    return Math.floor(baseH);
+}
+
+function getDesertTemplePlacement(wx, wz) {
+    let minH = Infinity, maxH = -Infinity;
+    for (let dx = -5; dx <= 5; dx++) {
+        for (let dz = -5; dz <= 5; dz++) {
+            const sx = wx + dx;
+            const sz = wz + dz;
+            if (getBiomeAt(sx, sz) !== BIOMES.DESERT) return null;
+            const h = getTerrainHeightAt(sx, sz);
+            if (h <= WATER_LEVEL + 1) return null;
+            minH = Math.min(minH, h);
+            maxH = Math.max(maxH, h);
+        }
+    }
+    if (maxH - minH > 3) return null;
+    return { baseY: maxH, minH, maxH };
+}
+
+function canSpawnPalmAt(wx, wz, h) {
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+            const sx = wx + dx;
+            const sz = wz + dz;
+            if (getBiomeAt(sx, sz) !== BIOMES.DESERT) return false;
+            if (getTerrainHeightAt(sx, sz) <= WATER_LEVEL + 1) return false;
+            if (Math.abs(getTerrainHeightAt(sx, sz) - h) > 2) return false;
+        }
+    }
+    return true;
+}
+
+function meadowPatch(wx, wz) {
+    return (Math.sin(wx * 0.31) + Math.cos(wz * 0.27) + Math.sin((wx + wz) * 0.13)) / 3;
+}
+
+function choosePlainsVegetation(wx, wz, rng) {
+    const patch = meadowPatch(wx, wz);
+    const roll = rng();
+    if (patch > 0.48) {
+        if (roll < 0.16) return rng() < 0.56 ? 9 : 10;
+        if (roll < 0.52) return 44;
+        if (roll < 0.56) return 43;
+        return 0;
+    }
+    if (patch < -0.48) {
+        if (roll < 0.18) return 44;
+        if (roll < 0.22) return 46;
+        return 0;
+    }
+    if (roll < 0.05) return rng() < 0.45 ? 9 : 10;
+    if (roll < 0.32) return 44;
+    if (roll < 0.35) return rng() < 0.55 ? 43 : 52;
+    return 0;
 }
 
 function spawnTree(data, x, h, z, biome, rng) {
@@ -133,18 +198,26 @@ function spawnTree(data, x, h, z, biome, rng) {
 
 function spawnPalm(data, x, h, z, rng) {
     const th = 4 + Math.floor(rng() * 2);
+    let topX = x, topZ = z;
+    const leanX = Math.floor(rng() * 3) - 1;
+    const leanZ = leanX === 0 ? Math.floor(rng() * 3) - 1 : 0;
     for (let ty = 0; ty < th; ty++) {
-        let ox = 0, oz = 0;
-        if (ty > 2) { ox = Math.floor(rng() * 2); oz = Math.floor(rng() * 2); }
-        const wx = x + ox, wz = z + oz, wy = h + ty;
+        const leanStep = ty >= th - 2 ? 1 : 0;
+        const wx = x + leanX * leanStep, wz = z + leanZ * leanStep, wy = h + ty;
+        topX = wx; topZ = wz;
         if (wx >= 0 && wx < CHUNK_SIZE && wz >= 0 && wz < CHUNK_SIZE && wy < CHUNK_HEIGHT)
             data[(wy * CHUNK_SIZE * CHUNK_SIZE) + (wz * CHUNK_SIZE) + wx] = 15;
     }
-    for (let i = 0; i < 5; i++) {
-        const lx = Math.floor(Math.cos(i * 1.5) * 2), lz = Math.floor(Math.sin(i * 1.5) * 2);
-        const wx = x + lx, wz = z + lz, wy = h + th;
-        if (wx >= 0 && wx < CHUNK_SIZE && wz >= 0 && wz < CHUNK_SIZE && wy < CHUNK_HEIGHT)
-            data[(wy * CHUNK_SIZE * CHUNK_SIZE) + (wz * CHUNK_SIZE) + wx] = 16;
+
+    const crownY = h + th;
+    setBlockLocal(data, topX, crownY - 1, topZ, 15);
+    setBlockLocal(data, topX, crownY, topZ, 16);
+    const fronds = [
+        [1, 0], [-1, 0], [0, 1], [0, -1],
+        [1, 1], [1, -1], [-1, 1], [-1, -1]
+    ];
+    for (const [dx, dz] of fronds) {
+        setBlockLocal(data, topX + dx, crownY, topZ + dz, 16);
     }
 }
 
@@ -193,12 +266,24 @@ function spawnMine(data, x, y, z, surfaceY) {
     }
 }
 
-// Wüstentempel: 11×11 Sandstein-Pyramide mit versteckter Kammer
-function spawnDesertTemple(data, x, y, z) {
+// Wüstentempel: 11×11 Sandstein-Pyramide mit verfülltem Fundament und ummauerter Kammer
+function spawnDesertTemple(data, x, y, z, worldX, worldZ) {
     const size = 11;
-    // Pyramide Schicht für Schicht
+    const halfBase = Math.floor(size / 2);
+
+    // Gelände unter dem gesamten Footprint bis zur Tempelbasis verfüllen.
+    for (let dx = -halfBase; dx <= halfBase; dx++) {
+        for (let dz = -halfBase; dz <= halfBase; dz++) {
+            const terrainH = getTerrainHeightAt(worldX + dx, worldZ + dz);
+            for (let fy = terrainH; fy < y; fy++) {
+                setBlockLocal(data, x + dx, fy, z + dz, 30);
+            }
+        }
+    }
+
+    // Pyramide Schicht für Schicht.
     for (let level = 0; level < 6; level++) {
-        const half = Math.floor(size / 2) - level;
+        const half = halfBase - level;
         if (half < 0) break;
         for (let dx = -half; dx <= half; dx++) {
             for (let dz = -half; dz <= half; dz++) {
@@ -207,24 +292,27 @@ function spawnDesertTemple(data, x, y, z) {
             }
         }
     }
-    // Versteckte Kammer im Innern (y-1 bis y+2)
-    for (let dy = -2; dy < 3; dy++) {
-        for (let dx = -2; dx <= 2; dx++) {
-            for (let dz = -2; dz <= 2; dz++) {
-                setBlockLocal(data, x + dx, y + dy, z + dz, 0); // Hohlraum
+
+    // Massive Kammerhülle unter der Pyramide: kein offener, schwebender Hohlraum.
+    for (let dy = -4; dy <= -1; dy++) {
+        for (let dx = -3; dx <= 3; dx++) {
+            for (let dz = -3; dz <= 3; dz++) {
+                const wall = dy === -4 || dy === -1 || Math.abs(dx) === 3 || Math.abs(dz) === 3;
+                setBlockLocal(data, x + dx, y + dy, z + dz, wall ? 30 : 0);
             }
         }
     }
-    // Boden der Kammer aus Sandstein
-    for (let dx = -2; dx <= 2; dx++) {
-        for (let dz = -2; dz <= 2; dz++) {
-            setBlockLocal(data, x + dx, y - 3, z + dz, 30);
+
+    // Zusätzlicher Sockel unter der Kammer, damit sie auch bei kleinen Dünenkanten nicht frei hängt.
+    for (let dx = -3; dx <= 3; dx++) {
+        for (let dz = -3; dz <= 3; dz++) {
+            setBlockLocal(data, x + dx, y - 5, z + dz, 30);
         }
     }
-    // Druckplatten-Falle (Eingang)
-    setBlockLocal(data, x, y - 2, z + 3, 79);  // PRESSURE_PLATE Eingang
-    // Truhe in der Kammer
-    setBlockLocal(data, x, y - 2, z - 2, 75); // CHEST
+
+    // Kleine interne Falle und Truhe in der geschlossenen Kammer.
+    setBlockLocal(data, x, y - 3, z + 1, 79);  // PRESSURE_PLATE
+    setBlockLocal(data, x, y - 3, z - 2, 75);  // CHEST
 }
 
 // Iglu: Halbkuppel Radius 5, Schnee-Kuppel, Eis-Boden, Bett + Truhe innen
@@ -262,10 +350,289 @@ function spawnIgloo(data, x, y, z) {
     setBlockLocal(data, x + 2, y + 1, z, 75);  // CHEST
 }
 
+// Dungeon: Unterirdischer Raum mit Spawner + Loot-Truhe (Tier 3)
+// Layout-Varianten: einfacher Raum, Korridor+Raum, L-Form
+function spawnDungeon(data, x, y, z, rng) {
+    const variant = Math.floor(rng() * 3); // 0=einfach, 1=korridor+raum, 2=L-form
+    
+    // 83=SPAWNER, 84=MOSSY_STONE, 85=COBBLESTONE, 75=CHEST
+    
+    if (variant === 0) {
+        // Einfacher Raum: 9×5×9, zentraler Spawner, 1 Truhe
+        for (let dx = -4; dx <= 4; dx++) {
+            for (let dz = -4; dz <= 4; dz++) {
+                for (let dy = 0; dy <= 4; dy++) {
+                    const isWall = (Math.abs(dx) === 4 || Math.abs(dz) === 4 || dy === 0 || dy === 4);
+                    if (isWall) {
+                        // Mischung aus Cobblestone und Mossy Stone für Atmosphäre
+                        const wallType = rng() < 0.3 ? 84 : 85;
+                        setBlockLocal(data, x + dx, y + dy, z + dz, wallType);
+                    } else {
+                        setBlockLocal(data, x + dx, y + dy, z + dz, 0); // Hohlraum
+                    }
+                }
+            }
+        }
+        // Spawner zentral
+        setBlockLocal(data, x, y + 1, z, 83);
+        // Truhe an der Wand
+        setBlockLocal(data, x + 3, y + 1, z, 75);
+        
+    } else if (variant === 1) {
+        // Korridor (3×3, Länge 10) → Hauptraum (7×5×7)
+        // Gang
+        for (let i = 0; i < 10; i++) {
+            for (let dy = 0; dy <= 2; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    setBlockLocal(data, x + dx, y + dy, z + i, 0);
+                }
+            }
+            // Boden und Decke
+            for (let dx = -1; dx <= 1; dx++) {
+                setBlockLocal(data, x + dx, y - 1, z + i, 85); // Cobblestone Boden
+                setBlockLocal(data, x + dx, y + 3, z + i, 85); // Cobblestone Decke
+            }
+        }
+        // Hauptraum am Ende
+        for (let dx = -3; dx <= 3; dx++) {
+            for (let dz = 0; dz <= 6; dz++) {
+                for (let dy = 0; dy <= 4; dy++) {
+                    const isWall = (Math.abs(dx) === 3 || dz === 6 || dy === 0 || dy === 4);
+                    if (isWall) {
+                        setBlockLocal(data, x + dx, y + dy, z + 10 + dz, rng() < 0.35 ? 84 : 85);
+                    } else {
+                        setBlockLocal(data, x + dx, y + dy, z + 10 + dz, 0);
+                    }
+                }
+            }
+        }
+        // Spawner und 2 Truhen
+        setBlockLocal(data, x, y + 1, z + 13, 83);
+        setBlockLocal(data, x - 2, y + 1, z + 15, 75);
+        setBlockLocal(data, x + 2, y + 1, z + 15, 75);
+        
+    } else {
+        // L-Form: Hauptraum (7×5×7) + Seitengang + kleiner Raum
+        // Hauptraum
+        for (let dx = -3; dx <= 3; dx++) {
+            for (let dz = -3; dz <= 3; dz++) {
+                for (let dy = 0; dy <= 4; dy++) {
+                    const isWall = (Math.abs(dx) === 3 || Math.abs(dz) === 3 || dy === 0 || dy === 4);
+                    if (isWall) {
+                        setBlockLocal(data, x + dx, y + dy, z + dz, rng() < 0.4 ? 84 : 85);
+                    } else {
+                        setBlockLocal(data, x + dx, y + dy, z + dz, 0);
+                    }
+                }
+            }
+        }
+        // Seitengang nach rechts
+        for (let i = 4; i < 10; i++) {
+            for (let dy = 0; dy <= 2; dy++) {
+                for (let dz = -1; dz <= 1; dz++) {
+                    setBlockLocal(data, x + i, y + dy, z + dz, 0);
+                }
+            }
+            for (let dz = -1; dz <= 1; dz++) {
+                setBlockLocal(data, x + i, y - 1, z + dz, 85);
+                setBlockLocal(data, x + i, y + 3, z + dz, 85);
+            }
+        }
+        // Kleiner Raum am Ende des Seitengangs
+        for (let dx = 0; dx <= 4; dx++) {
+            for (let dz = -2; dz <= 2; dz++) {
+                for (let dy = 0; dy <= 3; dy++) {
+                    const isWall = (dx === 4 || Math.abs(dz) === 2 || dy === 0 || dy === 3);
+                    if (isWall) {
+                        setBlockLocal(data, x + 10 + dx, y + dy, z + dz, rng() < 0.5 ? 84 : 85);
+                    } else {
+                        setBlockLocal(data, x + 10 + dx, y + dy, z + dz, 0);
+                    }
+                }
+            }
+        }
+        // Spawner im Hauptraum
+        setBlockLocal(data, x, y + 1, z, 83);
+        // Truhe im kleinen Raum
+        setBlockLocal(data, x + 13, y + 1, z, 75);
+    }
+}
+
+// NPC-Dorf: Generiert ein kleines Dorf mit Häusern, Brunnen, Wegen
+// Gibt villageData zurück (für NPC-Spawning im Main-Thread)
+function spawnVillage(data, x, y, z, rng, worldX, worldZ) {
+    const villageInfo = { cx: 0, cz: 0, houses: [] };
+    const drawWell = () => {
+        for (let dx = -3; dx <= 3; dx++) {
+            for (let dz = -3; dz <= 3; dz++) {
+                setBlockLocal(data, x + dx, y - 1, z + dz, 87);
+                setBlockLocal(data, x + dx, y, z + dz, 0);
+                setBlockLocal(data, x + dx, y + 1, z + dz, 0);
+            }
+        }
+        for (let dx = -2; dx <= 2; dx++) {
+            for (let dz = -2; dz <= 2; dz++) {
+                const rim = Math.abs(dx) === 2 || Math.abs(dz) === 2;
+                if (rim) {
+                    setBlockLocal(data, x + dx, y, z + dz, 85);
+                } else {
+                    setBlockLocal(data, x + dx, y - 1, z + dz, 85);
+                    setBlockLocal(data, x + dx, y, z + dz, 4);
+                }
+            }
+        }
+        for (const [px, pz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) {
+            for (let py = y + 1; py <= y + 3; py++) setBlockLocal(data, x + px, py, z + pz, 5);
+        }
+        for (let dx = -2; dx <= 2; dx++) {
+            for (let dz = -2; dz <= 2; dz++) {
+                const edge = Math.abs(dx) === 2 || Math.abs(dz) === 2;
+                setBlockLocal(data, x + dx, y + 4, z + dz, edge ? 85 : 26);
+            }
+        }
+    };
+    
+    // Brunnen im Zentrum (5×5 Cobblestone-Ring + Wasser)
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+            // Boden: Village Path
+            setBlockLocal(data, x + dx, y - 1, z + dz, 87); // VILLAGE_PATH
+            if (Math.abs(dx) === 2 || Math.abs(dz) === 2) {
+                // Rand: Cobblestone
+                setBlockLocal(data, x + dx, y, z + dz, 85); // COBBLESTONE
+                setBlockLocal(data, x + dx, y + 1, z + dz, 0); // Luft darüber
+            } else {
+                // Innen: Wasser
+                setBlockLocal(data, x + dx, y, z + dz, 4); // WATER
+                setBlockLocal(data, x + dx, y + 1, z + dz, 0);
+            }
+        }
+    }
+
+    // Häuser um den Brunnen (3-5 Stück)
+    drawWell();
+    const houseCount = 3 + Math.floor(rng() * 3);
+    const houseOffsets = [
+        { dx: -8, dz: -8 }, { dx: 8, dz: -8 },
+        { dx: -8, dz: 8 },  { dx: 8, dz: 8 },
+        { dx: 0, dz: -10 }
+    ];
+
+    for (let h = 0; h < Math.min(houseCount, houseOffsets.length); h++) {
+        const ho = houseOffsets[h];
+        const hx = x + ho.dx, hz = z + ho.dz;
+        const houseW = 5 + Math.floor(rng() * 2); // 5 oder 6 breit
+        const houseD = 5 + Math.floor(rng() * 2);
+        const houseH = 4;
+        const floorY = y;
+        const wallY = y + 1;
+        const roofY = wallY + houseH - 1;
+        const houseWorldX = worldX + ho.dx;
+        const houseWorldZ = worldZ + ho.dz;
+
+        // Boden: Planken
+        for (let dx = 0; dx < houseW; dx++) {
+            for (let dz = 0; dz < houseD; dz++) {
+                const terrainY = getTerrainHeightAt(houseWorldX + dx, houseWorldZ + dz);
+                for (let fy = terrainY; fy < floorY; fy++) {
+                    setBlockLocal(data, hx + dx, fy, hz + dz, 85); // COBBLESTONE Fundament
+                }
+                setBlockLocal(data, hx + dx, y - 1, hz + dz, 85); // COBBLESTONE Fundament
+                setBlockLocal(data, hx + dx, floorY, hz + dz, 26); // PLANKS Boden
+            }
+        }
+
+        // Wände: Holz-Planken mit Fenstern
+        for (let dy = 0; dy < houseH; dy++) {
+            for (let dx = 0; dx < houseW; dx++) {
+                for (let dz = 0; dz < houseD; dz++) {
+                    const isEdge = (dx === 0 || dx === houseW - 1 || dz === 0 || dz === houseD - 1);
+                    if (dy === houseH - 1) {
+                        // Dach: Cobblestone
+                        setBlockLocal(data, hx + dx, wallY + dy, hz + dz, 85);
+                    } else if (isEdge) {
+                        // Fenster in der Mitte der Wände (y=1)
+                        const isMidX = dx > 1 && dx < houseW - 2;
+                        const isMidZ = dz > 1 && dz < houseD - 2;
+                        if (dy === 1 && ((dx === 0 || dx === houseW - 1) && isMidZ || (dz === 0 || dz === houseD - 1) && isMidX)) {
+                            setBlockLocal(data, hx + dx, wallY + dy, hz + dz, 32); // GLASS
+                        } else {
+                            setBlockLocal(data, hx + dx, wallY + dy, hz + dz, 26); // PLANKS
+                        }
+                    } else {
+                        // Innenraum: Luft
+                        setBlockLocal(data, hx + dx, wallY + dy, hz + dz, 0);
+                    }
+                }
+            }
+        }
+
+        // Eckpfeiler und Dachüberstand geben den Häusern eine klarere Silhouette.
+        const corners = [[0, 0], [houseW - 1, 0], [0, houseD - 1], [houseW - 1, houseD - 1]];
+        for (const [cx0, cz0] of corners) {
+            for (let py = wallY; py < roofY; py++) {
+                setBlockLocal(data, hx + cx0, py, hz + cz0, 5); // WOOD
+            }
+        }
+        for (let dx = -1; dx <= houseW; dx++) {
+            for (let dz = -1; dz <= houseD; dz++) {
+                const isOverhang = dx === -1 || dx === houseW || dz === -1 || dz === houseD;
+                if (isOverhang) setBlockLocal(data, hx + dx, roofY, hz + dz, 85); // COBBLESTONE Dachkante
+            }
+        }
+
+        // Tür (Lücke in der Wand richtung Brunnen)
+        const doorDz = ho.dz < 0 ? houseD - 1 : 0;
+        const doorDx = Math.floor(houseW / 2);
+        setBlockLocal(data, hx + doorDx, wallY, hz + doorDz, 0);
+        setBlockLocal(data, hx + doorDx, wallY + 1, hz + doorDz, 0);
+        setBlockLocal(data, hx + doorDx, wallY + 2, hz + doorDz, 26); // PLANKS Tuersturz
+        const porchZ = doorDz === 0 ? hz - 1 : hz + houseD;
+        setBlockLocal(data, hx + doorDx, y - 1, porchZ, 87); // VILLAGE_PATH
+        setBlockLocal(data, hx + doorDx, y, porchZ, 26); // PLANKS Schwelle
+        setBlockLocal(data, hx + doorDx, y + 1, porchZ, 0);
+
+        // Weg vom Haus zum Brunnen
+        const pathStartX = hx + doorDx;
+        const pathStartZ = porchZ;
+        const toCenterX = x - pathStartX;
+        const toCenterZ = z - pathStartZ;
+        const pathEndX = Math.abs(toCenterX) >= Math.abs(toCenterZ) ? x - Math.sign(toCenterX || 1) * 3 : x;
+        const pathEndZ = Math.abs(toCenterX) >= Math.abs(toCenterZ) ? z : z - Math.sign(toCenterZ || 1) * 3;
+        const steps = Math.max(Math.abs(pathStartX - pathEndX), Math.abs(pathStartZ - pathEndZ));
+        for (let s = 0; s <= steps; s++) {
+            const t = steps > 0 ? s / steps : 0;
+            const px = Math.round(pathStartX + (pathEndX - pathStartX) * t);
+            const pz = Math.round(pathStartZ + (pathEndZ - pathStartZ) * t);
+            setBlockLocal(data, px, y - 1, pz, 87); // VILLAGE_PATH
+            // Luft über dem Weg
+            setBlockLocal(data, px, y, pz, 0);
+            setBlockLocal(data, px, y + 1, pz, 0);
+        }
+        setBlockLocal(data, hx + doorDx, y, porchZ, 26); // PLANKS Schwelle nach Weg-Clear wiederherstellen
+        setBlockLocal(data, hx + doorDx, y + 1, porchZ, 0);
+
+        // Truhe im Haus
+        setBlockLocal(data, hx + 1, floorY + 1, hz + 1, 75); // CHEST
+
+        // NPC-Spawn-Position (Mitte des Hauses)
+        villageInfo.houses.push({
+            x: hx + Math.floor(houseW / 2),
+            y: floorY + 1,
+            z: hz + Math.floor(houseD / 2),
+            professionIdx: h
+        });
+    }
+
+    drawWell();
+    return villageInfo;
+}
+
 function generateTerrain(cx, cz, buffer) {
     const data = new Uint8Array(buffer);
     data.fill(0);
     const rng = mulberry32(cx * 1000 + cz);
+    const villageInfos = []; // Tier 3: gesammelte Dorf-Infos für NPC-Spawning
 
     for (let x = 0; x < CHUNK_SIZE; x++) {
         for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -334,10 +701,8 @@ function generateTerrain(cx, cz, buffer) {
             if (h > WATER_LEVEL + 1) {
                 const surfIdx = (h * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x;
                 if (biome === BIOMES.PLAINS) {
-                    const r = rng();
-                    if (r < 0.03) data[surfIdx] = rng() < 0.5 ? 9 : 10;
-                    else if (r < 0.28) data[surfIdx] = 44;
-                    else if (r < 0.30) data[surfIdx] = 43;
+                    const plant = choosePlainsVegetation(wx, wz, rng);
+                    if (plant) data[surfIdx] = plant;
                 }
                 if (biome === BIOMES.DESERT) {
                     const r = rng();
@@ -350,16 +715,14 @@ function generateTerrain(cx, cz, buffer) {
                 }
                 if (biome === BIOMES.JUNGLE) {
                     const r = rng();
-                    if (r < 0.15) data[surfIdx] = 50;
-                    else if (r < 0.19) data[surfIdx] = 43;
-                    else if (r < 0.21) data[surfIdx] = 47;
-                    else if (r < 0.23) data[surfIdx] = 48;
+                    const lush = meadowPatch(wx + 100, wz - 60);
+                    if (r < 0.16 + Math.max(0, lush) * 0.08) data[surfIdx] = 50;
+                    else if (r < 0.22) data[surfIdx] = rng() < 0.7 ? 43 : 52;
+                    else if (r < 0.25) data[surfIdx] = rng() < 0.5 ? 47 : 48;
+                    else if (r < 0.29 && lush > 0.25) data[surfIdx] = 44;
                 }
-                if (biome === BIOMES.SNOW && rng() < 0.005) {
-                    const rh = 1 + Math.floor(rng() * 3);
-                    for (let ry = 0; ry < rh; ry++) {
-                        if (h + ry < CHUNK_HEIGHT) data[((h + ry) * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x] = 3;
-                    }
+                if (biome === BIOMES.SNOW && rng() < 0.012) {
+                    data[surfIdx] = rng() < 0.7 ? 46 : 44;
                 }
                 if (h === WATER_LEVEL + 1 && (biome === BIOMES.PLAINS || biome === BIOMES.JUNGLE)) {
                     const isShore = rng() < 0.08;
@@ -372,7 +735,9 @@ function generateTerrain(cx, cz, buffer) {
                 }
                 const tc = (biome === BIOMES.JUNGLE) ? 0.08 : (biome === BIOMES.PLAINS) ? 0.015 : 0;
                 if (rng() < tc) spawnTree(data, x, h, z, biome, rng);
-                if (biome === BIOMES.DESERT && rng() < 0.008) spawnPalm(data, x, h, z, rng);
+                if (biome === BIOMES.DESERT && rng() < 0.008 && canSpawnPalmAt(wx, wz, h)) {
+                    spawnPalm(data, x, h, z, rng);
+                }
             }
         }
     }
@@ -405,13 +770,11 @@ function generateTerrain(cx, cz, buffer) {
             if (srng() < 0.07) {
                 const tx = wx0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
                 const tz = wz0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
-                if (getBiomeAt(tx, tz) === BIOMES.DESERT) {
-                    const th = Math.floor(noise2D(tx, tz) + 38 + Math.sin(tx * 0.2) * 2);
-                    if (th > WATER_LEVEL) {
-                        const lx = tx - cx * CHUNK_SIZE;
-                        const lz = tz - cz * CHUNK_SIZE;
-                        spawnDesertTemple(data, lx, th, lz);
-                    }
+                const templePlacement = getDesertTemplePlacement(tx, tz);
+                if (templePlacement) {
+                    const lx = tx - cx * CHUNK_SIZE;
+                    const lz = tz - cz * CHUNK_SIZE;
+                    spawnDesertTemple(data, lx, templePlacement.baseY, lz, tx, tz);
                 }
             }
 
@@ -428,10 +791,51 @@ function generateTerrain(cx, cz, buffer) {
                     }
                 }
             }
+
+            // Dungeon (Tier 3): 5% Chance, Y 8-18, Plains/Jungle/Snow
+            if (srng() < 0.05) {
+                const dx = wx0 + 4 + Math.floor(srng() * (CHUNK_SIZE - 8));
+                const dz = wz0 + 4 + Math.floor(srng() * (CHUNK_SIZE - 8));
+                const db = getBiomeAt(dx, dz);
+                if (db === BIOMES.PLAINS || db === BIOMES.JUNGLE || db === BIOMES.SNOW) {
+                    const dungeonY = 8 + Math.floor(srng() * 11); // Y 8-18
+                    const lx = dx - cx * CHUNK_SIZE;
+                    const lz = dz - cz * CHUNK_SIZE;
+                    spawnDungeon(data, lx, dungeonY, lz, srng);
+                }
+            }
+
+            // NPC-Dorf (Tier 3): 3% Chance, nur Plains.
+            // Dörfer sind größer als ein Chunk, deshalb werden auch Nachbar-Quellchunks geprüft,
+            // damit Häuser/Fundamente/Dächer an Chunkgrenzen nicht abgeschnitten schweben.
+            if (srng() < 0.03) {
+                const vx = wx0 + 8 + Math.floor(srng() * (CHUNK_SIZE - 16));
+                const vz = wz0 + 8 + Math.floor(srng() * (CHUNK_SIZE - 16));
+                const vb = getBiomeAt(vx, vz);
+                if (vb === BIOMES.PLAINS) {
+                    const vh = Math.floor(noise2D(vx, vz) + 38);
+                    if (vh > WATER_LEVEL + 1) {
+                        const lx = vx - cx * CHUNK_SIZE;
+                        const lz = vz - cz * CHUNK_SIZE;
+                        const vInfo = spawnVillage(data, lx, vh, lz, srng, vx, vz);
+                        // Welt-Koordinaten für NPC-Spawn
+                        if (scx === cx && scz === cz) {
+                            vInfo.cx = cx;
+                            vInfo.cz = cz;
+                            vInfo.houses.forEach(h => {
+                                h.x = h.x + cx * CHUNK_SIZE;
+                                h.z = h.z + cz * CHUNK_SIZE;
+                                h.y = vh + 1;
+                            });
+                            villageInfos.push(vInfo);
+                        }
+                    }
+                }
+            }
         }
     }
 
-    return data;
+    return { data, villageInfos };
 }
 
 // ============================================================
@@ -517,8 +921,8 @@ function buildMesh(cx, cz, getBlock, isWater, blockMeta) {
                 const variation = 0.9 + rng() * 0.2;
                 bcR *= variation; bcG *= variation; bcB *= variation;
 
-                // Gras: Weiße Vertex-Color für unverfälschte HD-Textur
-                if (blockType === 1) {
+                // Gras/Holz: helle Vertex-Color für unverfälschte Atlas-Textur.
+                if (blockType === 1 || LOG_IDS.has(blockType)) {
                     const gVar = 0.85 + rng() * 0.3;
                     bcR = gVar; bcG = gVar; bcB = gVar;
                 }
@@ -552,18 +956,38 @@ function buildMesh(cx, cz, getBlock, isWater, blockMeta) {
                     else if (blockType === 54) scaleY = 0.6 + rng2() * 0.4;
                     else scaleY = 0.7 + rng2() * 0.5;
 
+                    let scaleX = 1.0;
+                    if (blockType === 44) scaleX = 0.55 + rng2() * 0.65;
+                    else if (blockType === 50) scaleX = 0.75 + rng2() * 0.45;
+                    else if (blockType === 9 || blockType === 10) scaleX = 0.55 + rng2() * 0.45;
+                    else if (blockType === 43 || blockType === 52) scaleX = 0.9 + rng2() * 0.35;
+                    else if (blockType === 46) scaleX = 0.7 + rng2() * 0.5;
+
                     // Weiße Vertex-Color für Textur-Atlas
-                    const pVar = 0.8 + rng2() * 0.4;
-                    const pR = pVar, pG = pVar, pB = pVar;
+                    const pVar = 0.84 + rng2() * 0.28;
+                    let pR = pVar, pG = pVar, pB = pVar;
+                    if (blockType === 44) {
+                        pR *= 0.88 + rng2() * 0.28;
+                        pG *= 0.95 + rng2() * 0.18;
+                        pB *= 0.76 + rng2() * 0.16;
+                    } else if (blockType === 50 || blockType === 43 || blockType === 52) {
+                        pR *= 0.82 + rng2() * 0.18;
+                        pG *= 0.95 + rng2() * 0.16;
+                        pB *= 0.78 + rng2() * 0.16;
+                    } else if (blockType === 9 || blockType === 10) {
+                        pR *= 0.95 + rng2() * 0.18;
+                        pG *= 0.92 + rng2() * 0.16;
+                        pB *= 0.92 + rng2() * 0.18;
+                    }
 
                     const texIdx = BLOCK_TEX[blockType] || 15;
                     const u0 = (texIdx % 16) / 16, v0 = 1 - (Math.floor(texIdx / 16) + 1) / 16;
                     const u1 = u0 + 1 / 16, v1 = v0 + 1 / 16;
 
                     for (let i = 0; i < 3; i++) {
-                        const angle = (i * Math.PI) / 3;
-                        const c = Math.cos(angle) * 0.5;
-                        const s = Math.sin(angle) * 0.5;
+                        const angle = (i * Math.PI) / 3 + (rng2() - 0.5) * 0.16;
+                        const c = Math.cos(angle) * 0.5 * scaleX;
+                        const s = Math.sin(angle) * 0.5 * scaleX;
                         const st = vc;
                         pos.push(
                             x + 0.5 - c + offX, y, z + 0.5 - s + offZ,
@@ -885,7 +1309,7 @@ function buildMesh(cx, cz, getBlock, isWater, blockMeta) {
                         let qR = ((bcHex2 >> 16) & 0xff) / 255;
                         let qG = ((bcHex2 >> 8) & 0xff) / 255;
                         let qB = (bcHex2 & 0xff) / 255;
-                        if (type === 1) { qR = qG = qB = 1; } // Gras: weiße Vertex-Color
+                        if (type === 1 || LOG_IDS.has(type)) { qR = qG = qB = 1; } // Gras/Holz: weiße Vertex-Color
 
                         for (let vi = 0; vi < 4; vi++) {
                             const fv = f.v[vi];
@@ -947,12 +1371,14 @@ self.onmessage = function (e) {
     if (e.data.type === 'generate') {
         const { cx, cz } = e.data;
         const buffer = e.data.buffer || new ArrayBuffer(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
-        const data = generateTerrain(cx, cz, buffer);
+        const result = generateTerrain(cx, cz, buffer);
+        const data = result.data;
+        const villageInfos = result.villageInfos || [];
 
         // Cache für spätere Mesh-Requests — speichere eine KOPIE, da der Buffer transferiert wird
         chunkCache.set(cx + ',' + cz, new Uint8Array(data));
 
-        self.postMessage({ type: 'terrain', cx, cz, data }, [data.buffer]);
+        self.postMessage({ type: 'terrain', cx, cz, data, villageInfos }, [data.buffer]);
         return;
     }
 

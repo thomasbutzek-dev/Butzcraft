@@ -292,5 +292,142 @@ export const SoundManager = {
                 this.uwGain = null;
             }
         }
+    },
+
+    // =============================================
+    // Wetter-Sounds (Tier 3) — programmatisch erzeugt
+    // =============================================
+
+    /**
+     * Regen-Loop: Start/Stop eines kontinuierlichen gefilterten Rausch-Sounds.
+     * Klingt wie sanftes Regenrauschen über Lowpass-Filter.
+     */
+    playRainLoop(enable) {
+        if (!this.ctx) return;
+        if (enable) {
+            if (this._rainSource) return;
+            this.ctx.resume().then(() => {
+                // Weißes Rauschen generieren (2s Loop-Buffer)
+                const sr = this.ctx.sampleRate;
+                const len = sr * 2;
+                const buf = this.ctx.createBuffer(1, len, sr);
+                const data = buf.getChannelData(0);
+                for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
+
+                this._rainSource = this.ctx.createBufferSource();
+                this._rainSource.buffer = buf;
+                this._rainSource.loop = true;
+
+                // Lowpass für weiches Regenrauschen
+                this._rainFilter = this.ctx.createBiquadFilter();
+                this._rainFilter.type = 'lowpass';
+                this._rainFilter.frequency.value = 2500;
+                this._rainFilter.Q.value = 0.7;
+
+                this._rainGain = this.ctx.createGain();
+                this._rainGain.gain.value = 0;
+                // Fade-in über 2 Sekunden
+                this._rainGain.gain.linearRampToValueAtTime(0.18, this.ctx.currentTime + 2);
+
+                this._rainSource.connect(this._rainFilter);
+                this._rainFilter.connect(this._rainGain);
+                this._rainGain.connect(this.ctx.destination);
+                this._rainSource.start(0);
+            });
+        } else {
+            if (this._rainSource) {
+                if (this._rainGain) {
+                    // Fade-out über 1.5s
+                    this._rainGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1.5);
+                }
+                const src = this._rainSource;
+                setTimeout(() => { try { src.stop(); } catch(e) {} }, 1600);
+                this._rainSource = null;
+                this._rainFilter = null;
+                this._rainGain = null;
+            }
+        }
+    },
+
+    /**
+     * Donner: Kurzer tiefer Rumpel (programmatisch erzeugt über Rauschen + Tiefpass + Envelope).
+     */
+    playThunder() {
+        if (!this.ctx) return;
+        try {
+            this.ctx.resume().catch(() => {});
+            const sr = this.ctx.sampleRate;
+            const duration = 1.5 + Math.random() * 1.0;
+            const len = Math.floor(sr * duration);
+            const buf = this.ctx.createBuffer(1, len, sr);
+            const data = buf.getChannelData(0);
+
+            // Rauschen mit abklingender Amplitude
+            for (let i = 0; i < len; i++) {
+                const t = i / sr;
+                const envelope = Math.exp(-t * 2.5) * (1 + Math.sin(t * 30) * 0.3);
+                data[i] = (Math.random() * 2 - 1) * envelope;
+            }
+
+            const source = this.ctx.createBufferSource();
+            source.buffer = buf;
+
+            // Sehr tiefer Lowpass für den Donner-Rumpel
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 200 + Math.random() * 100;
+            filter.Q.value = 1.2;
+
+            const gain = this.ctx.createGain();
+            gain.gain.value = 0.35 + Math.random() * 0.15;
+
+            source.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+            source.start();
+            source.onended = () => { try { source.disconnect(); filter.disconnect(); gain.disconnect(); } catch(e) {} };
+        } catch (e) {
+            console.warn('Thunder sound failed:', e);
+        }
+    },
+
+    /**
+     * Feuer-Knistern: Kurzer zufälliger Knister-Sound.
+     */
+    playFireCrackle(pos) {
+        if (!this.ctx) return;
+        try {
+            const sr = this.ctx.sampleRate;
+            const duration = 0.3 + Math.random() * 0.4;
+            const len = Math.floor(sr * duration);
+            const buf = this.ctx.createBuffer(1, len, sr);
+            const data = buf.getChannelData(0);
+
+            for (let i = 0; i < len; i++) {
+                const t = i / sr;
+                // Sporadische kurze Impulse (Knistern)
+                const crack = Math.random() < 0.03 ? (Math.random() - 0.5) * 2 : 0;
+                const base = (Math.random() * 2 - 1) * 0.1 * Math.exp(-t * 4);
+                data[i] = base + crack * Math.exp(-t * 3);
+            }
+
+            const source = this.ctx.createBufferSource();
+            source.buffer = buf;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'highpass';
+            filter.frequency.value = 1000;
+
+            const gain = this.ctx.createGain();
+            gain.gain.value = 0.15;
+
+            source.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+            source.start();
+            source.onended = () => { try { source.disconnect(); filter.disconnect(); gain.disconnect(); } catch(e) {} };
+        } catch (e) {
+            console.warn('Fire crackle sound failed:', e);
+        }
     }
 };

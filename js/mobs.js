@@ -14,11 +14,13 @@ window.droppedItems = window.droppedItems || [];
 const _tempDir = new THREE.Vector3();
 const _tempPDir = new THREE.Vector3();
 const _tempNormVel = new THREE.Vector3();
+const _tempProjectileMove = new THREE.Vector3();
 
 // Material-Cache pro (baseColor, texIdx). Vorher wurde pro Body-Part eines Mobs
 // ein NEUES Material + Textur-Clone erzeugt → Skelett-Mob = ~20 Materials, 20 Textur-Klone.
 // Bei 20 Mobs = 400 Material-Instanzen mit eigenen Atlas-Klonen. Mit Cache: ~10 Materials total.
 const _matCache = new Map();
+const _sharedMobMaterials = new Set();
 function getCachedMobMaterial(baseColor, texIdx) {
     const key = (baseColor << 16) | (texIdx & 0xffff);
     let mat = _matCache.get(key);
@@ -44,6 +46,7 @@ function getCachedMobMaterial(baseColor, texIdx) {
         });
     }
     _matCache.set(key, mat);
+    _sharedMobMaterials.add(mat);
     return mat;
 }
 
@@ -90,6 +93,22 @@ export class Mob {
         this.group.position.set(x, y, z);
         scene.add(this.group);
         this.mesh = this.group;
+    }
+
+    dispose() {
+        if (this._disposed || !this.group) return;
+        this.scene.remove(this.group);
+        this.group.traverse(obj => {
+            if (obj.geometry) obj.geometry.dispose();
+            if (obj.material) {
+                const disposeMaterial = (mat) => {
+                    if (!_sharedMobMaterials.has(mat)) mat.dispose();
+                };
+                if (Array.isArray(obj.material)) obj.material.forEach(disposeMaterial);
+                else disposeMaterial(obj.material);
+            }
+        });
+        this._disposed = true;
     }
 
     _getTexMat(baseColor, texIdx) {
@@ -1011,7 +1030,7 @@ export class Mob {
                 if (this.type === 'geist') return;   // Geist – unantastbar, kein Schaden möglich
                 this.health -= amount;
                 if (this.health <= 0) {
-                    this.isDead = true; this.scene.remove(this.group);
+                    this.isDead = true;
                     
                     let blockType = null;
                     let dropColor = 0xFFFFFF;
@@ -1084,7 +1103,7 @@ export class ArrowProjectile {
             return;
         }
 
-        const moveVec = new THREE.Vector3().copy(this.dir).multiplyScalar(this.speed * delta);
+        const moveVec = _tempProjectileMove.copy(this.dir).multiplyScalar(this.speed * delta);
         this.mesh.position.add(moveVec);
 
         if (this.mesh.position.distanceTo(playerPos) < 1.0) {

@@ -8,7 +8,7 @@ const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFI
 
 // Werkzeug-Kategorien und Materialien
 const TOOL_TYPES = {
-    pickaxe: { materials: [63, 64, 65, 66], goodBlocks: new Set([3, 29, 56, 57, 58, 59, 30, 20, 78]) },
+    pickaxe: { materials: [63, 64, 65, 66], goodBlocks: new Set([3, 29, 56, 57, 58, 59, 30, 20, 78, 83, 84, 85]) },
     axe:     { materials: [67, 68, 69, 70], goodBlocks: new Set([5, 13, 15, 26, 28, 36, 75, 81]) },
     shovel:  { materials: [71, 72, 73, 74], goodBlocks: new Set([2, 1, 7, 11, 77]) },
 };
@@ -60,7 +60,7 @@ export class PlayerInteraction {
         }
     }
 
-    handleInteraction(e) {
+    async handleInteraction(e) {
         // Schlag-Animation triggern
         if (e.button === 0) { 
             window.player.isSwinging = true; 
@@ -69,6 +69,32 @@ export class PlayerInteraction {
         }
 
         this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+
+        // 0. NPCs prüfen (Tier 3: Handel)
+        const activeNpcs = (window.npcs || []).filter(n => !n.isDead);
+        if (activeNpcs.length > 0) {
+            const npcMeshes = activeNpcs.map(n => n.group);
+            const npcHits = this.raycaster.intersectObjects(npcMeshes, true);
+            if (npcHits.length > 0 && npcHits[0].distance <= 3.5) {
+                const hitNpc = activeNpcs.find(n => {
+                    let p = npcHits[0].object;
+                    while(p) { if(p === n.group) return true; p = p.parent; }
+                    return false;
+                });
+                if (hitNpc) {
+                    if (e.button === 2) {
+                        // Rechtsklick: Handels-UI öffnen
+                        const { openTradeUI } = await import('./tradeUI.js');
+                        openTradeUI(hitNpc, this._controls);
+                        return;
+                    } else if (e.button === 0) {
+                        // Linksklick: NPC angreifen
+                        hitNpc.takeDamage(10);
+                        return;
+                    }
+                }
+            }
+        }
 
         // 1. Mobs prüfen
         const activeMobs = this.mobs.filter(m => !m.isDead);
@@ -272,6 +298,17 @@ export class PlayerInteraction {
                 // DRUCKPLATTE: fallen lassen
                 } else if (brokenType === 79) {
                     this.context.addItemToInventory(79, 1);
+                // SPAWNER: Abbau zerstört den Spawner, droppt nur Cobblestone
+                } else if (brokenType === 83) {
+                    const spawnerKey = `${bx},${by},${bz}`;
+                    delete this.world.spawnerMeta[spawnerKey];
+                    this.context.addItemToInventory(85, 2); // 2x Cobblestone
+                    this.showMessage('Spawner zerstört! 💀', '#8B0000', 20);
+                // FEUER: Feuer löschen, kein Drop
+                } else if (brokenType === 86) {
+                    const fireKey = `${bx},${by},${bz}`;
+                    this.world.fireBlocks.delete(fireKey);
+                    this.showMessage('Feuer gelöscht! 🔥', '#FF6600', 18);
                 } else if (brokenType !== 0) {
                     this.context.addItemToInventory(brokenType, 1);
                 }
@@ -402,13 +439,27 @@ export class PlayerInteraction {
         // Loot nur einmal generieren: lootedChests merkt sich alle je geöffneten Kisten.
         // Auch nach Save/Load wird kein Loot mehr nachgefüllt.
         if (!this.world.lootedChests.has(key)) {
-            // Biom-Typ bestimmen
-            const biome = window.getBiomeAt ? window.getBiomeAt(x, z) : 'Grasland';
-            const biomeType = (biome === 'Wüste') ? 'temple' : (biome === 'Schneefeld') ? 'igloo' : 'mine';
+            // Biom-Typ bestimmen — Dungeon-Erkennung über Y-Level + umgebende Blöcke
+            let biomeType;
+            if (y <= 18) {
+                // Tief unterirdisch: prüfe ob Dungeon-Blöcke in der Nähe
+                let dungeonBlocks = 0;
+                for (let dx = -2; dx <= 2; dx++) {
+                    for (let dz = -2; dz <= 2; dz++) {
+                        const nb = this.world.getBlock(x + dx, y, z + dz);
+                        if (nb === 84 || nb === 85 || nb === 83) dungeonBlocks++;
+                    }
+                }
+                biomeType = dungeonBlocks >= 3 ? 'dungeon' : 'mine';
+            } else {
+                const biome = window.getBiomeAt ? window.getBiomeAt(x, z) : 'Grasland';
+                biomeType = (biome === 'Wüste') ? 'temple' : (biome === 'Schneefeld') ? 'igloo' : 'mine';
+            }
             this.world.chestContents[key] = rollLoot(biomeType, x * 7013 + y * 3517 + z * 1223);
             this.world.lootedChests.add(key);
         }
-        const contents = this.world.chestContents[key] || [];
+        if (!this.world.chestContents[key]) this.world.chestContents[key] = [];
+        const contents = this.world.chestContents[key];
 
         // Truhen-UI befüllen
         const grid = document.getElementById('chest-grid');
@@ -437,6 +488,7 @@ export class PlayerInteraction {
                     slot.onclick = () => {
                         this.context.addItemToInventory(item.type, item.count);
                         contents[i] = { type: 0, count: 0 };
+                        this.world.chestContents[key] = contents;
                         slot.innerHTML = '';
                         slot.title = '';
                         slot.style.cursor = '';

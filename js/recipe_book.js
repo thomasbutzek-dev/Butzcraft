@@ -1,6 +1,6 @@
 import { normalizeRecipe } from './recipes.js';
 
-export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS) {
+export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick) {
     const EMOJI_MAP = { 21: '🐟', 22: '🥩', 23: '🍗', 24: '🧟', 25: '🍖' };
 
     const createMiniHTML = (type) => {
@@ -79,18 +79,28 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             const entry = document.createElement('div');
             entry.className = 'recipe-entry';
 
-            // Zutaten-Grid erstellen
+            // Zutaten-Grid erstellen: Das Rezeptbuch zeigt immer die aktuelle 3x3-Werkbank.
+            // Legacy-2x2-Rezepte bleiben logisch 2x2, werden aber optisch oben links in 3x3 eingebettet.
             const gs = recipe.gridSize || 2;
+            const displayGridSize = 3;
             const ingredientsDiv = document.createElement('div');
-            ingredientsDiv.className = `recipe-ingredients grid-${gs}x${gs}`;
+            ingredientsDiv.className = `recipe-ingredients grid-${displayGridSize}x${displayGridSize}`;
 
             let cells;
             if (recipe.kind === 'shapeless') {
                 cells = [...recipe.ingredients];
-                while (cells.length < gs * gs) cells.push(0);
-                cells = cells.slice(0, gs * gs);
+                while (cells.length < displayGridSize * displayGridSize) cells.push(0);
+                cells = cells.slice(0, displayGridSize * displayGridSize);
+            } else if (gs === 2) {
+                cells = [
+                    recipe.pattern[0] || 0, recipe.pattern[1] || 0, 0,
+                    recipe.pattern[2] || 0, recipe.pattern[3] || 0, 0,
+                    0, 0, 0
+                ];
             } else {
                 cells = recipe.pattern;
+                while (cells.length < displayGridSize * displayGridSize) cells.push(0);
+                cells = cells.slice(0, displayGridSize * displayGridSize);
             }
 
             cells.forEach(type => {
@@ -137,6 +147,9 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             entry.appendChild(ingredientsDiv);
             entry.appendChild(arrow);
             entry.appendChild(resultContainer);
+            entry.addEventListener('click', () => {
+                if (onRecipeClick) onRecipeClick(recipe);
+            });
             container.appendChild(entry);
         });
 

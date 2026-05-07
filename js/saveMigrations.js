@@ -15,7 +15,7 @@
  */
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 3;
+export const CURRENT_SAVE_VERSION = 4;
 
 // Migration v0 → v1: Inventory-Format vom Objekt {type: count} auf Array<{type, count}>
 const OLD_INVENTORY_MAP = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
@@ -60,11 +60,22 @@ function migrateV2toV3(data) {
     return data;
 }
 
+// Migration v3 → v4: Weather-System, NPCs, Villages, FireBlocks, Spawner-Metadaten.
+function migrateV3toV4(data) {
+    if (!data.weather) data.weather = { state: 'clear', stateTimer: 120, intensity: 0 };
+    if (!data.npcs) data.npcs = [];
+    if (!data.villages) data.villages = [];
+    if (!data.fireBlocks) data.fireBlocks = {};
+    if (!data.spawnerMeta) data.spawnerMeta = {};
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
     2: migrateV1toV2,
-    3: migrateV2toV3
+    3: migrateV2toV3,
+    4: migrateV3toV4
 };
 
 /**

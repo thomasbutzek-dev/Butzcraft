@@ -14,6 +14,9 @@
         import { PlayerInteraction } from './PlayerInteraction.js';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js';
         import { tickFurnace, isFurnaceOpen } from './furnace.js';
+        import { WeatherSystem } from './weather.js';
+        import { NPC } from './npc.js';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js';
         window.addItemToInventory = addItemToInventory;
         window.inventorySlots = inventorySlots;
         window.updateInventoryUI = updateInventoryUI;
@@ -47,6 +50,16 @@
         const mobs = [];
         window.droppedItems = [];
         const droppedItems = window.droppedItems;
+        let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
+        const npcs = [];            // Tier 3: NPC-Array
+        window.npcs = npcs;
+        // Tier 3: Spawner-Tick-Timer auf Modul-Scope. WICHTIG nicht `this._spawnerTickTimer`
+        // verwenden — `this` ist in einer Top-Level-Funktion innerhalb eines ES-Moduls `undefined`
+        // (strict mode), und `this.x = 0` wirft TypeError. Das war der Grund, warum nach dem
+        // Tier-3-Update die gesamte Steuerung blockiert war: animate() ist jeden Frame in dieser
+        // Zeile abgestürzt, BEVOR `window.player.updatePhysics(...)` aufgerufen werden konnte.
+        let _spawnerTickTimer = 0;
+        let _lastVisibleChunkX = null, _lastVisibleChunkZ = null, _lastVisibleRenderDist = null;
         
         
         let inventoryOpened = false;
@@ -55,6 +68,25 @@
         let currentSaveName = null;
 
         // Schwert & Animation
+
+        function isBlockingOverlayOpen() {
+            const visible = (id) => {
+                const el = document.getElementById(id);
+                return el && el.style.display !== 'none' && getComputedStyle(el).display !== 'none';
+            };
+            return isInventoryOpened() || visible('trade-overlay') || visible('furnace-overlay') || visible('chest-overlay');
+        }
+
+        function updateVisibleChunksIfNeeded(playerPos, force = false) {
+            const cx = Math.floor(playerPos.x / CHUNK_SIZE);
+            const cz = Math.floor(playerPos.z / CHUNK_SIZE);
+            const rd = CONFIG.WORLD.RENDER_DIST;
+            if (!force && cx === _lastVisibleChunkX && cz === _lastVisibleChunkZ && rd === _lastVisibleRenderDist) return;
+            world.updateVisibleChunks(playerPos.x, playerPos.z);
+            _lastVisibleChunkX = cx;
+            _lastVisibleChunkZ = cz;
+            _lastVisibleRenderDist = rd;
+        }
 
         window.startNewGame = function() {
             console.log("DEBUG: startNewGame starting...");
@@ -104,17 +136,42 @@
                     updateInventoryUI();
                     updateUI();
                     
-                    if(data.modifiedBlocks) {
-                        world.modifiedBlocks = data.modifiedBlocks;
+                    {
+                        world.modifiedBlocks = data.modifiedBlocks || {};
                         world.blockMeta = data.blockMeta || {};
                         world.chestContents = data.chestContents || {};
                         world.lootedChests = new Set(data.lootedChests || []);
+
+                        // Tier 3: Wetter-State + Feuer-Blöcke wiederherstellen
+                        if (weatherSystem) {
+                            weatherSystem.deserialize(data.weather);
+                            weatherSystem.loadFireBlocks(data.fireBlocks || {});
+                        }
+                        if (data.villages) world.villages = data.villages;
+
+                        // Tier 3: NPCs wiederherstellen
+                        // Bestehende NPCs entfernen
+                        while (npcs.length > 0) {
+                            const npc = npcs.pop();
+                            npc.dispose();
+                        }
+                        if (data.npcs && Array.isArray(data.npcs)) {
+                            for (const npcData of data.npcs) {
+                                if (!npcData.isDead) {
+                                    const npc = new NPC(scene, npcData.homeX, npcData.homeY, npcData.homeZ, npcData.professionIdx);
+                                    npc.group.position.set(npcData.x, npcData.y, npcData.z);
+                                    npc.health = npcData.health;
+                                    npcs.push(npc);
+                                }
+                            }
+                        }
+
                         world.chunks.forEach(c => {
                             if (c.mesh) scene.remove(c.mesh);
                             if (c.waterMesh) scene.remove(c.waterMesh);
                         });
                         world.chunks.clear();
-                        world.updateVisibleChunks(playerPos.x, playerPos.z);
+                        updateVisibleChunksIfNeeded(playerPos, true);
                     }
                 })
                 .catch(err => alert("Netzwerkfehler beim Laden!"));
@@ -144,6 +201,8 @@
             bloodMoonZ: new THREE.Color().setHSL(0.02, 0.6, 0.05),  // Blutmond-Zenit: schwarz-rot
             hColor: new THREE.Color(),
             zColor: new THREE.Color(),
+            weatherColor: new THREE.Color(),
+            lightningColor: new THREE.Color(0xCCCCFF),
             underwaterColor: new THREE.Color(0x003060)
         };
         const BLOOD_MOON_INTERVAL = CONFIG.GAMEPLAY.BLOOD_MOON_INTERVAL || 3;
@@ -307,7 +366,8 @@
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
             renderer.domElement.id = 'game-canvas';
-            renderer.setPixelRatio(window.devicePixelRatio); renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
             // WebGL Context-Loss Handling: tritt auf bei Tab-Wechsel auf Mobile, GPU-Reset, oder
@@ -409,7 +469,7 @@
             });
             controls.addEventListener('unlock', () => { 
                 // Nur anzeigen, wenn das Hauptmenü weg ist UND wir nicht gerade im Lade-Spawn sind
-                if (gameActive && !spawning && document.getElementById('start-menu').style.display === 'none') {
+                if (gameActive && !spawning && document.getElementById('start-menu').style.display === 'none' && !isBlockingOverlayOpen()) {
                     inst.style.display = 'block'; 
                     window.loadGamesList(); // Liste im Pause-Menü aktualisieren
                 }
@@ -425,6 +485,26 @@
             world = new World(scene);
             window.world = world;
 
+            // Tier 3: Wetter-System initialisieren
+            weatherSystem = new WeatherSystem(scene, world);
+            window.weatherSystem = weatherSystem;
+
+            // Tier 3: NPC-Spawning bei Dorf-Generierung
+            const _spawnedVillageKeys = new Set();
+            window.addEventListener('villageGenerated', (e) => {
+                const vInfo = e.detail;
+                const vKey = `${vInfo.cx},${vInfo.cz}`;
+                if (_spawnedVillageKeys.has(vKey)) return; // Doppel-Spawn verhindern
+                _spawnedVillageKeys.add(vKey);
+                for (const house of vInfo.houses) {
+                    const npc = new NPC(scene, house.x, house.y, house.z, house.professionIdx);
+                    npcs.push(npc);
+                }
+            });
+
+            // Trade-UI globale Schließ-Funktion
+            window.closeTradeUI = () => closeTradeUI(controls);
+
             // --- Render Distance Setting (persistiert in localStorage) ---
             const RD_STORAGE_KEY = 'butzcraft.renderDistance';
             const RD_ALLOWED = [2, 4, 6, 8, 12];
@@ -436,7 +516,7 @@
                 // Sofort wirksam machen, wenn Spieler bereits in der Welt ist
                 if (window.player && window.player.controls) {
                     const p = window.player.controls.getObject().position;
-                    world.updateVisibleChunks(p.x, p.z);
+                    updateVisibleChunksIfNeeded(p, true);
                 }
             };
             window.applyRenderDistance = applyRenderDistance;
@@ -475,11 +555,13 @@
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
                 if (e.code === 'KeyE') {
-                    // Ofen/Truhe zuerst schließen
+                    // Ofen/Truhe/Handel zuerst schließen
                     const furnaceOverlay = document.getElementById('furnace-overlay');
                     const chestOverlay = document.getElementById('chest-overlay');
+                    const tradeOverlay = document.getElementById('trade-overlay');
                     if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
                     if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
+                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
                     toggleInventory(gameStarted, spawning, controls); return;
                 }
                 if (isInventoryOpened()) return;
@@ -613,13 +695,37 @@
                 scene.background = SKY.underwaterColor;
                 if (scene.fog) { scene.fog.color.copy(SKY.underwaterColor); scene.fog.density = 0.12; }
             } else {
-                scene.background = SKY.hColor;
-                if (scene.fog) { scene.fog.color.copy(SKY.hColor); scene.fog.density = 0.015; }
-                if (skyUniforms) { skyUniforms.bottomColor.value.copy(SKY.hColor); skyUniforms.topColor.value.copy(SKY.zColor); if (skyMesh) skyMesh.position.copy(camera.position); }
+                // Tier 3: Wetter-System beeinflusst Sky + Fog
+                const weatherSkyMult = weatherSystem ? weatherSystem.getSkyMultiplier() : 1.0;
+                const weatherFogExtra = weatherSystem ? weatherSystem.getExtraFogDensity() : 0;
+
+                // Blitz-Flash: kurzzeitig weißer Himmel
+                if (weatherSystem && weatherSystem.isLightningFlash()) {
+                    scene.background = SKY.lightningColor;
+                    if (scene.fog) { scene.fog.color.copy(SKY.lightningColor); scene.fog.density = 0.005; }
+                } else {
+                    // Sky-Farbe mit Wetter-Verdunkelung
+                    const wH = SKY.weatherColor.copy(SKY.hColor).multiplyScalar(weatherSkyMult);
+                    scene.background = wH;
+                    if (scene.fog) { scene.fog.color.copy(wH); scene.fog.density = 0.015 + weatherFogExtra; }
+                }
+                if (skyUniforms) {
+                    skyUniforms.bottomColor.value.copy(SKY.hColor).multiplyScalar(weatherSkyMult);
+                    skyUniforms.topColor.value.copy(SKY.zColor).multiplyScalar(weatherSkyMult);
+                    if (skyMesh) skyMesh.position.copy(camera.position);
+                }
             }
 
             const bAt = getBiomeAt(playerPos.x, playerPos.z);
-            DOM.stats.innerText = `Pos: ${Math.floor(playerPos.x)}, ${Math.floor(playerPos.y)}, ${Math.floor(playerPos.z)} | Biom: ${bAt}`;
+            // Tier 3: Wetter-Indikator im Stats-String
+            let weatherIcon = '';
+            if (weatherSystem) {
+                const ws = weatherSystem.getState();
+                if (ws === 'rain') weatherIcon = ' | 🌧️ Regen';
+                else if (ws === 'thunderstorm') weatherIcon = ' | ⛈️ Gewitter';
+                else if (ws === 'snow') weatherIcon = ' | 🌨️ Schnee';
+            }
+            DOM.stats.innerText = `Pos: ${Math.floor(playerPos.x)}, ${Math.floor(playerPos.y)}, ${Math.floor(playerPos.z)} | Biom: ${bAt}${weatherIcon}`;
             updateUI();
 
             // 4. SIMULATION (Nur wenn nicht pausiert)
@@ -628,7 +734,13 @@
             const isPaused = !gameStarted || (!controls.isLocked && !spawning && !window.touchActive);
             if (!isPaused) {
                 time += delta;
-                                if (spawning) {
+
+                // Tier 3: Wetter-System Update
+                if (weatherSystem) {
+                    weatherSystem.update(delta, playerPos, bAt);
+                }
+
+                if (spawning) {
                     const cx = Math.floor(playerPos.x / CHUNK_SIZE);
                     const cz = Math.floor(playerPos.z / CHUNK_SIZE);
                     if (!world.chunks.has(world.getChunkKey(cx, cz))) {
@@ -657,8 +769,25 @@
                     if ((dayRatio < 0.25 || dayRatio > 0.75) === false && (m.type === 'zombie' || m.type === 'skeleton')) m.isDead = true;
                     else m.update(delta, playerPos, world, onPlayerDamage, dayRatio);
                 });
-                for (let i = mobs.length - 1; i >= 0; i--) { if (mobs[i].isDead) { scene.remove(mobs[i].group); mobs.splice(i, 1); } }
+                for (let i = mobs.length - 1; i >= 0; i--) {
+                    if (mobs[i].isDead) {
+                        if (typeof mobs[i].dispose === 'function') mobs[i].dispose();
+                        else scene.remove(mobs[i].group);
+                        mobs.splice(i, 1);
+                    }
+                }
                 updateProjectiles(delta, playerPos, world, onPlayerDamage);
+
+                // Tier 3: NPC-Update
+                for (let i = npcs.length - 1; i >= 0; i--) {
+                    const npc = npcs[i];
+                    if (npc.isDead) {
+                        npc.dispose();
+                        npcs.splice(i, 1);
+                    } else {
+                        npc.update(delta, playerPos, world);
+                    }
+                }
 
                 // --- Mob Spawning (optimiert: eine Schleife statt 3x filter) ---
                 let landMobsCount = 0, waterMobsCount = 0, geistCount = 0, parrotCount = 0;
@@ -670,7 +799,7 @@
                     else landMobsCount++;
                 }
                 
-                if ((landMobsCount < MAX_COUNT || waterMobsCount < 15) && Math.random() < SPAWN_CHANCE) {
+                if ((landMobsCount < MAX_COUNT || waterMobsCount < 15 || parrotCount < 5) && Math.random() < SPAWN_CHANCE) {
                     const angle = Math.random() * Math.PI * 2;
                     const dist = SPAWN_DIST_MIN + Math.random() * (SPAWN_DIST_MAX - SPAWN_DIST_MIN);
                     const ox = playerPos.x + Math.cos(angle) * dist, oz = playerPos.z + Math.sin(angle) * dist;
@@ -700,6 +829,22 @@
                             mobs.push(new Mob(scene, 'geist', ox, spawnY + 5, oz));
                         }
 
+                        // Papageien: tagsüber, unabhängig vom Land-Mob-Cap (eigenes Cap: 5)
+                        if (!isNight && parrotCount < 5 && !isWaterSpawn && !waterNearby && spawnY > 0 && spawnY <= 46) {
+                            let leavesNearby = false;
+                            outer2: for (let dy = -2; dy <= 12; dy++) {
+                                for (let dx = -4; dx <= 4; dx++) {
+                                    for (let dz = -4; dz <= 4; dz++) {
+                                        const b = world.getBlock(Math.floor(ox + dx), Math.floor(spawnY + dy), Math.floor(oz + dz));
+                                        if (b === 6 || b === 14 || b === 16) { leavesNearby = true; break outer2; }
+                                    }
+                                }
+                            }
+                            if (leavesNearby && Math.random() < 0.35) {
+                                mobs.push(new Mob(scene, 'parrot', ox, spawnY + 4, oz));
+                            }
+                        }
+
                         if (spawnY <= 46) {
                             if (isWaterSpawn && waterMobsCount < 15) {
                                 const WEIGHT_FISH = CONFIG.MOBS.WEIGHT_FISH || 40;
@@ -717,31 +862,72 @@
                                     else mobs.push(new Mob(scene, 'skeleton', ox, spawnY, oz));
                                 }
                                 else if (dayRatio >= 0.25 && dayRatio <= 0.75) {
-                                    // Papageien: tagsüber, in der Nähe von Bäumen (Blätter im Umkreis)
-                                    let leavesNearby = false;
-                                    if (parrotCount < 5) {
-                                        outer: for (let dy = -2; dy <= 6; dy++) {
-                                            for (let dx = -4; dx <= 4; dx += 2) {
-                                                for (let dz = -4; dz <= 4; dz += 2) {
-                                                    const b = world.getBlock(Math.floor(ox + dx), Math.floor(spawnY + dy), Math.floor(oz + dz));
-                                                    if (b === 6 || b === 14 || b === 16) { leavesNearby = true; break outer; }
-                                                }
-                                            }
-                                        }
-                                    }
-                                    if (leavesNearby && Math.random() < 0.35) {
-                                        mobs.push(new Mob(scene, 'parrot', ox, spawnY + 4, oz));
-                                    } else {
-                                        const totalWeight = WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP + WEIGHT_CHICKEN;
-                                        const r = Math.random() * totalWeight;
-                                        if (r < WEIGHT_COW) mobs.push(new Mob(scene, 'cow', ox, spawnY, oz));
-                                        else if (r < WEIGHT_COW + WEIGHT_PIG) mobs.push(new Mob(scene, 'pig', ox, spawnY, oz));
-                                        else if (r < WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP) mobs.push(new Mob(scene, 'sheep', ox, spawnY, oz));
-                                        else mobs.push(new Mob(scene, 'chicken', ox, spawnY, oz));
+                                    const totalWeight = WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP + WEIGHT_CHICKEN;
+                                    const r = Math.random() * totalWeight;
+                                    if (r < WEIGHT_COW) mobs.push(new Mob(scene, 'cow', ox, spawnY, oz));
+                                    else if (r < WEIGHT_COW + WEIGHT_PIG) mobs.push(new Mob(scene, 'pig', ox, spawnY, oz));
+                                    else if (r < WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP) mobs.push(new Mob(scene, 'sheep', ox, spawnY, oz));
+                                    else mobs.push(new Mob(scene, 'chicken', ox, spawnY, oz));
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // ===== Tier 3: SPAWNER-TICK-LOGIK =====
+                // Überprüft alle Spawner im Radius des Spielers und spawnt hostile Mobs
+                _spawnerTickTimer -= delta;
+                if (_spawnerTickTimer <= 0) {
+                    _spawnerTickTimer = 2.0; // Alle 2 Sekunden checken
+                    const SPAWNER_RANGE = CONFIG.DUNGEON.SPAWNER_RANGE;
+                    const px = Math.floor(playerPos.x), py = Math.floor(playerPos.y), pz = Math.floor(playerPos.z);
+                    
+                    // Scan für Spawner-Blöcke in Reichweite
+                    for (let dx = -SPAWNER_RANGE; dx <= SPAWNER_RANGE; dx += 4) {
+                        for (let dz = -SPAWNER_RANGE; dz <= SPAWNER_RANGE; dz += 4) {
+                            for (let dy = -SPAWNER_RANGE; dy <= SPAWNER_RANGE; dy += 4) {
+                                const sx = px + dx, sy = py + dy, sz = pz + dz;
+                                if (sy < 1 || sy >= 63) continue;
+                                const block = world.getBlock(sx, sy, sz);
+                                if (block !== 83) continue; // Nicht SPAWNER
+                                
+                                const sKey = `${sx},${sy},${sz}`;
+                                if (!world.spawnerMeta[sKey]) {
+                                    world.spawnerMeta[sKey] = { lastSpawn: 0, mobCount: 0 };
+                                }
+                                const meta = world.spawnerMeta[sKey];
+                                const now = performance.now() / 1000;
+                                const interval = CONFIG.DUNGEON.SPAWNER_INTERVAL_MIN + 
+                                    Math.random() * (CONFIG.DUNGEON.SPAWNER_INTERVAL_MAX - CONFIG.DUNGEON.SPAWNER_INTERVAL_MIN);
+                                
+                                if (now - meta.lastSpawn > interval && meta.mobCount < CONFIG.DUNGEON.SPAWNER_MAX_MOBS) {
+                                    // Spawn-Position: zufällig um den Spawner herum (innerhalb des Dungeons)
+                                    const spX = sx + (Math.random() - 0.5) * 4;
+                                    const spZ = sz + (Math.random() - 0.5) * 4;
+                                    const spY = sy + 1;
+                                    
+                                    // Luft über dem Spawn-Punkt prüfen
+                                    if (world.getBlock(Math.floor(spX), spY, Math.floor(spZ)) === 0 &&
+                                        world.getBlock(Math.floor(spX), spY + 1, Math.floor(spZ)) === 0) {
+                                        const mobType = Math.random() < 0.6 ? 'zombie' : 'skeleton';
+                                        const newMob = new Mob(scene, mobType, spX, spY, spZ);
+                                        newMob._spawnerKey = sKey; // Spawner-Referenz für Zähler
+                                        mobs.push(newMob);
+                                        meta.lastSpawn = now;
+                                        meta.mobCount++;
                                     }
                                 }
                             }
                         }
+                    }
+                    
+                    // Spawner-Mob-Counter aktualisieren (tote Mobs abziehen)
+                    for (const sKey in world.spawnerMeta) {
+                        let aliveCount = 0;
+                        for (const m of mobs) {
+                            if (!m.isDead && m._spawnerKey === sKey) aliveCount++;
+                        }
+                        world.spawnerMeta[sKey].mobCount = aliveCount;
                     }
                 }
 
@@ -800,7 +986,7 @@
             // Ofen-Tick (auch wenn pausiert, solange UI offen)
             tickFurnace(controls);
 
-            world.updateVisibleChunks(playerPos.x, playerPos.z);
+            updateVisibleChunksIfNeeded(playerPos);
             window.player.updateSword(delta);
 
 
@@ -890,7 +1076,12 @@
                 modifiedBlocks: world.modifiedBlocks,
                 blockMeta: world.blockMeta,
                 chestContents: world.chestContents,
-                lootedChests: [...world.lootedChests]
+                lootedChests: [...world.lootedChests],
+                // Tier 3: Wetter + Feuer + Dörfer + NPCs persistieren
+                weather: weatherSystem ? weatherSystem.serialize() : null,
+                fireBlocks: weatherSystem ? weatherSystem.saveFireBlocks() : {},
+                villages: world.villages || [],
+                npcs: npcs.filter(n => !n.isDead).map(n => n.serialize())
             });
             
             fetch('/api/save', {

@@ -9,7 +9,8 @@ export const BLOCK_TYPES = {
         WOOD_AXE: 67, STONE_AXE: 68, IRON_AXE: 69, GOLD_AXE: 70,
         WOOD_SHOVEL: 71, STONE_SHOVEL: 72, IRON_SHOVEL: 73, GOLD_SHOVEL: 74,
         CHEST: 75,
-        SNOW_BLOCK: 77, ICE_BLOCK: 78, PRESSURE_PLATE: 79, MINE_RAIL: 80, MINE_SUPPORT: 81, SANDSTONE_CARVED: 82
+        SNOW_BLOCK: 77, ICE_BLOCK: 78, PRESSURE_PLATE: 79, MINE_RAIL: 80, MINE_SUPPORT: 81, SANDSTONE_CARVED: 82,
+        SPAWNER: 83, MOSSY_STONE: 84, COBBLESTONE: 85, FIRE: 86, VILLAGE_PATH: 87, HAY_BALE: 88
         };
 
         export const BLOCK_COLORS = {
@@ -28,7 +29,8 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.WOOD_AXE]: 0xCD853F, [BLOCK_TYPES.STONE_AXE]: 0x808080, [BLOCK_TYPES.IRON_AXE]: 0xC0C0C0, [BLOCK_TYPES.GOLD_AXE]: 0xFFD700,
             [BLOCK_TYPES.WOOD_SHOVEL]: 0xCD853F, [BLOCK_TYPES.STONE_SHOVEL]: 0x808080, [BLOCK_TYPES.IRON_SHOVEL]: 0xC0C0C0, [BLOCK_TYPES.GOLD_SHOVEL]: 0xFFD700,
             [BLOCK_TYPES.CHEST]: 0xA0724A,
-            [BLOCK_TYPES.SNOW_BLOCK]: 0xF0F0F0, [BLOCK_TYPES.ICE_BLOCK]: 0x99DDEE, [BLOCK_TYPES.PRESSURE_PLATE]: 0x999999, [BLOCK_TYPES.MINE_RAIL]: 0x888888, [BLOCK_TYPES.MINE_SUPPORT]: 0x6B4226, [BLOCK_TYPES.SANDSTONE_CARVED]: 0xD2A85A
+            [BLOCK_TYPES.SNOW_BLOCK]: 0xF0F0F0, [BLOCK_TYPES.ICE_BLOCK]: 0x99DDEE, [BLOCK_TYPES.PRESSURE_PLATE]: 0x999999, [BLOCK_TYPES.MINE_RAIL]: 0x888888, [BLOCK_TYPES.MINE_SUPPORT]: 0x6B4226, [BLOCK_TYPES.SANDSTONE_CARVED]: 0xD2A85A,
+            [BLOCK_TYPES.SPAWNER]: 0x1A1A2E, [BLOCK_TYPES.MOSSY_STONE]: 0x5A7A5A, [BLOCK_TYPES.COBBLESTONE]: 0x7A7A7A, [BLOCK_TYPES.FIRE]: 0xFF6600, [BLOCK_TYPES.VILLAGE_PATH]: 0x8B6B3D, [BLOCK_TYPES.HAY_BALE]: 0xD4A820
         };
 
         export const BLOCK_TEX = {
@@ -46,7 +48,8 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.WOOD_AXE]: 67, [BLOCK_TYPES.STONE_AXE]: 68, [BLOCK_TYPES.IRON_AXE]: 69, [BLOCK_TYPES.GOLD_AXE]: 70,
             [BLOCK_TYPES.WOOD_SHOVEL]: 71, [BLOCK_TYPES.STONE_SHOVEL]: 72, [BLOCK_TYPES.IRON_SHOVEL]: 73, [BLOCK_TYPES.GOLD_SHOVEL]: 74,
             [BLOCK_TYPES.CHEST]: 75,
-            [BLOCK_TYPES.SNOW_BLOCK]: 8, [BLOCK_TYPES.ICE_BLOCK]: 9, [BLOCK_TYPES.PRESSURE_PLATE]: 79, [BLOCK_TYPES.MINE_RAIL]: 80, [BLOCK_TYPES.MINE_SUPPORT]: 81, [BLOCK_TYPES.SANDSTONE_CARVED]: 82
+            [BLOCK_TYPES.SNOW_BLOCK]: 8, [BLOCK_TYPES.ICE_BLOCK]: 9, [BLOCK_TYPES.PRESSURE_PLATE]: 79, [BLOCK_TYPES.MINE_RAIL]: 80, [BLOCK_TYPES.MINE_SUPPORT]: 81, [BLOCK_TYPES.SANDSTONE_CARVED]: 82,
+            [BLOCK_TYPES.SPAWNER]: 83, [BLOCK_TYPES.MOSSY_STONE]: 84, [BLOCK_TYPES.COBBLESTONE]: 85, [BLOCK_TYPES.FIRE]: 86, [BLOCK_TYPES.VILLAGE_PATH]: 87, [BLOCK_TYPES.HAY_BALE]: 88
         };
 
 // --- TEXTURE GENERATOR ---
@@ -354,29 +357,61 @@ export const BLOCK_TYPES = {
             });
             // FLOWER RED
             drawTile(15, 0, (c) => { 
-                c.fillStyle = '#4CAF50'; c.fillRect(29, 24, 6, 40);
-                c.beginPath(); c.ellipse(22, 44, 8, 4, -0.4, 0, Math.PI*2); c.fill();
-                c.beginPath(); c.ellipse(42, 40, 8, 4, 0.4, 0, Math.PI*2); c.fill();
-                const reds = ['#E53935', '#F44336', '#EF5350'];
-                for(let i=0; i<8; i++) {
-                    const a = i * Math.PI / 4;
-                    c.fillStyle = reds[i % reds.length];
-                    c.beginPath(); c.ellipse(32 + Math.cos(a)*10, 20 + Math.sin(a)*10, 8, 8, a, 0, Math.PI*2); c.fill();
-                }
-                c.fillStyle = '#FDD835'; c.beginPath(); c.arc(32, 20, 6, 0, Math.PI*2); c.fill();
+                c.clearRect(0, 0, 64, 64);
+                const stems = ['#2F7D32', '#3E8E41', '#5A9B36'];
+                const clusters = [
+                    { x: 20, y: 26, r: 8, colors: ['#D83A56', '#EF6A8A', '#F6A6B8'], petals: 6 },
+                    { x: 35, y: 18, r: 7, colors: ['#C73566', '#E55E92', '#F39AC0'], petals: 7 },
+                    { x: 45, y: 34, r: 6, colors: ['#FFFFFF', '#F8DDE5', '#E85A72'], petals: 5 }
+                ];
+                clusters.forEach((flower, fi) => {
+                    c.strokeStyle = stems[fi % stems.length];
+                    c.lineWidth = 3;
+                    c.beginPath();
+                    c.moveTo(32, 63);
+                    c.quadraticCurveTo(30 + fi * 3, 48, flower.x, flower.y + 7);
+                    c.stroke();
+                    c.fillStyle = stems[(fi + 1) % stems.length];
+                    c.beginPath(); c.ellipse(28 + fi * 7, 47 - fi * 3, 7, 3, fi * 0.4 - 0.5, 0, Math.PI * 2); c.fill();
+                    for (let i = 0; i < flower.petals; i++) {
+                        const a = i * Math.PI * 2 / flower.petals;
+                        c.fillStyle = flower.colors[i % flower.colors.length];
+                        c.beginPath();
+                        c.ellipse(flower.x + Math.cos(a) * flower.r, flower.y + Math.sin(a) * flower.r, 4.5, 7, a, 0, Math.PI * 2);
+                        c.fill();
+                    }
+                    c.fillStyle = '#F5C542';
+                    c.beginPath(); c.arc(flower.x, flower.y, 3.5, 0, Math.PI * 2); c.fill();
+                });
             });
             // FLOWER YELLOW
             drawTile(16, 0, (c) => { 
-                c.fillStyle = '#64DD17'; c.fillRect(30, 26, 4, 38);
-                c.beginPath(); c.ellipse(24, 48, 6, 3, -0.4, 0, Math.PI*2); c.fill();
-                c.beginPath(); c.ellipse(40, 42, 6, 3, 0.4, 0, Math.PI*2); c.fill();
-                const yellows = ['#FFF176', '#FFEE58', '#FFEB3B'];
-                for(let i=0; i<12; i++) {
-                    const a = i * Math.PI / 6;
-                    c.fillStyle = yellows[i % yellows.length];
-                    c.beginPath(); c.ellipse(32 + Math.cos(a)*8, 22 + Math.sin(a)*8, 4, 10, a, 0, Math.PI*2); c.fill();
-                }
-                c.fillStyle = '#F57F17'; c.beginPath(); c.arc(32, 22, 5, 0, Math.PI*2); c.fill();
+                c.clearRect(0, 0, 64, 64);
+                const greens = ['#4E9B3C', '#6FAE3E', '#2F7D46'];
+                const flowers = [
+                    { x: 17, y: 33, r: 6, colors: ['#FFE45C', '#F8C63A', '#FFF2A6'], petals: 8 },
+                    { x: 31, y: 20, r: 7, colors: ['#FFFFFF', '#FFF9C7', '#FFE169'], petals: 9 },
+                    { x: 46, y: 29, r: 6, colors: ['#7AA7FF', '#A9C7FF', '#FFFFFF'], petals: 6 }
+                ];
+                flowers.forEach((flower, fi) => {
+                    c.strokeStyle = greens[fi % greens.length];
+                    c.lineWidth = 2 + fi % 2;
+                    c.beginPath();
+                    c.moveTo(30 + fi * 2, 63);
+                    c.quadraticCurveTo(28 + fi * 5, 47, flower.x, flower.y + 8);
+                    c.stroke();
+                    c.fillStyle = greens[(fi + 2) % greens.length];
+                    c.beginPath(); c.ellipse(23 + fi * 8, 48 - fi * 4, 6, 3, fi * 0.45 - 0.35, 0, Math.PI * 2); c.fill();
+                    for (let i = 0; i < flower.petals; i++) {
+                        const a = i * Math.PI * 2 / flower.petals;
+                        c.fillStyle = flower.colors[i % flower.colors.length];
+                        c.beginPath();
+                        c.ellipse(flower.x + Math.cos(a) * flower.r, flower.y + Math.sin(a) * flower.r, 3.5, 7.5, a, 0, Math.PI * 2);
+                        c.fill();
+                    }
+                    c.fillStyle = fi === 2 ? '#F2B63D' : '#A86B24';
+                    c.beginPath(); c.arc(flower.x, flower.y, 3, 0, Math.PI * 2); c.fill();
+                });
             });
             // PIG SKIN
             drawTile(17, 0, (c) => { 
@@ -692,16 +727,16 @@ export const BLOCK_TYPES = {
             // 43: BERRY_BUSH (Beerenbusch voll mit Beeren)
             drawTile(43, 0, (c) => {
                 c.clearRect(0, 0, 64, 64);
-                // Busch-Basis (dichtes Grün)
-                const greens = ['#2E7D32', '#1B5E20', '#388E3C', '#33691E'];
-                pixelDraw(c, 64, 64, 4, (x, y) => {
-                    if (x < 8 || x > 56 || y < 12 || y > 60) { if (Math.random() > 0.3) return null; }
-                    return greens[Math.floor(Math.random() * greens.length)];
+                const greens = ['#1E5F2A', '#2E7D32', '#3D8C3F', '#517D2D', '#244F21'];
+                const leafBlobs = [[16,42,14,12],[30,34,18,16],[46,42,14,13],[24,52,18,10],[40,54,16,9],[33,22,12,10]];
+                leafBlobs.forEach(([x, y, rx, ry], i) => {
+                    c.fillStyle = greens[i % greens.length];
+                    c.beginPath(); c.ellipse(x, y, rx, ry, (i - 2) * 0.25, 0, Math.PI * 2); c.fill();
                 });
-                // Beeren (rote Punkte)
-                const berryPositions = [[16,24],[28,20],[44,28],[20,40],[36,36],[48,44],[24,52],[40,52],[32,44]];
+                pixelDraw(c, 64, 64, 3, (x, y) => Math.random() > 0.82 ? 'rgba(255,255,255,0.08)' : null);
+                const berryPositions = [[14,31],[26,24],[43,30],[21,43],[36,39],[49,47],[28,54],[42,53],[33,45],[52,36]];
                 berryPositions.forEach(([bx,by]) => {
-                    c.fillStyle = '#E53935'; c.beginPath(); c.arc(bx, by, 4, 0, Math.PI*2); c.fill();
+                    c.fillStyle = Math.random() > 0.35 ? '#D93245' : '#8E2442'; c.beginPath(); c.arc(bx, by, 3.5, 0, Math.PI*2); c.fill();
                     c.fillStyle = 'rgba(255,255,255,0.3)'; c.beginPath(); c.arc(bx-1, by-1, 1.5, 0, Math.PI*2); c.fill();
                 });
             });
@@ -709,17 +744,22 @@ export const BLOCK_TYPES = {
             // 44: TALL_GRASS (Hohes Gras)
             drawTile(44, 0, (c) => {
                 c.clearRect(0, 0, 64, 64);
-                const grassColors = ['#4CAF50', '#66BB6A', '#43A047', '#388E3C'];
-                // Mehrere Grashalme
-                for (let i = 0; i < 10; i++) {
-                    const bx = 8 + Math.random() * 48;
-                    const h = 20 + Math.random() * 30;
+                const grassColors = ['#2F7D32', '#4B9B3E', '#6DAD3A', '#8AA64A', '#B2A65A', '#3A6F2D'];
+                for (let i = 0; i < 18; i++) {
+                    const bx = 6 + Math.random() * 52;
+                    const h = 14 + Math.random() * 42;
                     c.strokeStyle = grassColors[Math.floor(Math.random() * grassColors.length)];
-                    c.lineWidth = 3 + Math.random() * 3;
+                    c.lineWidth = 1.5 + Math.random() * 3.5;
+                    c.lineCap = 'round';
                     c.beginPath();
                     c.moveTo(bx, 64);
-                    c.quadraticCurveTo(bx + (Math.random()-0.5)*16, 64 - h*0.6, bx + (Math.random()-0.5)*12, 64 - h);
+                    c.quadraticCurveTo(bx + (Math.random()-0.5)*22, 64 - h*0.55, bx + (Math.random()-0.5)*16, 64 - h);
                     c.stroke();
+                }
+                c.fillStyle = 'rgba(238, 205, 95, 0.45)';
+                for (let i = 0; i < 4; i++) {
+                    const x = 12 + Math.random() * 40, y = 34 + Math.random() * 18;
+                    c.fillRect(x, y, 2, 8 + Math.random() * 8);
                 }
             });
 
@@ -814,23 +854,21 @@ export const BLOCK_TYPES = {
             // 50: FERN (Farn)
             drawTile(50, 0, (c) => {
                 c.clearRect(0, 0, 64, 64);
-                c.strokeStyle = '#2E7D32'; c.lineWidth = 2;
-                // Zentraler Stiel
-                c.beginPath(); c.moveTo(32, 62); c.lineTo(32, 10); c.stroke();
-                // Wedel
-                const fernColors = ['#388E3C', '#2E7D32', '#1B5E20'];
-                for (let i = 0; i < 7; i++) {
-                    const y = 56 - i * 7;
-                    const spread = 8 + i * 2.5;
-                    c.strokeStyle = fernColors[i % fernColors.length];
+                const fernColors = ['#1B5E20', '#2E7D32', '#3F8F3A', '#5C8F36'];
+                const stems = [24, 33, 42];
+                stems.forEach((sx, si) => {
+                    c.strokeStyle = fernColors[si];
                     c.lineWidth = 2;
-                    // Links
-                    c.beginPath(); c.moveTo(32, y); c.quadraticCurveTo(32 - spread*0.6, y - 4, 32 - spread, y + 2); c.stroke();
-                    // Rechts
-                    c.beginPath(); c.moveTo(32, y); c.quadraticCurveTo(32 + spread*0.6, y - 4, 32 + spread, y + 2); c.stroke();
-                }
-                // Spitze
-                c.fillStyle = '#4CAF50'; c.beginPath(); c.moveTo(32, 10); c.lineTo(28, 18); c.lineTo(36, 18); c.fill();
+                    c.beginPath(); c.moveTo(sx, 63); c.quadraticCurveTo(sx - 5 + si * 4, 37, sx + (si - 1) * 4, 12 + si * 5); c.stroke();
+                    for (let i = 0; i < 7 - si; i++) {
+                        const y = 55 - i * 7;
+                        const spread = 7 + i * 2.2;
+                        c.strokeStyle = fernColors[(i + si) % fernColors.length];
+                        c.lineWidth = 1.5 + (i % 2) * 0.5;
+                        c.beginPath(); c.moveTo(sx, y); c.quadraticCurveTo(sx - spread * 0.7, y - 4, sx - spread, y + 2); c.stroke();
+                        c.beginPath(); c.moveTo(sx, y - 1); c.quadraticCurveTo(sx + spread * 0.7, y - 5, sx + spread, y + 1); c.stroke();
+                    }
+                });
             });
 
             // 51: BERRIES (Beeren-Item)
@@ -854,13 +892,17 @@ export const BLOCK_TYPES = {
             // 52: BERRY_BUSH_EMPTY (Leerer Beerenbusch)
             drawTile(52, 0, (c) => {
                 c.clearRect(0, 0, 64, 64);
-                // Busch-Basis (dunkles Grün, weniger dicht)
-                const greens = ['#33691E', '#1B5E20', '#2E7D32'];
-                pixelDraw(c, 64, 64, 4, (x, y) => {
-                    if (x < 10 || x > 54 || y < 16 || y > 58) { if (Math.random() > 0.2) return null; }
-                    if (Math.random() > 0.7) return null;
-                    return greens[Math.floor(Math.random() * greens.length)];
+                const greens = ['#254F20', '#33691E', '#2E7D32', '#58722E'];
+                [[18,44,14,11],[34,36,17,14],[48,47,12,10],[28,55,18,8],[42,56,14,8]].forEach(([x, y, rx, ry], i) => {
+                    c.fillStyle = greens[i % greens.length];
+                    c.beginPath(); c.ellipse(x, y, rx, ry, (i - 2) * 0.35, 0, Math.PI * 2); c.fill();
                 });
+                c.strokeStyle = '#4A3A24';
+                c.lineWidth = 1.5;
+                for (let i = 0; i < 7; i++) {
+                    const x = 15 + Math.random() * 35;
+                    c.beginPath(); c.moveTo(x, 61); c.lineTo(x + (Math.random() - 0.5) * 14, 34 + Math.random() * 16); c.stroke();
+                }
             });
 
             // 54: SEAGRASS (Wassergras)
@@ -880,14 +922,16 @@ export const BLOCK_TYPES = {
                 }
             });
 
-            // GRAS SEITE (Tile 53) – Oben Grasüberhang, unten exakt dieselbe Erde wie DIRT-Block
+            // GRAS SEITE (Tile 53) – Oben Grasüberhang, unten visuell an den gerenderten DIRT-Block angepasst.
             drawTile(53, 0, (c) => {
-                // 1) Erdbasis identisch zum DIRT-Block (Tile 1) – garantiert farbgleich
-                const browns = ['#6B4F35', '#5C3F28', '#4F3320', '#604030', '#3E2618'];
+                // Grass-Block-Seiten werden im Mesh weiß getintet; normale Dirt-Blöcke bekommen
+                // zusätzlich den DIRT-Vertex-Tint. Diese Palette kompensiert das, damit die
+                // Grass-Unterkante nicht heller/grauer als der darunterliegende Erdblock wirkt.
+                const browns = ['#4B3524', '#3F2A1C', '#362216', '#452D20', '#2B1A11'];
                 pixelDraw(c, 64, 64, 2, (x, y) => browns[Math.floor(Math.random() * browns.length)]);
-                // Steinkrümel wie im DIRT-Block
+                // Gedämpfte Steinkrümel passend zur dunkleren Grass-Side-Erde
                 for (let i = 0; i < 8; i++) {
-                    c.fillStyle = ['#9E9E9E', '#8D8D8D'][Math.floor(Math.random() * 2)];
+                    c.fillStyle = ['#6F6A62', '#5F5A53'][Math.floor(Math.random() * 2)];
                     c.fillRect(Math.random()*60+2, Math.random()*60+2, 4, 2);
                 }
 
@@ -1143,6 +1187,139 @@ export const BLOCK_TYPES = {
                 c.fillRect(24,20,16,24);
                 c.fillStyle = '#F0D090';
                 c.fillRect(26,22,12,20);
+            });
+
+            // === TIER 3: DUNGEON / WETTER / DORF BLÖCKE (IDs 83–88) ===
+
+            // SPAWNER (Tile 83) – Dunkler Käfig-Block mit Gitterstruktur
+            drawTile(83, 0, (c) => {
+                const darks = ['#1A1A2E', '#16213E', '#0F3460', '#1A1A30'];
+                pixelDraw(c, 64, 64, 4, () => darks[Math.floor(Math.random()*darks.length)]);
+                // Gitter-Muster (vertikale und horizontale Stäbe)
+                c.fillStyle = '#333355';
+                for (let i = 8; i < 64; i += 12) { c.fillRect(i, 0, 2, 64); c.fillRect(0, i, 64, 2); }
+                // Inneres dunkles Glühen
+                c.fillStyle = 'rgba(100,0,0,0.2)';
+                c.beginPath(); c.arc(32, 32, 16, 0, Math.PI*2); c.fill();
+                // Kanten
+                c.fillStyle = '#0A0A1A'; c.fillRect(0,0,64,3); c.fillRect(0,61,64,3); c.fillRect(0,0,3,64); c.fillRect(61,0,3,64);
+            });
+
+            // MOSSY STONE (Tile 84) – Steinziegel mit Moos-Flecken
+            drawTile(84, 0, (c) => {
+                // Basis: Steinziegel (wie Tile 30)
+                c.fillStyle = '#808080'; c.fillRect(0, 0, 64, 64);
+                const brickColors = ['#7A7A7A', '#858585', '#727272', '#8A8A8A'];
+                for (let row = 0; row < 2; row++) {
+                    const yOff = row * 32;
+                    const xShift = row * 16;
+                    for (let col = 0; col < 2; col++) {
+                        c.fillStyle = brickColors[row*2+col];
+                        c.fillRect((col * 32 + xShift) % 64, yOff, 30, 30);
+                    }
+                }
+                c.fillStyle = '#555555';
+                c.fillRect(0, 30, 64, 2); c.fillRect(0, 62, 64, 2);
+                c.fillRect(30, 0, 2, 32); c.fillRect(14, 32, 2, 32); c.fillRect(46, 32, 2, 32);
+                // Moos-Flecken drüber
+                for (let i = 0; i < 16; i++) {
+                    c.fillStyle = ['rgba(76,175,80,0.45)', 'rgba(56,142,60,0.4)', 'rgba(46,125,50,0.35)'][Math.floor(Math.random()*3)];
+                    c.beginPath(); c.arc(Math.random()*60+2, Math.random()*60+2, 3+Math.random()*5, 0, Math.PI*2); c.fill();
+                }
+                // Moos am unteren Rand dichter
+                c.fillStyle = 'rgba(46,125,50,0.5)';
+                for (let x = 0; x < 64; x += 4) {
+                    if (Math.random() > 0.4) c.fillRect(x, 56 + Math.floor(Math.random()*6), 4, 8);
+                }
+            });
+
+            // COBBLESTONE (Tile 85) – Unregelmäßige Pflastersteine
+            drawTile(85, 0, (c) => {
+                c.fillStyle = '#6E6E6E'; c.fillRect(0, 0, 64, 64);
+                const cobbleColors = ['#7A7A7A', '#6A6A6A', '#858585', '#606060', '#909090'];
+                // Unregelmäßige Steine
+                const stones = [
+                    [2,2,18,14], [22,2,20,12], [44,2,18,16], [4,18,16,14], [22,16,18,16],
+                    [42,20,20,12], [2,34,20,14], [24,34,16,14], [42,34,20,14],
+                    [4,50,18,12], [24,50,16,12], [42,50,20,12]
+                ];
+                stones.forEach(([sx,sy,sw,sh]) => {
+                    c.fillStyle = cobbleColors[Math.floor(Math.random()*cobbleColors.length)];
+                    c.fillRect(sx, sy, sw, sh);
+                });
+                // Fugen
+                c.fillStyle = '#444444';
+                for (const [sx,sy,sw,sh] of stones) {
+                    c.strokeStyle = '#444444'; c.lineWidth = 1;
+                    c.strokeRect(sx, sy, sw, sh);
+                }
+                // Körnungseffekt
+                pixelDraw(c, 64, 64, 4, () => Math.random() > 0.85 ? 'rgba(255,255,255,0.06)' : (Math.random() > 0.92 ? 'rgba(0,0,0,0.08)' : null));
+            });
+
+            // FIRE (Tile 86) – Flammen (semi-transparent, für Stern-Mesh)
+            drawTile(86, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                // Flammen von unten nach oben
+                const flameColors = ['#FF2200', '#FF6600', '#FF9900', '#FFCC00', '#FFEE44'];
+                for (let i = 0; i < 8; i++) {
+                    const bx = 8 + Math.random() * 40;
+                    const h = 20 + Math.random() * 35;
+                    const w = 6 + Math.random() * 10;
+                    const grad = c.createLinearGradient(bx, 64, bx, 64 - h);
+                    grad.addColorStop(0, flameColors[0]);
+                    grad.addColorStop(0.3, flameColors[1]);
+                    grad.addColorStop(0.5, flameColors[2]);
+                    grad.addColorStop(0.7, flameColors[3]);
+                    grad.addColorStop(1, flameColors[4]);
+                    c.fillStyle = grad;
+                    c.beginPath();
+                    c.moveTo(bx, 64);
+                    c.quadraticCurveTo(bx - w/2, 64 - h*0.6, bx + (Math.random()-0.5)*8, 64 - h);
+                    c.quadraticCurveTo(bx + w/2, 64 - h*0.6, bx + w*0.3, 64);
+                    c.fill();
+                }
+                // Glühende Basis
+                c.fillStyle = 'rgba(255,100,0,0.4)';
+                c.fillRect(6, 56, 52, 8);
+            });
+
+            // VILLAGE_PATH (Tile 87) – Kompakter brauner Dorfweg
+            drawTile(87, 0, (c) => {
+                const pathColors = ['#8B6B3D', '#7D5F35', '#9A7A4A', '#705530', '#8C7040'];
+                pixelDraw(c, 64, 64, 2, () => pathColors[Math.floor(Math.random()*pathColors.length)]);
+                // Verdichtungs-Effekt (dunkler in der Mitte)
+                const grad = c.createRadialGradient(32, 32, 0, 32, 32, 40);
+                grad.addColorStop(0, 'rgba(0,0,0,0.08)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+                c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
+                // Kleine Kiesel
+                for (let i = 0; i < 10; i++) {
+                    c.fillStyle = ['#999', '#888', '#777'][Math.floor(Math.random()*3)];
+                    c.fillRect(Math.random()*60+2, Math.random()*60+2, 3, 2);
+                }
+                // Leichte Oberflächen-Glätte
+                c.fillStyle = 'rgba(255,255,255,0.04)'; c.fillRect(0, 0, 64, 64);
+            });
+
+            // HAY_BALE (Tile 88) – Gelber Strohballen mit Bindung
+            drawTile(88, 0, (c) => {
+                c.fillStyle = '#D4A820'; c.fillRect(0, 0, 64, 64);
+                // Stroh-Fasern (vertikale Linien)
+                const strawColors = ['#D4A820', '#C89A18', '#E0B830', '#BA8E10', '#CCAA28'];
+                for (let x = 0; x < 64; x += 2) {
+                    c.fillStyle = strawColors[Math.floor(Math.random()*strawColors.length)];
+                    c.fillRect(x, 0, 2, 64);
+                }
+                // Horizontale Bindungen (Seil)
+                c.fillStyle = '#8B5E14';
+                c.fillRect(0, 14, 64, 4); c.fillRect(0, 46, 64, 4);
+                c.fillStyle = '#6B4A0E';
+                c.fillRect(0, 16, 64, 2); c.fillRect(0, 48, 64, 2);
+                // Knoten
+                c.fillStyle = '#7A520C';
+                c.fillRect(28, 12, 8, 8); c.fillRect(28, 44, 8, 8);
+                // Stroh-Textur über die Bindungen hinaus
+                pixelDraw(c, 64, 64, 4, () => Math.random() > 0.88 ? 'rgba(0,0,0,0.08)' : null);
             });
 
             atlasDataURL = canvas.toDataURL("image/png");

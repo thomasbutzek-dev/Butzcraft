@@ -85,5 +85,47 @@ export const CONFIG = {
         ARROW_MAX_LIFETIME: 5.0,      // Sek bis Auto-Despawn (auch ohne Treffer)
         PROJECTILE_HARD_CAP: 200,     // Globaler Sicherheits-Cap gegen Spam
         MOB_DESPAWN_DISTANCE: 50      // Blöcke vom Spieler entfernt → Mob despawnt
+    },
+
+    // Wetter-System (Tier 3)
+    WEATHER: {
+        CLEAR_MIN: 45,          // Min. Dauer klares Wetter (Sekunden)
+        CLEAR_MAX: 120,         // Max. Dauer klares Wetter
+        RAIN_MIN: 45,           // Min. Regen-Dauer
+        RAIN_MAX: 90,           // Max. Regen-Dauer
+        STORM_MIN: 30,          // Min. Gewitter-Dauer
+        STORM_MAX: 60,          // Max. Gewitter-Dauer
+        SNOW_MIN: 60,           // Min. Schneefall-Dauer
+        SNOW_MAX: 120,          // Max. Schneefall-Dauer
+        STORM_CHANCE: 0.3,      // Chance dass Regen → Gewitter eskaliert
+        RAIN_PARTICLES: 1500,   // Regen-Partikel (Desktop)
+        SNOW_PARTICLES: 800,    // Schnee-Partikel (Desktop)
+        LIGHTNING_MIN: 5,       // Min. Abstand zwischen Blitzen (Sekunden)
+        LIGHTNING_MAX: 15,      // Max. Abstand zwischen Blitzen
+        LIGHTNING_RADIUS: 40,   // Radius um Spieler für Blitz-Einschlag
+        MAX_FIRES: 50,          // Max. aktive Feuer gleichzeitig
+        FIRE_DURATION: 15,      // Brenndauer eines Feuer-Blocks (Sekunden)
+        FIRE_SPREAD_CHANCE: 0.05 // Chance pro Tick auf Feuer-Ausbreitung
+    },
+
+    // Dungeon-System (Tier 3)
+    DUNGEON: {
+        SPAWN_CHANCE: 0.05,     // 5% Chance pro Chunk
+        Y_MIN: 8,               // Mindest-Y-Level für Dungeon
+        Y_MAX: 18,              // Max-Y-Level für Dungeon
+        SPAWNER_RANGE: 16,      // Aktivierungs-Radius um Spawner
+        SPAWNER_INTERVAL_MIN: 15, // Min. Spawn-Intervall (Sekunden)
+        SPAWNER_INTERVAL_MAX: 25, // Max. Spawn-Intervall
+        SPAWNER_MAX_MOBS: 4     // Max. gleichzeitige Mobs pro Spawner
+    },
+
+    // NPC-Dorf-System (Tier 3)
+    NPC: {
+        VILLAGE_SPAWN_CHANCE: 0.04, // 4% Chance pro Chunk
+        WANDER_RADIUS: 12,      // Wander-Radius um Home-Position
+        WANDER_INTERVAL_MIN: 3, // Min. Zeit bis neues Wander-Ziel (Sekunden)
+        WANDER_INTERVAL_MAX: 8, // Max. Zeit bis neues Wander-Ziel
+        RESPAWN_TIME: 300,      // Respawn-Timer nach Tod (Sekunden)
+        WANDER_SPEED: 1.2       // NPC-Laufgeschwindigkeit
     }
 };

@@ -1,6 +1,9 @@
 node_modules/
 saves/
 js_backup_*/
+.claude/
+_backups/
+dist/
 *.log
 .DS_Store
 Thumbs.db

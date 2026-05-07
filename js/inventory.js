@@ -55,7 +55,8 @@ const TRANSLATIONS = {
     'WOOD_PICKAXE': 'Holz-Spitzhacke', 'STONE_PICKAXE': 'Stein-Spitzhacke', 'IRON_PICKAXE': 'Eisen-Spitzhacke', 'GOLD_PICKAXE': 'Gold-Spitzhacke',
     'WOOD_AXE': 'Holz-Axt', 'STONE_AXE': 'Stein-Axt', 'IRON_AXE': 'Eisen-Axt', 'GOLD_AXE': 'Gold-Axt',
     'WOOD_SHOVEL': 'Holz-Schaufel', 'STONE_SHOVEL': 'Stein-Schaufel', 'IRON_SHOVEL': 'Eisen-Schaufel', 'GOLD_SHOVEL': 'Gold-Schaufel',
-    'CHEST': 'Truhe', 'SNOW_BLOCK': 'Schneeblock', 'ICE_BLOCK': 'Eisblock', 'PRESSURE_PLATE': 'Druckplatte', 'MINE_RAIL': 'Minengleis', 'MINE_SUPPORT': 'Minenbalken', 'SANDSTONE_CARVED': 'Gravierter Sandstein'
+    'CHEST': 'Truhe', 'SNOW_BLOCK': 'Schneeblock', 'ICE_BLOCK': 'Eisblock', 'PRESSURE_PLATE': 'Druckplatte', 'MINE_RAIL': 'Minengleis', 'MINE_SUPPORT': 'Minenbalken', 'SANDSTONE_CARVED': 'Gravierter Sandstein',
+    'SPAWNER': 'Mob-Spawner', 'MOSSY_STONE': 'Moosiger Stein', 'COBBLESTONE': 'Bruchstein', 'FIRE': 'Feuer', 'VILLAGE_PATH': 'Dorfweg', 'HAY_BALE': 'Strohballen'
 };
 
 
@@ -349,7 +350,27 @@ export function toggleInventory(gameStarted, spawning, controls) {
     
     // Rezeptbuch initialisieren/umbauen
     if (inventoryOpened) {
-        initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS);
+        const onRecipeClick = (recipe) => {
+            for (let i = 0; i < 9; i++) craftingGridData[i] = { type: 0, count: 0 };
+            if (recipe.kind === 'shapeless') {
+                recipe.ingredients.forEach((type, i) => {
+                    if (i < 9 && type !== 0) craftingGridData[i] = { type, count: 1 };
+                });
+            } else if (recipe.gridSize === 3) {
+                recipe.pattern.forEach((type, i) => {
+                    if (type !== 0) craftingGridData[i] = { type, count: 1 };
+                });
+            } else {
+                // 2×2-Legacy → oben-links im 3×3-Grid (Slots 0,1,3,4)
+                const slots = [0, 1, 3, 4];
+                recipe.pattern.forEach((type, i) => {
+                    if (type !== 0) craftingGridData[slots[i]] = { type, count: 1 };
+                });
+            }
+            checkCrafting();
+            updateInventoryUI();
+        };
+        initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick);
         if(window.updateRecipeList) window.updateRecipeList();
     }
     

@@ -26,6 +26,18 @@ const LOOT_TABLES = {
         { type: 22, minCount: 1, maxCount: 3, weight: 20 },  // RAW_MEAT
         { type: 60, minCount: 2, maxCount: 5, weight: 18 },  // COAL
         { type: 19, minCount: 1, maxCount: 2, weight: 10 },  // WOOL
+    ],
+    dungeon: [
+        { type: 61, minCount: 1, maxCount: 3, weight: 20 },  // IRON_INGOT
+        { type: 62, minCount: 1, maxCount: 2, weight: 12 },  // GOLD_INGOT
+        { type: 65, minCount: 1, maxCount: 1, weight: 8 },   // IRON_PICKAXE
+        { type: 69, minCount: 1, maxCount: 1, weight: 6 },   // IRON_AXE
+        { type: 31, minCount: 2, maxCount: 5, weight: 18 },  // BONE
+        { type: 60, minCount: 3, maxCount: 8, weight: 22 },  // COAL
+        { type: 57, minCount: 1, maxCount: 3, weight: 15 },  // IRON_ORE
+        { type: 58, minCount: 1, maxCount: 2, weight: 8 },   // GOLD_ORE
+        { type: 19, minCount: 1, maxCount: 3, weight: 10 },  // WOOL
+        { type: 26, minCount: 2, maxCount: 8, weight: 18 },  // PLANKS
     ]
 };
 
