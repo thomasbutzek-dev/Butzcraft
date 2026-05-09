@@ -12,6 +12,17 @@ export const CONFIG = {
         CLOUD_HEIGHT: 58
     },
 
+    // Mobile-Render-Profil — wird bei isTouchDevice() statt der Desktop-Defaults angewendet.
+    // Ziel: lauffähig auf Mid-Range-Geräten ab ~2022 (iPhone 12+, Pixel 6+, Galaxy A54+).
+    MOBILE: {
+        RENDER_DIST: 2,          // 25 statt 81 initiale Chunks
+        PIXEL_RATIO_CAP: 1.5,    // schont GPU bei DPR 3
+        ANTIALIAS: false,
+        DISABLE_SHADOWS: true,
+        PARTICLE_FACTOR: 0.5,
+        MAX_MOBS_FACTOR: 0.5
+    },
+
     // Spiel-Balance & Zeit
     GAMEPLAY: {
         DAY_DURATION: 300, // Dauer eines Tages in Sekunden (5 Min)

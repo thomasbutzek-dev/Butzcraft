@@ -70,6 +70,7 @@
     </style>
     <link rel="stylesheet" href="style.css?v=20260507h">
     <link rel="icon" type="image/png" href="favicon.png">
+    <script src="./js/mobileDebug.js?v=20260508a"></script>
     <script>
         window.__butzcraftStartRequested = false;
         window.__butzcraftLastStartPress = 0;
@@ -190,6 +191,14 @@
             });
         })();
     </script>
+    <div id="world-loading-overlay" style="display:none; position:fixed; inset:0; z-index:400; background:#000; color:#fff; flex-direction:column; align-items:center; justify-content:center; font-family:sans-serif; gap:18px; padding:20px; text-align:center;">
+        <img src="logo.png" alt="BUTZCRAFT" style="max-width:min(80vw, 360px); height:auto; opacity:0.9;">
+        <div id="world-loading-spinner" style="width:48px; height:48px; border:4px solid rgba(255,255,255,0.18); border-top-color:#ffd966; border-radius:50%; animation:butzcraft-spin 1s linear infinite;"></div>
+        <div id="world-loading-text" style="font-size:16px; color:#ffd966;">Welt wird generiert…</div>
+        <div id="world-loading-progress" style="font-size:13px; color:#aaa;">0 Chunks</div>
+        <button id="world-loading-cancel" style="display:none; margin-top:12px; padding:12px 24px; background:#e74c3c; color:#fff; border:none; border-radius:6px; font-size:15px; cursor:pointer; min-height:48px;">Neu laden</button>
+        <style>@keyframes butzcraft-spin { to { transform: rotate(360deg); } }</style>
+    </div>
     <div id="underwater-overlay">
         <div id="underwater-label">≈ Unter Wasser ≈</div>
     </div>
@@ -358,8 +367,8 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "/node_modules/three/build/three.module.js",
-                "three/addons/": "/node_modules/three/examples/jsm/"
+                "three": "https://esm.sh/three@0.160.0",
+                "three/addons/": "https://esm.sh/three@0.160.0/examples/jsm/"
             }
         }
     </script>

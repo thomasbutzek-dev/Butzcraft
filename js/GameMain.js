@@ -82,6 +82,58 @@
             return Boolean(window.touchActive) || isTouchDevice();
         }
 
+        // Welt-Loading-Overlay: zeigt Spinner + Chunk-Counter zwischen "Start gedrückt"
+        // und "erstem Chunk-Mesh in der Scene". Verhindert den schwarzen Screen, der
+        // auf Mobile bisher 5–15 s dauern konnte und den Anschein eines Crashes erweckte.
+        let __worldLoadingTimer = 0;
+        let __worldLoadingTimeoutId = null;
+        function showWorldLoading() {
+            const ov = document.getElementById('world-loading-overlay');
+            if (!ov) return;
+            ov.style.display = 'flex';
+            const cancelBtn = document.getElementById('world-loading-cancel');
+            if (cancelBtn) {
+                cancelBtn.style.display = 'none';
+                cancelBtn.onclick = () => window.location.reload();
+            }
+            __worldLoadingTimer = performance.now();
+            if (__worldLoadingTimeoutId) clearTimeout(__worldLoadingTimeoutId);
+            // Nach 30 s Reload-Button anbieten — wenn die Welt-Generation hängt,
+            // ist das die einzig sinnvolle Notbremse für den Spieler.
+            __worldLoadingTimeoutId = setTimeout(() => {
+                if (cancelBtn) cancelBtn.style.display = 'inline-block';
+                const txt = document.getElementById('world-loading-text');
+                if (txt) txt.textContent = 'Welt-Generation dauert ungewöhnlich lange…';
+            }, 30000);
+        }
+        function updateWorldLoadingProgress() {
+            const ov = document.getElementById('world-loading-overlay');
+            if (!ov || ov.style.display === 'none') return;
+            const ready = window.world && window.world.chunks ? window.world.chunks.size : 0;
+            const rd = CONFIG.WORLD.RENDER_DIST;
+            const expected = (2 * rd + 1) * (2 * rd + 1);
+            const el = document.getElementById('world-loading-progress');
+            if (el) el.textContent = `${ready} / ${expected} Chunks`;
+        }
+        function hideWorldLoadingIfReady() {
+            const ov = document.getElementById('world-loading-overlay');
+            if (!ov || ov.style.display === 'none') return;
+            // Erst ausblenden, wenn wenigstens ein Chunk-Mesh tatsächlich in der Scene ist —
+            // dann ist auch der erste Frame keine schwarze Fläche mehr.
+            const w = window.world;
+            if (!w || !w.chunks) return;
+            let firstMeshReady = false;
+            for (const chunk of w.chunks.values()) {
+                if (chunk.mesh) { firstMeshReady = true; break; }
+            }
+            if (!firstMeshReady) return;
+            ov.style.display = 'none';
+            if (__worldLoadingTimeoutId) { clearTimeout(__worldLoadingTimeoutId); __worldLoadingTimeoutId = null; }
+            const dt = ((performance.now() - __worldLoadingTimer) / 1000).toFixed(1);
+            console.info(`[Butzcraft] Welt sichtbar nach ${dt}s (${w.chunks.size} Chunks geladen).`);
+        }
+        window.__butzcraftShowWorldLoading = showWorldLoading;
+
         function lockControlsForDesktop() {
             if (shouldUseTouchMode()) return;
             controls.lock();
@@ -120,6 +172,7 @@
             if (gameStarted) return;
             console.log("DEBUG: startNewGame starting...");
             document.getElementById('start-menu').style.display = 'none';
+            showWorldLoading();
             currentSaveName = null;
             SoundManager.init();
             lockControlsForDesktop();
@@ -134,6 +187,7 @@
 
         window.loadGame = function(name) {
             console.log("DEBUG: loadGame starting for", name);
+            showWorldLoading();
             SoundManager.init();
             fetch(`/api/load?name=${encodeURIComponent(name)}`)
                 .then(res => res.json())
@@ -407,11 +461,55 @@
             window.starsMesh = new THREE.Points(starsGeo, window.starsMat);
             scene.add(window.starsMesh);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+            // Mobile-Render-Profil: auf Touch-Geräten antialias aus, pixelRatio gedeckelt,
+            // RENDER_DIST + Mob-Cap reduziert. Einmaliger Schalter, der sich vor der ersten
+            // Welt-Generation auswirken muss (siehe new World(scene) weiter unten).
+            // ?mobile=1 erzwingt das Profil auch auf Desktop (für Diagnose).
+            const __mobileForce = new URLSearchParams(window.location.search).has('mobile');
+            const __mobile = __mobileForce || isTouchDevice();
+            const __mProfile = CONFIG.MOBILE || {};
+            window.__butzcraftRenderProfile = {
+                mobile: __mobile,
+                antialias: __mobile ? !!__mProfile.ANTIALIAS : true,
+                pixelRatioCap: __mobile ? (__mProfile.PIXEL_RATIO_CAP || 1.5) : 2,
+                renderDist: __mobile ? (__mProfile.RENDER_DIST || 2) : CONFIG.WORLD.RENDER_DIST,
+                disableShadows: __mobile ? !!__mProfile.DISABLE_SHADOWS : false,
+                particleFactor: __mobile ? (__mProfile.PARTICLE_FACTOR || 0.5) : 1,
+                maxMobsFactor: __mobile ? (__mProfile.MAX_MOBS_FACTOR || 0.5) : 1
+            };
+            if (__mobile) {
+                CONFIG.WORLD.RENDER_DIST = window.__butzcraftRenderProfile.renderDist;
+                CONFIG.MOBS.MAX_COUNT = Math.max(2, Math.round(CONFIG.MOBS.MAX_COUNT * window.__butzcraftRenderProfile.maxMobsFactor));
+                console.info(`[Butzcraft] Mobile-Profil aktiv: RENDER_DIST=${CONFIG.WORLD.RENDER_DIST}, antialias=${window.__butzcraftRenderProfile.antialias}, pixelRatioCap=${window.__butzcraftRenderProfile.pixelRatioCap}, MAX_MOBS=${CONFIG.MOBS.MAX_COUNT}`);
+            }
+
+            try {
+                renderer = new THREE.WebGLRenderer({
+                    antialias: window.__butzcraftRenderProfile.antialias,
+                    powerPreference: 'high-performance'
+                });
+            } catch (err) {
+                console.error('[WebGL] Renderer-Init fehlgeschlagen:', err);
+                if (window.__butzcraftShowStartError) {
+                    window.__butzcraftShowStartError('WebGL nicht verfügbar: ' + (err && err.message ? err.message : String(err)));
+                }
+                throw err;
+            }
             renderer.domElement.id = 'game-canvas';
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.__butzcraftRenderProfile.pixelRatioCap));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
+
+            // GPU-/Capability-Info loggen — wichtig für Mobile-Debugging ohne Remote-DevTools.
+            try {
+                const gl = renderer.getContext();
+                const dbg = gl.getExtension('WEBGL_debug_renderer_info');
+                const gpu = dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '(unmasked nicht verfügbar)';
+                const vendor = dbg ? gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL) : '(unmasked nicht verfügbar)';
+                console.info(`[WebGL] GPU: ${gpu} | Vendor: ${vendor} | MAX_TEXTURE_SIZE=${gl.getParameter(gl.MAX_TEXTURE_SIZE)} | DPR=${window.devicePixelRatio}`);
+            } catch (err) {
+                console.warn('[WebGL] GPU-Info konnte nicht gelesen werden:', err);
+            }
 
             // WebGL Context-Loss Handling: tritt auf bei Tab-Wechsel auf Mobile, GPU-Reset, oder
             // wenn der Browser den Context wegen Inaktivität freigibt. Ohne preventDefault wird
@@ -693,6 +791,9 @@
             const now = performance.now();
             const delta = Math.min((now - prevTime) / 1000, 0.02);
             prevTime = now;
+
+            updateWorldLoadingProgress();
+            hideWorldLoadingIfReady();
 
             const playerPos = controls.getObject().position;
 

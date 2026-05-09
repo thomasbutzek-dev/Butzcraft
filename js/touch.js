@@ -183,6 +183,45 @@ function _injectTouchStyles() {
         @media (hover: hover) and (pointer: fine) {
             #touch-overlay { display: none; }
         }
+        /* Mobile-only: UI-Slots, Buttons und Hotbar auf treffsichere ≥48 px hochziehen.
+           "Fat-Finger"-Schutz für Inventar / Crafting / Truhe / Ofen / Handel. */
+        @media (pointer: coarse) {
+            #esc-hint { display: none !important; }
+            #inventory .slot {
+                width: 64px !important;
+                height: 64px !important;
+                min-width: 48px;
+                min-height: 48px;
+            }
+            #inventory-overlay .inv-slot,
+            #chest-overlay .inv-slot,
+            #furnace-overlay .inv-slot,
+            #crafting-grid .inv-slot {
+                width: 64px !important;
+                height: 64px !important;
+            }
+            #crafting-grid {
+                grid-template-columns: repeat(3, 64px) !important;
+                grid-template-rows: repeat(3, 64px) !important;
+            }
+            #chest-grid {
+                grid-template-columns: repeat(5, 64px) !important;
+            }
+            #inventory-overlay button,
+            #chest-overlay button,
+            #furnace-overlay button,
+            #trade-overlay button,
+            #instructions button,
+            #game-over button {
+                min-height: 48px !important;
+                padding: 12px 22px !important;
+                font-size: 15px !important;
+            }
+            /* Hotbar etwas höher, damit sie nicht mit dem Joystick kollidiert. */
+            #bottom-ui {
+                bottom: clamp(96px, 16vh, 140px) !important;
+            }
+        }
     `;
     const style = document.createElement('style');
     style.id = 'touch-controls-styles';

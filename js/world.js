@@ -56,7 +56,12 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 //                       16×16-Atlas-Zelle bei aAtlasUV gemappt. So kann ein
                 //                       greedy-merged Quad die Tile-Textur N×M-fach wiederholen,
                 //                       ohne benachbarte Atlas-Zellen anzuschneiden.
-                this.opaqueMaterial = new THREE.MeshPhongMaterial({ vertexColors: true, map: textureAtlas, shininess: 10, alphaTest: 0.5 });
+                // Mobile: Lambert (per-Vertex Lighting) statt Phong (per-Pixel) — Voxel-Look
+                // verträgt das problemlos und der Fragment-Shader-Aufwand sinkt deutlich.
+                const __useLambert = !!(window.__butzcraftRenderProfile && window.__butzcraftRenderProfile.mobile);
+                this.opaqueMaterial = __useLambert
+                    ? new THREE.MeshLambertMaterial({ vertexColors: true, map: textureAtlas, alphaTest: 0.5 })
+                    : new THREE.MeshPhongMaterial({ vertexColors: true, map: textureAtlas, shininess: 10, alphaTest: 0.5 });
                 const windTime = this.uTime;
                 this.opaqueMaterial.onBeforeCompile = (shader) => {
                     shader.uniforms.uTime = windTime;
@@ -96,7 +101,9 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 };
                 
                 // Water Material mit Wellen-Shader
-                this.waterMaterial = new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, opacity: 0.6, shininess: 100, depthWrite: false });
+                this.waterMaterial = __useLambert
+                    ? new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.6, depthWrite: false })
+                    : new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, opacity: 0.6, shininess: 100, depthWrite: false });
                 this.waterMaterial.onBeforeCompile = (shader) => {
                     shader.uniforms.uTime = windTime;
                     shader.vertexShader = shader.vertexShader.replace(

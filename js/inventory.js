@@ -271,8 +271,25 @@ function handleSlotClick(e, sType, index) {
     
     if (sType === 'crafting') checkCrafting();
     updateInventoryUI();
-    
-    document.dispatchEvent(new MouseEvent('mousemove', {clientX: e.clientX, clientY: e.clientY}));
+
+    // Cursor-Item sofort an aktuelle Position setzen — auf Touch gibt es kein
+    // implizites pointermove zwischen den Taps, also direkt das Cursor-DOM aktualisieren.
+    updateCursorItemPosition(e.clientX, e.clientY);
+}
+
+function updateCursorItemPosition(clientX, clientY) {
+    const cursorEl = document.getElementById('cursor-item');
+    if (!cursorEl) return;
+    if (cursorItem.count > 0 && cursorItem.type > 0) {
+        cursorEl.style.display = 'block';
+        cursorEl.style.left = clientX + 'px';
+        cursorEl.style.top = clientY + 'px';
+        const iconDiv = cursorEl.querySelector('.cursor-icon');
+        iconDiv.innerHTML = createBlockHTML(cursorItem.type);
+        cursorEl.querySelector('.cursor-count').textContent = cursorItem.count > 1 ? cursorItem.count : '';
+    } else {
+        cursorEl.style.display = 'none';
+    }
 }
 
 export function createSlotElement(i, sType = 'inventory') {
@@ -304,7 +321,11 @@ export function createSlotElement(i, sType = 'inventory') {
     countLabel.style.pointerEvents = 'none';
     slot.appendChild(countLabel);
     
-    slot.addEventListener('mousedown', (e) => handleSlotClick(e, sType, i));
+    // Pointer Events vereinen Maus + Touch + Stylus → funktioniert auch auf Mobile.
+    slot.addEventListener('pointerdown', (e) => {
+        if (e.cancelable) e.preventDefault();
+        handleSlotClick(e, sType, i);
+    });
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
     
     return slot;
@@ -400,19 +421,8 @@ export function setupInventoryEvents() {
         });
     }
 
-    document.addEventListener('mousemove', (e) => {
+    document.addEventListener('pointermove', (e) => {
         if (!inventoryOpened) return;
-        const cursorEl = document.getElementById('cursor-item');
-        if (cursorItem.count > 0 && cursorItem.type > 0) {
-            cursorEl.style.display = 'block';
-            cursorEl.style.left = e.clientX + 'px';
-            cursorEl.style.top = e.clientY + 'px';
-            
-            const iconDiv = cursorEl.querySelector('.cursor-icon');
-            iconDiv.innerHTML = createBlockHTML(cursorItem.type);
-            cursorEl.querySelector('.cursor-count').textContent = cursorItem.count > 1 ? cursorItem.count : '';
-        } else {
-            cursorEl.style.display = 'none';
-        }
+        updateCursorItemPosition(e.clientX, e.clientY);
     });
 }
