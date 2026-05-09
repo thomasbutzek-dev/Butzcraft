@@ -43,6 +43,19 @@
 
         // --- GAME STATE ---
         let camera, scene, renderer, controls, world, sun, sunGroup;
+        // Adaptive Pixel-Ratio State — muss VOR animate() existieren, weil animate()
+        // sich via requestAnimationFrame im ersten Frame schon selbst aufruft, bevor die
+        // Modul-Eval bei einer "spät" deklarierten const angekommen wäre (TDZ).
+        const __adaptivePR = {
+            enabled: true,
+            current: 0,
+            floor: 0.6,
+            ceiling: 0,
+            sampleStart: 0,
+            sampleFrames: 0,
+            cooldownUntil: 0,
+            lastChangeMs: 0
+        };
         let skyUniforms, skyMesh;
         // Spielstart auf Mittag setzen
         let time = DAY_DURATION * 0.45, prevTime = performance.now(), spawnTimer = 0;
@@ -418,9 +431,13 @@
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 1000);
             
             // Zufälligen Spawn-Punkt über einem Land-Biom ermitteln (mit Garantie, dass Höhe > WATER_LEVEL ist)
-            let spawnX = 0, spawnZ = 0, spawnH = 0;
+            let spawnX = 0, spawnZ = 0, spawnH = WATER_LEVEL + 1;
             let foundLand = false;
-            while (!foundLand) {
+            // Iterations-Cap gegen Endlosschleife auf ungünstigen Seeds (z.B. fast nur Ozean).
+            // Falls nach 200 Tries kein Land: nimm den letzten Sample und hebe ihn auf
+            // WATER_LEVEL+1 — dann spawnt der Spieler eben auf dem Wasser, statt das Spiel
+            // beim Start hängen zu lassen.
+            for (let tries = 0; tries < 200 && !foundLand; tries++) {
                 spawnX = Math.floor(Math.random() * 2000 - 1000);
                 spawnZ = Math.floor(Math.random() * 2000 - 1000);
                 const h = getHeightAt(spawnX, spawnZ);
@@ -428,6 +445,9 @@
                     spawnH = h;
                     foundLand = true;
                 }
+            }
+            if (!foundLand) {
+                console.warn('[Butzcraft] Kein Land-Spawn nach 200 Tries — Fallback auf Wasser-Spawn.');
             }
             camera.position.set(spawnX, spawnH + 5, spawnZ); // Näher am Boden spawnen
 
@@ -783,6 +803,40 @@
                 .catch(() => { section.style.display = 'none'; });
         }
 
+        // Adaptive Pixel-Ratio: bei FPS-Einbruch wird die Auflösung dynamisch gesenkt,
+        // bei stabil hohen FPS wieder hochgefahren — bis zum Profil-Cap. State ist ganz
+        // oben deklariert (siehe __adaptivePR bei den Game-State-Variablen).
+        function tickAdaptivePixelRatio(now) {
+            const a = __adaptivePR;
+            if (!a.enabled || !renderer) return;
+            if (a.ceiling === 0) {
+                a.ceiling = (window.__butzcraftRenderProfile && window.__butzcraftRenderProfile.pixelRatioCap) || 2;
+                a.current = renderer.getPixelRatio();
+            }
+            if (a.sampleStart === 0) { a.sampleStart = now; a.sampleFrames = 0; }
+            a.sampleFrames++;
+            const dt = now - a.sampleStart;
+            if (dt < 1500) return; // 1.5 s gleitendes Fenster
+            const fps = (a.sampleFrames * 1000) / dt;
+            a.sampleStart = now;
+            a.sampleFrames = 0;
+            if (now < a.cooldownUntil) return;
+            let newPR = a.current;
+            if (fps < 25 && a.current > a.floor) {
+                newPR = Math.max(a.floor, a.current - 0.25);
+            } else if (fps > 50 && a.current < a.ceiling) {
+                newPR = Math.min(a.ceiling, a.current + 0.25);
+            }
+            if (Math.abs(newPR - a.current) > 0.01) {
+                renderer.setPixelRatio(newPR);
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                a.current = newPR;
+                a.cooldownUntil = now + 3000; // 3 s Ruhe nach Anpassung
+                a.lastChangeMs = now;
+                console.info(`[Butzcraft] Adaptive PixelRatio → ${newPR.toFixed(2)} bei ${fps.toFixed(1)} FPS`);
+            }
+        }
+
         function animate() {
             requestAnimationFrame(animate);
             // Bei verlorenem WebGL-Context: prevTime trotzdem aktualisieren,
@@ -792,6 +846,7 @@
             const delta = Math.min((now - prevTime) / 1000, 0.02);
             prevTime = now;
 
+            tickAdaptivePixelRatio(now);
             updateWorldLoadingProgress();
             hideWorldLoadingIfReady();
 
