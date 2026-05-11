@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260511b">
+    <link rel="stylesheet" href="style.css?v=20260511c">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -111,6 +111,18 @@
             window.__butzcraftRefreshStartStatus('Engine wird geladen. Das Spiel startet automatisch...');
             return false;
         };
+        window.__butzcraftRequestFullscreen = function() {
+            const el = document.documentElement;
+            if (document.fullscreenElement || document.webkitFullscreenElement) return;
+            const request = el.requestFullscreen || el.webkitRequestFullscreen;
+            if (typeof request !== 'function') return;
+            try {
+                const result = request.call(el);
+                if (result && typeof result.catch === 'function') result.catch(() => {});
+            } catch (err) {
+                // Mobile Browser erlauben Fullscreen nur, wenn es aus dem Start-Tap kommt.
+            }
+        };
         window.addEventListener('error', (event) => {
             const msg = event.message || 'Unbekannter JavaScript-Fehler';
             window.__butzcraftShowStartError('Fehler: ' + msg);
@@ -124,6 +136,7 @@
             if (now - window.__butzcraftLastStartPress < 350) return false;
             window.__butzcraftLastStartPress = now;
             if (event && event.cancelable) event.preventDefault();
+            window.__butzcraftRequestFullscreen();
 
             window.__butzcraftStartRequested = true;
 

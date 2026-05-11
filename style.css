@@ -1377,7 +1377,27 @@ html.touch-device body {
     }
 
     #survival-bars {
+        display: flex;
+        width: 300px;
+        gap: 6px;
+        margin-bottom: 4px;
+        justify-content: center;
+    }
+
+    #survival-bars .bar-container {
+        min-width: 0;
+        flex: 1 1 0;
+    }
+
+    #survival-bars .bar-label {
         display: none;
+    }
+
+    #survival-bars .bar {
+        width: 100%;
+        max-width: none;
+        height: 7px;
+        border-width: 1px;
     }
 
     #inventory {
