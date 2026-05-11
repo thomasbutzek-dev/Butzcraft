@@ -7,16 +7,20 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// CORS: Nur lokale Entwicklung erlauben (anpassbar via ALLOWED_ORIGINS env var, kommagetrennt)
+// CORS: Nur API-Zugriffe aus lokaler Entwicklung erlauben (anpassbar via ALLOWED_ORIGINS env var, kommagetrennt).
+// Nicht global auf statische Assets anwenden: Vite setzt im Production-Build `crossorigin`
+// auf Script/CSS-Tags, und der Browser schickt dann einen Origin-Header. Ein globaler
+// CORS-Reject wuerde JS/CSS auf Render als 500 blockieren.
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT},http://127.0.0.1:${PORT}`).split(',').map(s => s.trim());
-app.use(cors({
+const corsOptions = {
     origin: (origin, cb) => {
         // Same-origin requests haben kein Origin-Header → erlauben
         if (!origin) return cb(null, true);
         if (allowedOrigins.includes(origin)) return cb(null, true);
         return cb(new Error('CORS: Origin nicht erlaubt'));
     }
-}));
+};
+app.use('/api', cors(corsOptions));
 // Body-Limit: 5MB reicht für realistische Saves (Welt + Inventar + Mods).
 // Vorher 50MB → DoS-Vektor (RAM-Exhaustion durch parallele große Requests).
 app.use(bodyParser.json({ limit: '5mb' }));
