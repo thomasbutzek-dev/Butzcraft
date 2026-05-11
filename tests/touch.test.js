@@ -3,7 +3,7 @@
  * Tests fuer die Touch-Detection-Heuristik in touch.js.
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { initTouchControls, isTouchDevice } from '../js/touch.js';
+import { applyTouchLookDelta, initTouchControls, isTouchDevice } from '../js/touch.js';
 
 const origMaxTouchPoints = navigator.maxTouchPoints;
 const origMatchMedia = window.matchMedia;
@@ -62,5 +62,33 @@ describe('isTouchDevice', () => {
         expect(document.getElementById('touch-overlay')).not.toBeNull();
         expect(document.documentElement.classList.contains('touch-device')).toBe(true);
         expect(document.body.classList.contains('touch-device')).toBe(true);
+    });
+
+    it('Touch-Look erzeugt keinen Roll/Seitwaerts-Kippwinkel', () => {
+        const camera = {
+            rotation: { x: 0, y: 0, z: 0.8, order: 'XYZ' },
+            quaternion: { setFromEuler: (rotation) => { camera.lastEuler = { ...rotation }; } }
+        };
+
+        applyTouchLookDelta({
+            camera,
+            controls: { getObject: () => camera }
+        }, 40, -20);
+
+        expect(camera.rotation.order).toBe('YXZ');
+        expect(camera.rotation.z).toBe(0);
+        expect(camera.lastEuler.z).toBe(0);
+    });
+
+    it('Touch-Look klemmt Pitch auf PointerLock-Grenzen', () => {
+        const camera = { rotation: { x: 10, y: 0, z: -0.4, order: 'XYZ' } };
+
+        applyTouchLookDelta({
+            camera,
+            controls: { getObject: () => camera }
+        }, 0, -10000);
+
+        expect(camera.rotation.x).toBeLessThan(Math.PI / 2);
+        expect(camera.rotation.z).toBe(0);
     });
 });

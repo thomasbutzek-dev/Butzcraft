@@ -18,11 +18,41 @@ import { Input } from './Input.js?v=20260507b';
 const LOOK_SENSITIVITY = 0.005;
 const JOYSTICK_DEADZONE = 0.18;
 const JOYSTICK_RADIUS_PX = 60;
+const PITCH_LIMIT = Math.PI / 2 - 0.01;
 
 export function isTouchDevice() {
     return ('ontouchstart' in window) ||
            (navigator.maxTouchPoints > 0) ||
            (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+}
+
+export function applyTouchLookDelta(ctx, dx, dy) {
+    const camera = ctx && ctx.camera;
+    if (!camera || !camera.rotation) return;
+
+    const yawObj = ctx.controls && ctx.controls.getObject ? ctx.controls.getObject() : null;
+    const yawTarget = yawObj && yawObj.rotation && yawObj !== camera ? yawObj : camera;
+
+    if (camera.rotation.order !== undefined) camera.rotation.order = 'YXZ';
+    if (yawTarget.rotation.order !== undefined) yawTarget.rotation.order = 'YXZ';
+
+    yawTarget.rotation.y -= dx * LOOK_SENSITIVITY;
+    camera.rotation.x -= dy * LOOK_SENSITIVITY;
+
+    if (camera.rotation.x > PITCH_LIMIT) camera.rotation.x = PITCH_LIMIT;
+    if (camera.rotation.x < -PITCH_LIMIT) camera.rotation.x = -PITCH_LIMIT;
+
+    // Mobile darf nur Yaw + Pitch erzeugen. Roll/Seitwaerts-Kippen war auf
+    // Desktop nie vorgesehen und fuehlt sich wie ein verdrehter Charakter an.
+    if ('z' in camera.rotation) camera.rotation.z = 0;
+    if (yawTarget !== camera && 'z' in yawTarget.rotation) yawTarget.rotation.z = 0;
+
+    if (camera.quaternion && typeof camera.quaternion.setFromEuler === 'function') {
+        camera.quaternion.setFromEuler(camera.rotation);
+    }
+    if (yawTarget !== camera && yawTarget.quaternion && typeof yawTarget.quaternion.setFromEuler === 'function') {
+        yawTarget.quaternion.setFromEuler(yawTarget.rotation);
+    }
 }
 
 /**
@@ -272,16 +302,7 @@ function _bindLookArea(ctx) {
             const dx = t.clientX - lastX;
             const dy = t.clientY - lastY;
             lastX = t.clientX; lastY = t.clientY;
-            // controls.getObject() trägt Yaw, camera direkt trägt Pitch (PointerLockControls-Konvention)
-            const yawObj = ctx.controls && ctx.controls.getObject ? ctx.controls.getObject() : null;
-            if (yawObj) yawObj.rotation.y -= dx * LOOK_SENSITIVITY;
-            if (ctx.camera) {
-                ctx.camera.rotation.x -= dy * LOOK_SENSITIVITY;
-                // Pitch klemmen wie PointerLockControls (±π/2)
-                const lim = Math.PI / 2 - 0.01;
-                if (ctx.camera.rotation.x > lim) ctx.camera.rotation.x = lim;
-                if (ctx.camera.rotation.x < -lim) ctx.camera.rotation.x = -lim;
-            }
+            applyTouchLookDelta(ctx, dx, dy);
         }
     }, { passive: false });
 
