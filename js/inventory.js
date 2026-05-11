@@ -72,6 +72,9 @@ export function isInventoryOpened() {
     return inventoryOpened;
 }
 
+const TOUCH_LONG_PRESS_MS = 420;
+const TOUCH_MOVE_CANCEL_PX = 10;
+
 export function addItemToInventory(type, count) {
     if (type === 0) return;
     for (let i = 0; i < 64; i++) {
@@ -275,6 +278,16 @@ function handleSlotClick(e, sType, index) {
     document.dispatchEvent(new MouseEvent('mousemove', {clientX: e.clientX, clientY: e.clientY}));
 }
 
+function makeSlotClickEvent(sourceEvent, button) {
+    return {
+        button,
+        clientX: sourceEvent.clientX || 0,
+        clientY: sourceEvent.clientY || 0,
+        preventDefault: () => sourceEvent.preventDefault && sourceEvent.preventDefault(),
+        stopPropagation: () => sourceEvent.stopPropagation && sourceEvent.stopPropagation()
+    };
+}
+
 export function createSlotElement(i, sType = 'inventory') {
     const slot = document.createElement('div');
     slot.className = 'inv-slot';
@@ -305,6 +318,59 @@ export function createSlotElement(i, sType = 'inventory') {
     slot.appendChild(countLabel);
     
     slot.addEventListener('mousedown', (e) => handleSlotClick(e, sType, i));
+    slot.addEventListener('pointerdown', (e) => {
+        if (e.pointerType === 'mouse') return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const startX = e.clientX;
+        const startY = e.clientY;
+        let handled = false;
+        let cancelled = false;
+
+        if (slot.setPointerCapture) {
+            try { slot.setPointerCapture(e.pointerId); } catch (err) {}
+        }
+
+        const cleanup = () => {
+            clearTimeout(longPressTimer);
+            slot.removeEventListener('pointermove', onMove);
+            slot.removeEventListener('pointerup', onUp);
+            slot.removeEventListener('pointercancel', onCancel);
+            if (slot.releasePointerCapture) {
+                try { slot.releasePointerCapture(e.pointerId); } catch (err) {}
+            }
+        };
+        const onMove = (moveEvent) => {
+            const dx = moveEvent.clientX - startX;
+            const dy = moveEvent.clientY - startY;
+            if (Math.sqrt(dx * dx + dy * dy) > TOUCH_MOVE_CANCEL_PX) {
+                cancelled = true;
+                cleanup();
+            }
+        };
+        const onCancel = () => {
+            cancelled = true;
+            cleanup();
+        };
+        const onUp = (upEvent) => {
+            if (!handled && !cancelled) {
+                handleSlotClick(makeSlotClickEvent(upEvent, 0), sType, i);
+                handled = true;
+            }
+            cleanup();
+        };
+        const longPressTimer = setTimeout(() => {
+            if (cancelled || handled) return;
+            handleSlotClick(makeSlotClickEvent(e, 2), sType, i);
+            handled = true;
+            cleanup();
+        }, TOUCH_LONG_PRESS_MS);
+
+        slot.addEventListener('pointermove', onMove);
+        slot.addEventListener('pointerup', onUp);
+        slot.addEventListener('pointercancel', onCancel);
+    });
     slot.addEventListener('contextmenu', (e) => e.preventDefault());
     
     return slot;
@@ -380,7 +446,10 @@ export function toggleInventory(gameStarted, spawning, controls) {
         initInventoryGrid();
         updateInventoryUI();
     } else {
-        if (!window.touchActive) controls.lock();
+        if (!window.touchActive) {
+            if (typeof window.resumeGame === 'function') window.resumeGame();
+            else controls.lock();
+        }
     }
     return inventoryOpened;
 }
@@ -400,7 +469,7 @@ export function setupInventoryEvents() {
         });
     }
 
-    document.addEventListener('mousemove', (e) => {
+    const updateCursorPreview = (e) => {
         if (!inventoryOpened) return;
         const cursorEl = document.getElementById('cursor-item');
         if (cursorItem.count > 0 && cursorItem.type > 0) {
@@ -414,5 +483,11 @@ export function setupInventoryEvents() {
         } else {
             cursorEl.style.display = 'none';
         }
+    };
+
+    document.addEventListener('mousemove', updateCursorPreview);
+    document.addEventListener('pointermove', (e) => {
+        if (e.pointerType === 'mouse') return;
+        updateCursorPreview(e);
     });
 }

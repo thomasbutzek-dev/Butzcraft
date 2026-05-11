@@ -115,7 +115,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 // URL statt String-Pfad: Vite kann den Worker so in dist/ mitnehmen.
                 // Im Dev/Express-Modus bleibt er weiterhin relativ zu world.js auflösbar.
                 const workerUrl = new URL('./chunkWorker.js', import.meta.url);
-                workerUrl.search = import.meta.env?.DEV ? 'v=' + Date.now() : 'v=20260507b';
+                workerUrl.search = import.meta.env?.DEV ? 'v=' + Date.now() : 'v=20260507c';
                 this.worker = new Worker(workerUrl);
                 // Init: Sende Config + Block-Daten an Worker
                 this.worker.postMessage({

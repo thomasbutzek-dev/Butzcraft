@@ -39,7 +39,10 @@ export function closeFurnace(controls) {
     furnaceOpen = false;
     const overlay = document.getElementById('furnace-overlay');
     if (overlay) overlay.style.display = 'none';
-    if (controls && !window.touchActive) controls.lock();
+    if (controls && !window.touchActive) {
+        if (typeof window.resumeGame === 'function') window.resumeGame();
+        else controls.lock();
+    }
 }
 
 window.closeFurnace = () => closeFurnace(window._furnaceControls);

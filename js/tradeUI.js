@@ -141,7 +141,10 @@ export function closeTradeUI(controls) {
     const overlay = document.getElementById('trade-overlay');
     if (overlay) overlay.style.display = 'none';
     currentNPC = null;
-    if (controls && !window.touchActive) controls.lock();
+    if (controls && !window.touchActive) {
+        if (typeof window.resumeGame === 'function') window.resumeGame();
+        else controls.lock();
+    }
 }
 
 export function isTradeOpen() {

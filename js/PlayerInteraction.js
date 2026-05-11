@@ -46,7 +46,9 @@ export class PlayerInteraction {
         this._onMouseDown = (e) => {
             // PointerLock ist auf Touch-Geräten nicht verfügbar → bei aktivem Touch-Mode
             // wird die isLocked-Check übersprungen (Touch-Buttons feuern synthetische mousedowns).
-            const lockOk = controls.isLocked || window.touchActive;
+            const lockOk = typeof window.butzcraftCanInteract === 'function'
+                ? window.butzcraftCanInteract()
+                : (controls.isLocked || window.touchActive);
             if (!lockOk || !getGameActive() || getSpawning()) return;
             this.handleInteraction(e);
         };
@@ -505,7 +507,10 @@ export class PlayerInteraction {
 
         window.closeChest = () => {
             if (overlay) overlay.style.display = 'none';
-            if (this._controls && !window.touchActive) this._controls.lock();
+            if (this._controls && !window.touchActive) {
+                if (typeof window.resumeGame === 'function') window.resumeGame();
+                else this._controls.lock();
+            }
         };
     }
 

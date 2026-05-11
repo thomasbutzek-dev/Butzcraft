@@ -80,6 +80,7 @@ function _injectTouchStyles() {
             --touch-safe-bottom: max(16px, env(safe-area-inset-bottom));
             --touch-safe-left: max(16px, env(safe-area-inset-left));
             --touch-safe-right: max(16px, env(safe-area-inset-right));
+            --touch-look-bottom: 128px;
         }
         #touch-joystick-base {
             position: absolute;
@@ -104,8 +105,8 @@ function _injectTouchStyles() {
             transition: background 0.1s;
         }
         #touch-look-area {
-            position: absolute; right: 0; top: 0;
-            width: 58%; height: 100%;
+            position: absolute; right: 0; top: 0; bottom: var(--touch-look-bottom);
+            width: 58%;
             pointer-events: auto;
             touch-action: none;
         }
@@ -148,6 +149,9 @@ function _injectTouchStyles() {
         #touch-btn-place { grid-column: 2; }
         #touch-btn-dig { grid-column: 2; }
         @media (orientation: portrait) and (max-width: 560px) {
+            #touch-overlay {
+                --touch-look-bottom: 370px;
+            }
             #touch-button-stack {
                 grid-template-columns: repeat(2, 52px);
                 grid-auto-rows: 52px;
@@ -161,6 +165,9 @@ function _injectTouchStyles() {
             }
         }
         @media (orientation: landscape) and (max-height: 460px) {
+            #touch-overlay {
+                --touch-look-bottom: 104px;
+            }
             #touch-button-stack {
                 grid-template-columns: repeat(3, 50px);
                 grid-auto-rows: 50px;

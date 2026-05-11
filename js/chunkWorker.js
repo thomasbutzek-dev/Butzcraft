@@ -478,6 +478,16 @@ function spawnDungeonMarker(data, x, surfaceY, z) {
 // Gibt villageData zurück (für NPC-Spawning im Main-Thread)
 function spawnVillage(data, x, y, z, rng, worldX, worldZ) {
     const villageInfo = { cx: 0, cz: 0, houses: [] };
+    const getFootprintBaseY = (startWorldX, startWorldZ, width, depth) => {
+        let baseY = y - 1;
+        for (let dx = 0; dx < width; dx++) {
+            for (let dz = 0; dz < depth; dz++) {
+                baseY = Math.max(baseY, getTerrainHeightAt(startWorldX + dx, startWorldZ + dz) - 1);
+            }
+        }
+        return baseY;
+    };
+
     const drawWell = () => {
         for (let dx = -3; dx <= 3; dx++) {
             for (let dz = -3; dz <= 3; dz++) {
@@ -540,20 +550,20 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ) {
         const houseW = 5 + Math.floor(rng() * 2); // 5 oder 6 breit
         const houseD = 5 + Math.floor(rng() * 2);
         const houseH = 4;
-        const floorY = y;
-        const wallY = y + 1;
-        const roofY = wallY + houseH - 1;
         const houseWorldX = worldX + ho.dx;
         const houseWorldZ = worldZ + ho.dz;
+        const floorY = getFootprintBaseY(houseWorldX, houseWorldZ, houseW, houseD);
+        const wallY = floorY + 1;
+        const roofY = wallY + houseH - 1;
 
-        // Boden: Planken
+        // Boden: Planken auf eigener Haus-Hoehe, damit Hang-Haeuser nicht im Terrain versinken.
         for (let dx = 0; dx < houseW; dx++) {
             for (let dz = 0; dz < houseD; dz++) {
                 const terrainY = getTerrainHeightAt(houseWorldX + dx, houseWorldZ + dz);
                 for (let fy = terrainY; fy < floorY; fy++) {
                     setBlockLocal(data, hx + dx, fy, hz + dz, 85); // COBBLESTONE Fundament
                 }
-                setBlockLocal(data, hx + dx, y - 1, hz + dz, 85); // COBBLESTONE Fundament
+                setBlockLocal(data, hx + dx, floorY - 1, hz + dz, 85); // COBBLESTONE Fundament
                 setBlockLocal(data, hx + dx, floorY, hz + dz, 26); // PLANKS Boden
             }
         }
@@ -604,9 +614,9 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ) {
         setBlockLocal(data, hx + doorDx, wallY + 1, hz + doorDz, 0);
         setBlockLocal(data, hx + doorDx, wallY + 2, hz + doorDz, 26); // PLANKS Tuersturz
         const porchZ = doorDz === 0 ? hz - 1 : hz + houseD;
-        setBlockLocal(data, hx + doorDx, y - 1, porchZ, 87); // VILLAGE_PATH
-        setBlockLocal(data, hx + doorDx, y, porchZ, 26); // PLANKS Schwelle
-        setBlockLocal(data, hx + doorDx, y + 1, porchZ, 0);
+        setBlockLocal(data, hx + doorDx, floorY - 1, porchZ, 87); // VILLAGE_PATH
+        setBlockLocal(data, hx + doorDx, floorY, porchZ, 26); // PLANKS Schwelle
+        setBlockLocal(data, hx + doorDx, floorY + 1, porchZ, 0);
 
         // Weg vom Haus zum Brunnen
         const pathStartX = hx + doorDx;
@@ -620,13 +630,16 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ) {
             const t = steps > 0 ? s / steps : 0;
             const px = Math.round(pathStartX + (pathEndX - pathStartX) * t);
             const pz = Math.round(pathStartZ + (pathEndZ - pathStartZ) * t);
-            setBlockLocal(data, px, y - 1, pz, 87); // VILLAGE_PATH
+            const pathWorldX = px + (worldX - x);
+            const pathWorldZ = pz + (worldZ - z);
+            const pathY = Math.max(y, Math.min(floorY, getTerrainHeightAt(pathWorldX, pathWorldZ)));
+            setBlockLocal(data, px, pathY - 1, pz, 87); // VILLAGE_PATH
             // Luft über dem Weg
-            setBlockLocal(data, px, y, pz, 0);
-            setBlockLocal(data, px, y + 1, pz, 0);
+            setBlockLocal(data, px, pathY, pz, 0);
+            setBlockLocal(data, px, pathY + 1, pz, 0);
         }
-        setBlockLocal(data, hx + doorDx, y, porchZ, 26); // PLANKS Schwelle nach Weg-Clear wiederherstellen
-        setBlockLocal(data, hx + doorDx, y + 1, porchZ, 0);
+        setBlockLocal(data, hx + doorDx, floorY, porchZ, 26); // PLANKS Schwelle nach Weg-Clear wiederherstellen
+        setBlockLocal(data, hx + doorDx, floorY + 1, porchZ, 0);
 
         // Truhe im Haus
         setBlockLocal(data, hx + 1, floorY + 1, hz + 1, 75); // CHEST
@@ -846,7 +859,6 @@ function generateTerrain(cx, cz, buffer) {
                             vInfo.houses.forEach(h => {
                                 h.x = h.x + cx * CHUNK_SIZE;
                                 h.z = h.z + cz * CHUNK_SIZE;
-                                h.y = vh + 1;
                             });
                             villageInfos.push(vInfo);
                         }

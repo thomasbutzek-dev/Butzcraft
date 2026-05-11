@@ -3,20 +3,20 @@
         import { CONFIG } from '../config.js?v=20260507b';
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
-        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260507b';
+        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260507c';
         import { Mob, updateProjectiles } from './mobs.js?v=20260507b';
 
         import { Input } from './Input.js?v=20260507b';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260507b';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260511a';
         import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260507b';
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js?v=20260507b';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260507b';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260507b';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260507b';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260507c';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260511a';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260507c';
         import { WeatherSystem } from './weather.js?v=20260507b';
         import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260507b';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260507c';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
         window.inventorySlots = inventorySlots;
@@ -65,7 +65,7 @@
         
         let inventoryOpened = false;
         window.BLOCK_TEX = BLOCK_TEX;
-        let gameActive = true, spawning = true, gameStarted = false;
+        let gameActive = true, spawning = true, gameStarted = false, manuallyPaused = false;
         let currentSaveName = null;
 
         // Schwert & Animation
@@ -84,8 +84,78 @@
 
         function lockControlsForDesktop() {
             if (shouldUseTouchMode()) return;
-            controls.lock();
+            if (window.butzcraftPointerLockUnavailable) return false;
+            const policy = document.permissionsPolicy || document.featurePolicy;
+            if (policy && typeof policy.allowsFeature === 'function' && !policy.allowsFeature('pointer-lock')) {
+                window.butzcraftPointerLockUnavailable = true;
+                return false;
+            }
+            let embeddedOrAutomated = Boolean(window.navigator.webdriver);
+            try {
+                embeddedOrAutomated = embeddedOrAutomated || window.self !== window.top;
+            } catch (err) {
+                embeddedOrAutomated = true;
+            }
+            if (embeddedOrAutomated) {
+                window.butzcraftPointerLockUnavailable = true;
+                return false;
+            }
+            try {
+                if (window.top !== window.self) {
+                    window.butzcraftPointerLockUnavailable = true;
+                    return false;
+                }
+            } catch (err) {
+                window.butzcraftPointerLockUnavailable = true;
+                return false;
+            }
+            try {
+                controls.lock();
+                return true;
+            } catch (err) {
+                window.butzcraftPointerLockUnavailable = true;
+                const msg = err && err.message ? err.message : String(err);
+                console.warn('[Input] Pointer Lock nicht verfuegbar, Desktop-Fallback aktiv:', msg);
+                return false;
+            }
         }
+
+        window.butzcraftCanInteract = function() {
+            return Boolean(
+                gameStarted &&
+                gameActive &&
+                !spawning &&
+                !manuallyPaused &&
+                !isBlockingOverlayOpen() &&
+                (controls?.isLocked || window.touchActive || window.butzcraftPointerLockUnavailable)
+            );
+        };
+
+        function showPauseMenu() {
+            const inst = document.getElementById('instructions');
+            if (!inst) return;
+            inst.style.display = 'block';
+            if (typeof window.loadGamesList === 'function') window.loadGamesList();
+        }
+
+        function hidePauseMenu() {
+            const inst = document.getElementById('instructions');
+            if (inst) inst.style.display = 'none';
+        }
+
+        window.pauseGame = function() {
+            if (!gameStarted || spawning || isBlockingOverlayOpen()) return;
+            manuallyPaused = true;
+            if (controls?.isLocked) controls.unlock();
+            showPauseMenu();
+        };
+
+        window.resumeGame = function() {
+            if (!gameStarted || spawning) return;
+            manuallyPaused = false;
+            hidePauseMenu();
+            lockControlsForDesktop();
+        };
 
         function bindPress(el, handler) {
             if (!el) return;
@@ -105,6 +175,10 @@
             });
         }
 
+        function apiUrl(path) {
+            return new URL(path.replace(/^\/+/, ''), window.location.href).toString();
+        }
+
         function updateVisibleChunksIfNeeded(playerPos, force = false) {
             const cx = Math.floor(playerPos.x / CHUNK_SIZE);
             const cz = Math.floor(playerPos.z / CHUNK_SIZE);
@@ -122,7 +196,9 @@
             document.getElementById('start-menu').style.display = 'none';
             currentSaveName = null;
             SoundManager.init();
+            manuallyPaused = false;
             lockControlsForDesktop();
+            hidePauseMenu();
             gameStarted = true;
             window.__butzcraftStartRequested = false;
             console.log("DEBUG: startNewGame finished, gameStarted set to true");
@@ -135,7 +211,7 @@
         window.loadGame = function(name) {
             console.log("DEBUG: loadGame starting for", name);
             SoundManager.init();
-            fetch(`/api/load?name=${encodeURIComponent(name)}`)
+            fetch(apiUrl(`api/load?name=${encodeURIComponent(name)}`))
                 .then(res => res.json())
                 .then(data => {
                     if (data.error) {
@@ -308,9 +384,11 @@
             setupInventoryEvents();
             init();
             window.__butzcraftGameMainReady = true;
+            window.__butzcraftGameMainEvaluating = false;
             animate();
         } catch (err) {
             window.__butzcraftGameMainError = err && (err.stack || err.message || String(err));
+            window.__butzcraftGameMainEvaluating = false;
             if (window.__butzcraftShowStartError) {
                 window.__butzcraftShowStartError('GameMain Fehler: ' + (err && err.message ? err.message : String(err)));
             }
@@ -504,15 +582,15 @@
             const inst = document.getElementById('instructions');
             inst.addEventListener('click', () => { 
                 console.log("DEBUG: Instructions clicked -> Locking mouse");
-                if (gameActive) controls.lock(); 
-                gameStarted = true; 
+                if (gameActive && manuallyPaused) window.resumeGame();
             });
             controls.addEventListener('lock', () => {
+                manuallyPaused = false;
                 inst.style.display = 'none';
             });
             controls.addEventListener('unlock', () => { 
                 // Nur anzeigen, wenn das Hauptmenü weg ist UND wir nicht gerade im Lade-Spawn sind
-                if (gameActive && !spawning && document.getElementById('start-menu').style.display === 'none' && !isBlockingOverlayOpen()) {
+                if (manuallyPaused && gameActive && !spawning && document.getElementById('start-menu').style.display === 'none' && !isBlockingOverlayOpen()) {
                     inst.style.display = 'block'; 
                     window.loadGamesList(); // Liste im Pause-Menü aktualisieren
                 }
@@ -597,6 +675,18 @@
                 const tag = document.activeElement?.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
+                if (e.code === 'Escape') {
+                    const furnaceOverlay = document.getElementById('furnace-overlay');
+                    const chestOverlay = document.getElementById('chest-overlay');
+                    const tradeOverlay = document.getElementById('trade-overlay');
+                    if (isInventoryOpened()) { toggleInventory(gameStarted, spawning, controls); return; }
+                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
+                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
+                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
+                    if (manuallyPaused) window.resumeGame(); else window.pauseGame();
+                    return;
+                }
+
                 if (e.code === 'KeyE') {
                     // Ofen/Truhe/Handel zuerst schließen
                     const furnaceOverlay = document.getElementById('furnace-overlay');
@@ -662,7 +752,7 @@
             const list = document.getElementById('game-over-save-list');
             if (!section || !list) return;
             list.innerHTML = '';
-            fetch('/api/saves')
+            fetch(apiUrl('api/saves'))
                 .then(r => r.json())
                 .then(names => {
                     if (!Array.isArray(names) || names.length === 0) {
@@ -774,7 +864,7 @@
             // 4. SIMULATION (Nur wenn nicht pausiert)
             // Fix: Während spawning=true pausieren wir niemals automatisch
             // Touch-Mode kennt keinen PointerLock — touchActive zählt als "im Spiel aktiv".
-            const isPaused = !gameStarted || (!controls.isLocked && !spawning && !window.touchActive);
+            const isPaused = !gameStarted || manuallyPaused || (!spawning && isBlockingOverlayOpen());
             if (!isPaused) {
                 time += delta;
 
@@ -794,9 +884,7 @@
                         const bt = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z));
                         if (bt !== 0 && bt !== 8 && bt !== 9 && bt !== 10) {
                             spawning = false;
-                            if (!controls.isLocked && !window.touchActive) {
-                                controls.lock();
-                            }
+                            if (!controls.isLocked && !window.touchActive) lockControlsForDesktop();
                         }
                     }
                 }
@@ -1079,7 +1167,7 @@
             setStatus(startList, 'Lade...', '#aaa');
             setStatus(pauseList, 'Lade...', '#aaa');
 
-            fetch('/api/saves')
+            fetch(apiUrl('api/saves'))
                 .then(res => res.json())
                 .then(saves => {
                     if (startList) startList.textContent = '';
@@ -1097,8 +1185,8 @@
                     });
                 })
                 .catch(err => {
-                    setStatus(startList, 'Fehler!', '#ff6b6b');
-                    setStatus(pauseList, 'Fehler!', '#ff6b6b');
+                    setStatus(startList, 'Speicherstaende nur im Server-Modus', '#aaa');
+                    setStatus(pauseList, 'Speicherstaende nur im Server-Modus', '#aaa');
                 });
         };
 
@@ -1127,7 +1215,7 @@
                 npcs: npcs.filter(n => !n.isDead).map(n => n.serialize())
             });
             
-            fetch('/api/save', {
+            fetch(apiUrl('api/save'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ name, gameData })

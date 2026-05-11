@@ -305,6 +305,25 @@ body {
             letter-spacing: 2px;
         }
 
+        #inventory-close-btn {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.32);
+            background: rgba(0, 0, 0, 0.45);
+            color: #fff;
+            font-size: 22px;
+            font-weight: bold;
+            line-height: 1;
+            cursor: pointer;
+            z-index: 3;
+            touch-action: manipulation;
+        }
+
         .slot-name {
             font-size: 8px;
             color: rgba(220, 220, 220, 0.9);
@@ -1109,7 +1128,29 @@ html.touch-device body {
     }
 }
 
-@media (pointer: coarse), (max-width: 620px) {
+@media (pointer: coarse) and (orientation: portrait), (max-width: 560px) and (orientation: portrait) {
+    #bottom-ui {
+        position: fixed;
+        left: 50%;
+        bottom: calc(clamp(264px, 32svh, 300px) + env(safe-area-inset-bottom));
+        transform: translateX(-50%);
+        width: min(92vw, 336px);
+        margin-bottom: 0;
+        z-index: 210;
+    }
+
+    #survival-bars {
+        width: 100%;
+        max-width: 320px;
+    }
+
+    #inventory {
+        width: min(100%, 320px);
+        background: rgba(0, 0, 0, 0.58);
+    }
+}
+
+@media (pointer: coarse), (max-width: 900px) {
     #inventory-overlay {
         position: fixed !important;
         inset: 0 !important;
@@ -1129,12 +1170,29 @@ html.touch-device body {
         overflow-y: auto !important;
         -webkit-overflow-scrolling: touch;
         align-items: center !important;
+        flex-direction: column !important;
+        justify-content: flex-start !important;
+        gap: 12px !important;
+        overflow-x: hidden !important;
+    }
+
+    #inventory-main-content {
+        width: 100% !important;
+        max-width: 320px !important;
+        box-sizing: border-box !important;
+        display: flex !important;
+        flex-direction: column !important;
+        align-items: center !important;
     }
 
     #inventory-title {
         font-size: 18px;
         margin-bottom: 8px;
         letter-spacing: 1px;
+    }
+
+    #inventory-close-btn {
+        display: block;
     }
 
     #crafting-area {
@@ -1159,6 +1217,8 @@ html.touch-device body {
         grid-template-columns: repeat(4, 46px) !important;
         gap: 5px !important;
         justify-content: center;
+        width: min-content !important;
+        max-width: 100% !important;
     }
 
     .inv-slot {
@@ -1182,9 +1242,12 @@ html.touch-device body {
     }
 
     #recipe-book {
-        width: min(100%, 320px);
+        width: min(100%, 320px) !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
         padding: 10px;
         max-height: 36svh;
+        overflow-x: hidden !important;
     }
 }
 
