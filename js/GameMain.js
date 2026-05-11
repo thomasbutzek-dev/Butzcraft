@@ -7,7 +7,7 @@
         import { Mob, updateProjectiles } from './mobs.js?v=20260507b';
 
         import { Input } from './Input.js?v=20260507b';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260511b';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
         import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260507b';
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js?v=20260507b';

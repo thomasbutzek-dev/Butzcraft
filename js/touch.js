@@ -4,7 +4,8 @@
  *  - Wird beim Spielstart aufgerufen. Bei Nicht-Touch-Devices ist es ein No-Op.
  *  - Joystick (links): mappt auf Input.moveF/B/L/R
  *  - Look-Bereich (rechte Bildschirmhälfte ohne Buttons): swipt → camera/controls Rotation
- *  - Buttons: SPRINGEN (Input.moveUp), ABBAUEN (mousedown button=0), BAUEN (mousedown button=2)
+ *  - Buttons: SPRINGEN (Input.moveUp), BAUEN (mousedown button=2), Inventar/Pause
+ *  - Kurzer Tap in den Look-Bereich: ABBAUEN/Angreifen (mousedown button=0)
  *
  *  PointerLock funktioniert auf iOS/Android nicht (kein API-Support) → wir setzen
  *  window.touchActive=true, und PlayerInteraction sowie der Pause-Check ignorieren
@@ -19,6 +20,8 @@ const LOOK_SENSITIVITY = 0.005;
 const JOYSTICK_DEADZONE = 0.18;
 const JOYSTICK_RADIUS_PX = 60;
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
+const TAP_MAX_MOVE_PX = 10;
+const TAP_MAX_MS = 260;
 
 export function isTouchDevice() {
     return ('ontouchstart' in window) ||
@@ -59,12 +62,12 @@ export function applyTouchLookDelta(ctx, dx, dy) {
  * Initialisiert Touch-UI. Idempotent (mehrfache Aufrufe sind sicher).
  * @param {object} ctx - { camera, controls, isInventoryOpenedProvider, toggleInventory, openPauseMenu }
  *
- * Buttons (rechts unten, von oben nach unten):
- *   ⏸  Pause/Menü öffnen (für Save/Settings, da kein ESC auf Mobile)
- *   📦 Inventar öffnen/schließen
- *   ⤒  Springen (holdable)
- *   ▣  Block platzieren (synth. mousedown button=2)
- *   ⛏  Block abbauen / Mob angreifen (synth. mousedown button=0)
+ * Mobile HUD:
+ *   ⏸  Pause/Menü oben rechts
+ *   📦 Inventar rechts unten
+ *   ▣  Block platzieren rechts unten
+ *   ⤒  Springen unten rechts (holdable)
+ *   Tap im Look-Bereich: Block abbauen / Mob angreifen
  */
 export function initTouchControls(ctx) {
     if (!isTouchDevice()) return;
@@ -81,16 +84,13 @@ export function initTouchControls(ctx) {
             <div id="touch-joystick-knob"></div>
         </div>
         <div id="touch-look-area"></div>
-        <div id="touch-button-stack">
-            <div id="touch-slot-switch">
-                <button id="touch-btn-slot-prev" class="touch-btn touch-btn-small" aria-label="Slot zurück">◀</button>
-                <button id="touch-btn-slot-next" class="touch-btn touch-btn-small" aria-label="Slot vor">▶</button>
-            </div>
+        <div id="touch-top-actions">
             <button id="touch-btn-pause" class="touch-btn touch-btn-small" aria-label="Pause">⏸</button>
+        </div>
+        <div id="touch-button-stack">
             <button id="touch-btn-inv" class="touch-btn touch-btn-small" aria-label="Inventar">📦</button>
-            <button id="touch-btn-jump" class="touch-btn" aria-label="Springen">⤒</button>
             <button id="touch-btn-place" class="touch-btn" aria-label="Bauen">▣</button>
-            <button id="touch-btn-dig" class="touch-btn" aria-label="Abbauen">⛏</button>
+            <button id="touch-btn-jump" class="touch-btn touch-btn-primary" aria-label="Springen">⤒</button>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -110,6 +110,7 @@ function _injectTouchStyles() {
             --touch-safe-bottom: max(16px, env(safe-area-inset-bottom));
             --touch-safe-left: max(16px, env(safe-area-inset-left));
             --touch-safe-right: max(16px, env(safe-area-inset-right));
+            --touch-safe-top: max(16px, env(safe-area-inset-top));
             --touch-look-bottom: 128px;
         }
         #touch-joystick-base {
@@ -140,6 +141,14 @@ function _injectTouchStyles() {
             pointer-events: auto;
             touch-action: none;
         }
+        #touch-top-actions {
+            position: absolute;
+            top: var(--touch-safe-top);
+            right: var(--touch-safe-right);
+            width: clamp(46px, 8vw, 58px);
+            height: clamp(46px, 8vw, 58px);
+            pointer-events: auto;
+        }
         #touch-button-stack {
             position: absolute;
             right: var(--touch-safe-right);
@@ -164,30 +173,22 @@ function _injectTouchStyles() {
             touch-action: manipulation;
         }
         .touch-btn-small { font-size: clamp(15px, 3vw, 18px); opacity: 0.85; }
-        .touch-btn:active { background: rgba(255,255,255,0.4); }
-        #touch-slot-switch {
-            grid-column: 1 / span 2;
-            display: grid;
-            grid-template-columns: repeat(2, clamp(48px, 9vw, 64px));
-            gap: clamp(8px, 1.5vw, 12px);
-            width: 100%;
-            justify-content: center;
+        .touch-btn-primary {
+            background: rgba(255,255,255,0.26);
+            border-color: rgba(255,255,255,0.7);
+            font-size: clamp(22px, 5vw, 28px);
         }
-        #touch-btn-pause { grid-column: 1; }
-        #touch-btn-inv { grid-column: 2; }
-        #touch-btn-jump { grid-column: 1; }
+        .touch-btn:active { background: rgba(255,255,255,0.4); }
+        #touch-btn-inv { grid-column: 1; }
         #touch-btn-place { grid-column: 2; }
-        #touch-btn-dig { grid-column: 2; }
+        #touch-btn-jump { grid-column: 2; grid-row: 2; }
         @media (orientation: portrait) and (max-width: 560px) {
             #touch-overlay {
-                --touch-look-bottom: 370px;
+                --touch-look-bottom: 150px;
             }
             #touch-button-stack {
                 grid-template-columns: repeat(2, 52px);
                 grid-auto-rows: 52px;
-            }
-            #touch-slot-switch {
-                grid-template-columns: repeat(2, 52px);
             }
             #touch-joystick-base {
                 width: 116px;
@@ -199,18 +200,13 @@ function _injectTouchStyles() {
                 --touch-look-bottom: 104px;
             }
             #touch-button-stack {
-                grid-template-columns: repeat(3, 50px);
+                grid-template-columns: repeat(2, 50px);
                 grid-auto-rows: 50px;
             }
-            #touch-slot-switch {
-                grid-column: 1 / span 2;
-                grid-template-columns: repeat(2, 50px);
+            #touch-top-actions {
+                width: 50px;
+                height: 50px;
             }
-            #touch-btn-pause { grid-column: 3; grid-row: 1; }
-            #touch-btn-inv { grid-column: 1; grid-row: 2; }
-            #touch-btn-jump { grid-column: 2; grid-row: 2; }
-            #touch-btn-place { grid-column: 3; grid-row: 2; }
-            #touch-btn-dig { grid-column: 3; grid-row: 3; }
             #touch-joystick-base {
                 width: 104px;
                 height: 104px;
@@ -225,6 +221,16 @@ function _injectTouchStyles() {
     style.id = 'touch-controls-styles';
     style.textContent = css;
     document.head.appendChild(style);
+}
+
+function _dispatchInteraction(button) {
+    const evt = new MouseEvent('mousedown', {
+        button,
+        buttons: button === 2 ? 2 : 1,
+        bubbles: true,
+        cancelable: true
+    });
+    document.dispatchEvent(evt);
 }
 
 function _bindJoystick() {
@@ -284,6 +290,8 @@ function _bindLookArea(ctx) {
     const area = document.getElementById('touch-look-area');
     let activeId = null;
     let lastX = 0, lastY = 0;
+    let startX = 0, startY = 0, startTime = 0;
+    let moved = false;
 
     area.addEventListener('touchstart', (e) => {
         // Ignorieren, wenn Inventar offen
@@ -291,7 +299,10 @@ function _bindLookArea(ctx) {
         if (activeId !== null) return;
         const t = e.changedTouches[0];
         activeId = t.identifier;
-        lastX = t.clientX; lastY = t.clientY;
+        lastX = startX = t.clientX;
+        lastY = startY = t.clientY;
+        startTime = performance.now();
+        moved = false;
     }, { passive: true });
 
     area.addEventListener('touchmove', (e) => {
@@ -302,13 +313,21 @@ function _bindLookArea(ctx) {
             const dx = t.clientX - lastX;
             const dy = t.clientY - lastY;
             lastX = t.clientX; lastY = t.clientY;
+            if (Math.hypot(t.clientX - startX, t.clientY - startY) > TAP_MAX_MOVE_PX) moved = true;
             applyTouchLookDelta(ctx, dx, dy);
         }
     }, { passive: false });
 
     const endHandler = (e) => {
         for (const t of e.changedTouches) {
-            if (t.identifier === activeId) { activeId = null; break; }
+            if (t.identifier === activeId) {
+                const elapsed = performance.now() - startTime;
+                if (!moved && elapsed <= TAP_MAX_MS && !(ctx.isInventoryOpenedProvider && ctx.isInventoryOpenedProvider())) {
+                    _dispatchInteraction(0);
+                }
+                activeId = null;
+                break;
+            }
         }
     };
     area.addEventListener('touchend', endHandler);
@@ -317,7 +336,6 @@ function _bindLookArea(ctx) {
 
 function _bindActionButtons(ctx) {
     const jumpBtn = document.getElementById('touch-btn-jump');
-    const digBtn  = document.getElementById('touch-btn-dig');
     const placeBtn = document.getElementById('touch-btn-place');
     const invBtn = document.getElementById('touch-btn-inv');
     const pauseBtn = document.getElementById('touch-btn-pause');
@@ -340,14 +358,8 @@ function _bindActionButtons(ctx) {
     jumpBtn.addEventListener('touchend', (e) => { e.preventDefault(); holdJump(false); }, { passive: false });
     jumpBtn.addEventListener('touchcancel', () => holdJump(false));
 
-    // Dig/Place: synthetisches mousedown-Event auf body — PlayerInteraction.handleInteraction() reagiert darauf.
-    // Wir simulieren NICHT mouseup, weil die existierende Logik ohnehin nur auf mousedown reagiert.
-    const dispatchClick = (button) => {
-        const evt = new MouseEvent('mousedown', { button, bubbles: true });
-        document.dispatchEvent(evt);
-    };
-    digBtn.addEventListener('touchstart', (e) => { e.preventDefault(); dispatchClick(0); }, { passive: false });
-    placeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); dispatchClick(2); }, { passive: false });
+    // Place: synthetisches Rechtsklick-mousedown. Abbau liegt auf Tap im Look-Bereich.
+    placeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); _dispatchInteraction(2); }, { passive: false });
 
     // Inventar-Button: Synthetisches Tasten-Event 'KeyE' dispatchen.
     // GameMain registriert keydown auf KeyE → toggleInventory(). So bleibt Single-Source-of-Truth.
@@ -356,27 +368,6 @@ function _bindActionButtons(ctx) {
             e.preventDefault();
             const evt = new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', bubbles: true });
             window.dispatchEvent(evt);
-        }, { passive: false });
-    }
-
-    // Slot-Wechsel ◀ ▶: navigiert durch die 8 Hotbar-Slots.
-    // Nutzt window.getSelectedSlot / window.setSelectedSlot (aus GameMain.js exponiert).
-    const slotPrev = document.getElementById('touch-btn-slot-prev');
-    const slotNext = document.getElementById('touch-btn-slot-next');
-    if (slotPrev) {
-        slotPrev.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const cur = window.getSelectedSlot ? window.getSelectedSlot() : 0;
-            if (window.setSelectedSlot) window.setSelectedSlot((cur + 7) % 8);
-            if (window.updateInventoryUI) window.updateInventoryUI();
-        }, { passive: false });
-    }
-    if (slotNext) {
-        slotNext.addEventListener('touchstart', (e) => {
-            e.preventDefault();
-            const cur = window.getSelectedSlot ? window.getSelectedSlot() : 0;
-            if (window.setSelectedSlot) window.setSelectedSlot((cur + 1) % 8);
-            if (window.updateInventoryUI) window.updateInventoryUI();
         }, { passive: false });
     }
 

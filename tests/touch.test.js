@@ -9,6 +9,13 @@ const origMaxTouchPoints = navigator.maxTouchPoints;
 const origMatchMedia = window.matchMedia;
 const origOnTouchStart = 'ontouchstart' in window ? window.ontouchstart : undefined;
 
+function dispatchTouchEvent(el, type, touch) {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'changedTouches', { value: [touch] });
+    Object.defineProperty(event, 'touches', { value: type === 'touchend' || type === 'touchcancel' ? [] : [touch] });
+    el.dispatchEvent(event);
+}
+
 beforeEach(() => {
     Object.defineProperty(navigator, 'maxTouchPoints', { value: 0, configurable: true });
     delete window.ontouchstart;
@@ -62,6 +69,55 @@ describe('isTouchDevice', () => {
         expect(document.getElementById('touch-overlay')).not.toBeNull();
         expect(document.documentElement.classList.contains('touch-device')).toBe(true);
         expect(document.body.classList.contains('touch-device')).toBe(true);
+        expect(document.getElementById('touch-btn-jump')).not.toBeNull();
+        expect(document.getElementById('touch-btn-place')).not.toBeNull();
+        expect(document.getElementById('touch-btn-inv')).not.toBeNull();
+        expect(document.getElementById('touch-btn-pause')).not.toBeNull();
+        expect(document.getElementById('touch-btn-dig')).toBeNull();
+        expect(document.getElementById('touch-btn-slot-prev')).toBeNull();
+        expect(document.getElementById('touch-btn-slot-next')).toBeNull();
+    });
+
+    it('Touch-Bauen feuert eine Rechtsklick-Interaktion', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const buttons = [];
+        const onMouseDown = (e) => buttons.push(e.button);
+        document.addEventListener('mousedown', onMouseDown);
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        dispatchTouchEvent(document.getElementById('touch-btn-place'), 'touchstart', {
+            identifier: 1,
+            clientX: 10,
+            clientY: 10
+        });
+
+        document.removeEventListener('mousedown', onMouseDown);
+        expect(buttons).toEqual([2]);
+    });
+
+    it('kurzer Tap im Look-Bereich feuert eine Linksklick-Interaktion', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const buttons = [];
+        const onMouseDown = (e) => buttons.push(e.button);
+        document.addEventListener('mousedown', onMouseDown);
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const area = document.getElementById('touch-look-area');
+        dispatchTouchEvent(area, 'touchstart', { identifier: 7, clientX: 100, clientY: 100 });
+        dispatchTouchEvent(area, 'touchend', { identifier: 7, clientX: 102, clientY: 101 });
+
+        document.removeEventListener('mousedown', onMouseDown);
+        expect(buttons).toEqual([0]);
     });
 
     it('Touch-Look erzeugt keinen Roll/Seitwaerts-Kippwinkel', () => {
