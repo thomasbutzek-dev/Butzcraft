@@ -1048,6 +1048,56 @@ html.touch-device body {
         display: none;
     }
 
+    #inventory .slot-name {
+        display: none !important;
+    }
+
+    #inventory .slot-count {
+        position: absolute;
+        right: 3px;
+        bottom: 3px;
+        z-index: 2;
+        padding: 0;
+        font-size: 10px;
+    }
+
+    #inventory .slot-color-preview {
+        inset: 50% auto auto 50%;
+        width: min(78%, 30px);
+        height: min(78%, 30px);
+        transform: translate(-50%, -50%);
+        align-items: center;
+        justify-content: center;
+        overflow: visible;
+    }
+
+    #inventory .flat-icon {
+        width: 28px;
+        height: 28px;
+    }
+
+    #inventory .mc-cube {
+        width: 20px;
+        height: 20px;
+    }
+
+    #inventory .mc-face {
+        width: 20px;
+        height: 20px;
+    }
+
+    #inventory .mc-top {
+        transform: rotateX(90deg) translateZ(10px);
+    }
+
+    #inventory .mc-front {
+        transform: translateZ(10px);
+    }
+
+    #inventory .mc-right {
+        transform: rotateY(90deg) translateZ(10px);
+    }
+
     #instructions {
         position: fixed;
         width: min(92vw, 520px);
