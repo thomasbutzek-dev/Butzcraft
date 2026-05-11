@@ -18,11 +18,13 @@ export const CONFIG = {
         BLOOD_MOON_INTERVAL: 3, // Alle N Nächte kommt der Blutmond (Zombie-Angriffswelle)
         MAX_HEALTH: 100,
         MAX_HUNGER: 100,
-        HUNGER_LOSS_PASSIVE: 0.02, // Passiv pro Sekunde
-        HUNGER_LOSS_MOVE: 0.1,    // Beim Bewegen
+        HUNGER_LOSS_PASSIVE: 0.04, // Passiv pro Sekunde
+        HUNGER_LOSS_MOVE: 0.16,    // Beim Bewegen
         HUNGER_GAIN_PIG: 20,
         HUNGER_GAIN_EGG: 5,
         HUNGER_GAIN_MILK: 15,
+        UNDERWATER_BREATH_SECONDS: 8,
+        UNDERWATER_DAMAGE_PER_SECOND: 4,
         REGEN_RATE: 2.0,           // Gesundheit pro Sekunde bei vollem Hunger
         REGEN_THRESHOLD: 90,       // Hunger-Level ab dem man heilt
         FALL_DAMAGE_THRESHOLD: -35, // Ab dieser Fallgeschwindigkeit gibt es Schaden
@@ -44,7 +46,7 @@ export const CONFIG = {
         WEIGHT_TURTLE: 15,
         ZOMBIE_DETECTION_RANGE: 20,
         ZOMBIE_SPEED: 1.5,
-        ZOMBIE_DAMAGE: 5,           // Schaden pro Sekunde (Basiswert)
+        ZOMBIE_DAMAGE: 8,           // Schaden pro Sekunde bei Kontakt
         WANDER_SPEED: 1.0,
         MOB_JUMP_FORCE: 5,
         CHICKEN_EGG_TIME_MIN: 15000, // ms

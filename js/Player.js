@@ -24,6 +24,7 @@ export class Player {
         // Environment State
         this.wasInWater = false;
         this.wasHeadInWater = false;
+        this.underwaterTime = 0;
 
         // Sword Animation State
         this.isSwinging = false;
@@ -106,7 +107,7 @@ export class Player {
         }
     }
 
-    updateWaterAndVoid(world, SoundManager) {
+    updateWaterAndVoid(world, SoundManager, delta = 0) {
         const playerPos = this.controls.getObject().position;
 
         // Void Protection
@@ -135,6 +136,17 @@ export class Player {
         if (headInWater !== this.wasHeadInWater) {
             SoundManager.setUnderwater(headInWater);
             this.wasHeadInWater = headInWater;
+        }
+
+        if (headInWater) {
+            this.underwaterTime += delta;
+            const breathSeconds = this.CONFIG.GAMEPLAY.UNDERWATER_BREATH_SECONDS || 8;
+            const damagePerSecond = this.CONFIG.GAMEPLAY.UNDERWATER_DAMAGE_PER_SECOND || 0;
+            if (this.underwaterTime > breathSeconds && damagePerSecond > 0) {
+                this.health = Math.max(0, this.health - damagePerSecond * delta);
+            }
+        } else {
+            this.underwaterTime = 0;
         }
 
         // Overlay gecacht (DOM-Zugriff minimieren)

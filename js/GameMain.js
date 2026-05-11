@@ -1,16 +1,16 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-        import { CONFIG } from '../config.js?v=20260507b';
+        import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
         import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260507c';
-        import { Mob, updateProjectiles } from './mobs.js?v=20260507b';
+        import { Mob, updateProjectiles } from './mobs.js?v=20260511a';
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
         import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260507b';
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
-        import { Player } from './Player.js?v=20260507b';
+        import { Player } from './Player.js?v=20260511a';
         import { PlayerInteraction } from './PlayerInteraction.js?v=20260507c';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260511a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260507c';
@@ -798,7 +798,7 @@
             applyCameraShake();
 
             // 1. VOID PROTECTION (Immer aktiv)
-            window.player.updateWaterAndVoid(world, SoundManager);
+            window.player.updateWaterAndVoid(world, SoundManager, delta);
             // 3. SKY & HUD (Immer aktiv)
             const dayRatio = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
             const dayCount = Math.floor(time / DAY_DURATION);

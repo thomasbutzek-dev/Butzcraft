@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=20260507b';
+import { CONFIG } from '../config.js?v=20260511a';
 import { SoundManager } from './sound.js?v=20260507b';
 import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260507b';
 import { Physics } from './Physics.js?v=20260507b';
@@ -1023,7 +1023,7 @@ export class Mob {
                     window.droppedItems.push({ mesh: eggMesh, velocityY: 0, blockType: 17 });
                 }
 
-                if ((this.type === 'zombie' || this.type === 'skeleton') && dist < 2.0) onDamage(ZOMBIE_DAMAGE * delta * 20);
+                if ((this.type === 'zombie' || this.type === 'skeleton') && dist < 2.0) onDamage(ZOMBIE_DAMAGE * delta);
             }
             takeDamage(amount, onKill) {
                 if (this.type === 'octopus') return; // Unsterblich
