@@ -74,6 +74,8 @@
         window.__butzcraftStartRequested = false;
         window.__butzcraftLastStartPress = 0;
         window.__butzcraftLastStartError = '';
+        window.__butzcraftLocalServerUrl = 'http://localhost:3000/';
+        window.__butzcraftFileLaunchMessage = 'Direktes Oeffnen als Datei laedt die Engine nicht. Bitte Butzcraft_Starten.bat nutzen oder http://localhost:3000 oeffnen.';
         window.__butzcraftRefreshStartStatus = function(message) {
             const status = document.getElementById('mobile-start-status');
             const startButton = document.getElementById('start-button');
@@ -88,6 +90,7 @@
             }
         };
         window.__butzcraftShowStartError = function(message) {
+            if (window.location.protocol === 'file:') message = window.__butzcraftFileLaunchMessage;
             window.__butzcraftLastStartError = message;
             const status = document.getElementById('mobile-start-status');
             const startButton = document.getElementById('start-button');
@@ -97,7 +100,7 @@
                 status.style.color = '#ff8a80';
             }
             if (startButton) {
-                startButton.textContent = 'Erneut versuchen';
+                startButton.textContent = window.location.protocol === 'file:' ? 'Lokalen Server oeffnen' : 'Erneut versuchen';
                 startButton.disabled = false;
             }
             window.__butzcraftStartRequested = false;
@@ -136,6 +139,10 @@
             if (now - window.__butzcraftLastStartPress < 350) return false;
             window.__butzcraftLastStartPress = now;
             if (event && event.cancelable) event.preventDefault();
+            if (window.location.protocol === 'file:') {
+                window.location.href = window.__butzcraftLocalServerUrl;
+                return false;
+            }
             window.__butzcraftRequestFullscreen();
 
             window.__butzcraftStartRequested = true;
@@ -223,7 +230,7 @@
             <div style="display: flex; flex-direction: column; align-items: flex-start; pointer-events: auto;">
                 <div id="stats">Lädt...</div>
                 
-                <div id="esc-hint" style="font-size: 9px; color: #aaa; margin-top: 2px;">(ESC drücken für Maus)</div>
+                <div id="esc-hint" style="font-size: 9px; color: #aaa; margin-top: 2px;">(TAB fuer Pause | Klick fuer Maus)</div>
             </div>
             <div id="time-info">Tag 1 | 08:00</div>
         </div>
@@ -242,6 +249,9 @@
             <div id="save-section" onclick="event.stopPropagation()">
                 <input type="text" id="save-input" placeholder="Name für Spielstand..." />
                 <button class="save-btn" onclick="saveGame()">Speichern</button>
+                <button class="save-btn" onclick="exportSaveGame()">Export</button>
+                <button class="save-btn" onclick="importSaveGame()">Import</button>
+                <input type="file" id="save-import-input" accept="application/json,.json" style="display:none" onchange="handleSaveImport(this)" />
             </div>
             <div id="save-msg" style="color: #4caf50; font-size: 14px; margin-top: 10px; display: none;">Spiel gespeichert!</div>
 
@@ -385,7 +395,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260511c"
+        src="./js/GameMain.js?v=20260517a"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

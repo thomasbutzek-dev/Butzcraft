@@ -38,13 +38,16 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 this.chunks = new Map();
                 this.modifiedBlocks = {};
                 this.blockMeta = {};    // "x,y,z" → metadata byte (Tür-Rotation etc.)
+                this.blockMetaChunkIndex = new Map();
                 this.chestContents = {}; // "chest,x,y,z" → Array<{type,count}>
                 this.lootedChests = new Set(); // Keys von Kisten, die bereits einmal geöffnet wurden
                 this.fireBlocks = new Map();    // "x,y,z" → { remaining: seconds } — aktive Feuer-Blöcke
                 this.spawnerMeta = {};           // "x,y,z" → { lastSpawn, mobCount } — Spawner-Zustand
+                this.spawnerKeys = new Set();    // bekannte Spawner-Positionen, damit Runtime-Ticks nicht den Raum scannen
                 this.villages = [];              // [{cx,cz,x,y,z}] — erkannte Dörfer für NPC-Spawn
                 this.uTime = { value: 0 };
                 this.pendingMeshes = new Set(); // Verhindert doppelte Mesh-Requests
+                this.meshEpoch = 0;
                 
                 // Opaque Material mit Wind-Shader für Vegetation +
                 // Atlas-Tiling-Shader für Greedy-Meshing-Quads.
@@ -142,7 +145,8 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     // Terrain-Daten empfangen
                     // ==============================
                     if (msg.type === 'terrain') {
-                        const { cx, cz, data } = msg;
+                        const { cx, cz, data, epoch } = msg;
+                        if (epoch !== undefined && epoch !== this.meshEpoch) return;
                         this.queuedChunks.delete(this.getChunkKey(cx, cz));
                         
                         // Modified Blocks anwenden
@@ -157,7 +161,8 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                             }
                         }
 
-                        const chunk = { cx, cz, data: new Uint8Array(data), mesh: null, waterMesh: null };
+                        const chunk = { cx, cz, data: new Uint8Array(data), mesh: null, waterMesh: null, spawnerKeys: new Set() };
+                        this.indexChunkSpawners(chunk);
                         this.chunks.set(this.getChunkKey(cx, cz), chunk);
 
                         // Mesh für diesen und ALLE 8 angrenzenden Chunks anfordern
@@ -188,7 +193,8 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     // Mesh-Ergebnis empfangen
                     // ==============================
                     if (msg.type === 'meshResult') {
-                        const { cx, cz, opaque, water } = msg;
+                        const { cx, cz, opaque, water, epoch } = msg;
+                        if (epoch !== undefined && epoch !== this.meshEpoch) return;
                         const meshKey = this.getChunkKey(cx, cz);
                         this.pendingMeshes.delete(meshKey);
 
@@ -267,6 +273,108 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
 
             getChunkKey(x, z) { return `${x},${z}`; }
 
+            getBlockKey(x, y, z) { return `${x},${y},${z}`; }
+
+            _parseBlockKey(key) {
+                const parts = key.split(',');
+                return { x: +parts[0], y: +parts[1], z: +parts[2] };
+            }
+
+            _getMetaChunkKeyForBlock(x, z) {
+                return this.getChunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE));
+            }
+
+            _indexBlockMetaKey(key) {
+                const pos = this._parseBlockKey(key);
+                const chunkKey = this._getMetaChunkKeyForBlock(pos.x, pos.z);
+                let keys = this.blockMetaChunkIndex.get(chunkKey);
+                if (!keys) {
+                    keys = new Set();
+                    this.blockMetaChunkIndex.set(chunkKey, keys);
+                }
+                keys.add(key);
+            }
+
+            _unindexBlockMetaKey(key) {
+                const pos = this._parseBlockKey(key);
+                const chunkKey = this._getMetaChunkKeyForBlock(pos.x, pos.z);
+                const keys = this.blockMetaChunkIndex.get(chunkKey);
+                if (!keys) return;
+                keys.delete(key);
+                if (keys.size === 0) this.blockMetaChunkIndex.delete(chunkKey);
+            }
+
+            rebuildBlockMetaIndex() {
+                this.blockMetaChunkIndex.clear();
+                for (const key in this.blockMeta) this._indexBlockMetaKey(key);
+            }
+
+            setBlockMetaData(blockMeta = {}) {
+                this.blockMeta = blockMeta && typeof blockMeta === 'object' ? blockMeta : {};
+                this.rebuildBlockMetaIndex();
+            }
+
+            setBlockMeta(x, y, z, value) {
+                const key = this.getBlockKey(x, y, z);
+                this.blockMeta[key] = value;
+                this._indexBlockMetaKey(key);
+            }
+
+            deleteBlockMeta(x, y, z) {
+                const key = this.getBlockKey(x, y, z);
+                if (!(key in this.blockMeta)) return;
+                delete this.blockMeta[key];
+                this._unindexBlockMetaKey(key);
+            }
+
+            getChunkBlockMeta(cx, cz) {
+                const chunkMeta = {};
+                const x0 = cx * CHUNK_SIZE - 1, x1 = (cx + 1) * CHUNK_SIZE + 1;
+                const z0 = cz * CHUNK_SIZE - 1, z1 = (cz + 1) * CHUNK_SIZE + 1;
+                const mcx0 = Math.floor(x0 / CHUNK_SIZE), mcx1 = Math.floor((x1 - 1) / CHUNK_SIZE);
+                const mcz0 = Math.floor(z0 / CHUNK_SIZE), mcz1 = Math.floor((z1 - 1) / CHUNK_SIZE);
+
+                for (let mcx = mcx0; mcx <= mcx1; mcx++) {
+                    for (let mcz = mcz0; mcz <= mcz1; mcz++) {
+                        const keys = this.blockMetaChunkIndex.get(this.getChunkKey(mcx, mcz));
+                        if (!keys) continue;
+                        for (const key of keys) {
+                            const pos = this._parseBlockKey(key);
+                            if (pos.x >= x0 && pos.x < x1 && pos.z >= z0 && pos.z < z1) {
+                                chunkMeta[key] = this.blockMeta[key];
+                            }
+                        }
+                    }
+                }
+
+                return chunkMeta;
+            }
+
+            indexChunkSpawners(chunk) {
+                if (!chunk || !chunk.data) return;
+                if (!chunk.spawnerKeys) chunk.spawnerKeys = new Set();
+                chunk.spawnerKeys.clear();
+                const baseX = chunk.cx * CHUNK_SIZE;
+                const baseZ = chunk.cz * CHUNK_SIZE;
+                for (let y = 0; y < CHUNK_HEIGHT; y++) {
+                    for (let z = 0; z < CHUNK_SIZE; z++) {
+                        for (let x = 0; x < CHUNK_SIZE; x++) {
+                            const idx = (y * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x;
+                            if (chunk.data[idx] !== 83) continue;
+                            const key = this.getBlockKey(baseX + x, y, baseZ + z);
+                            chunk.spawnerKeys.add(key);
+                            this.spawnerKeys.add(key);
+                        }
+                    }
+                }
+            }
+
+            unindexChunkSpawners(chunk) {
+                if (!chunk || !chunk.spawnerKeys) return;
+                for (const key of chunk.spawnerKeys) this.spawnerKeys.delete(key);
+                chunk.spawnerKeys.clear();
+            }
+
             generateChunk(cx, cz) {
                 const key = this.getChunkKey(cx, cz);
                 if (this.chunks.has(key) || this.queuedChunks.has(key)) return;
@@ -274,9 +382,9 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 
                 const pooledBuffer = this.chunkPool.pop();
                 if (pooledBuffer) {
-                    this.worker.postMessage({ type: 'generate', cx, cz, buffer: pooledBuffer }, [pooledBuffer]);
+                    this.worker.postMessage({ type: 'generate', cx, cz, buffer: pooledBuffer, epoch: this.meshEpoch }, [pooledBuffer]);
                 } else {
-                    this.worker.postMessage({ type: 'generate', cx, cz });
+                    this.worker.postMessage({ type: 'generate', cx, cz, epoch: this.meshEpoch });
                 }
             }
 
@@ -316,18 +424,10 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 // Kopie der Center-Daten erstellen (da Transferables den Buffer neutrieren)
                 const centerCopy = chunk.data.buffer.slice(0);
 
-                // blockMeta für den Chunk-Bereich + 1 Block Rand (für Tür-Rendering an Grenzen)
-                const chunkMeta = {};
-                const x0 = cx * CHUNK_SIZE - 1, x1 = (cx + 1) * CHUNK_SIZE + 1;
-                const z0 = cz * CHUNK_SIZE - 1, z1 = (cz + 1) * CHUNK_SIZE + 1;
-                for (const key in this.blockMeta) {
-                    const parts = key.split(',');
-                    const bx = +parts[0], bz = +parts[2];
-                    if (bx >= x0 && bx < x1 && bz >= z0 && bz < z1) chunkMeta[key] = this.blockMeta[key];
-                }
+                const chunkMeta = this.getChunkBlockMeta(cx, cz);
 
                 this.worker.postMessage(
-                    { type: 'mesh', cx, cz, centerData: centerCopy, neighbors, blockMeta: chunkMeta },
+                    { type: 'mesh', cx, cz, centerData: centerCopy, neighbors, blockMeta: chunkMeta, epoch: this.meshEpoch },
                     [centerCopy, ...neighbors.map(n => n.data)]
                 );
             }
@@ -337,6 +437,27 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 if (!mesh) return;
                 this.scene.remove(mesh);
                 if (mesh.geometry) mesh.geometry.dispose();
+            }
+
+            disposeChunkMeshes(chunk) {
+                if (!chunk) return;
+                this.disposeMesh(chunk.mesh);
+                this.disposeMesh(chunk.waterMesh);
+                chunk.mesh = null;
+                chunk.waterMesh = null;
+            }
+
+            disposeAllChunks({ reuseBuffers = false } = {}) {
+                this.meshEpoch++;
+                for (const chunk of this.chunks.values()) {
+                    this.disposeChunkMeshes(chunk);
+                    if (reuseBuffers && chunk.data) this.chunkPool.push(chunk.data.buffer);
+                }
+                this.chunks.clear();
+                this.spawnerKeys.clear();
+                this.queuedChunks.clear();
+                this.pendingMeshes.clear();
+                this.dirtyMeshes.clear();
             }
 
             update(time) {
@@ -358,7 +479,18 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 const cx = Math.floor(x / CHUNK_SIZE), cz = Math.floor(z / CHUNK_SIZE);
                 const chunk = this.chunks.get(this.getChunkKey(cx, cz)); if (!chunk) return;
                 const lx = x - cx * CHUNK_SIZE, lz = z - cz * CHUNK_SIZE;
-                chunk.data[(y * CHUNK_SIZE * CHUNK_SIZE) + (lz * CHUNK_SIZE) + lx] = t;
+                const idx = (y * CHUNK_SIZE * CHUNK_SIZE) + (lz * CHUNK_SIZE) + lx;
+                const previous = chunk.data[idx];
+                chunk.data[idx] = t;
+                const blockKey = this.getBlockKey(x, y, z);
+                if (!chunk.spawnerKeys) chunk.spawnerKeys = new Set();
+                if (previous === 83 && t !== 83) {
+                    chunk.spawnerKeys.delete(blockKey);
+                    this.spawnerKeys.delete(blockKey);
+                } else if (previous !== 83 && t === 83) {
+                    chunk.spawnerKeys.add(blockKey);
+                    this.spawnerKeys.add(blockKey);
+                }
                 if (updateMesh) {
                     this.requestMesh(cx, cz);
                     if (lx === 0) this.requestMesh(cx - 1, cz); if (lx === CHUNK_SIZE - 1) this.requestMesh(cx + 1, cz);
@@ -375,7 +507,8 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 }
                 for (const [key, chunk] of this.chunks) {
                     if (Math.abs(chunk.cx - pcx) > RD + 1 || Math.abs(chunk.cz - pcz) > RD + 1) {
-                        this.disposeMesh(chunk.mesh); this.disposeMesh(chunk.waterMesh);
+                        this.disposeChunkMeshes(chunk);
+                        this.unindexChunkSpawners(chunk);
                         if (chunk.data) this.chunkPool.push(chunk.data.buffer);
                         this.chunks.delete(key);
                     }

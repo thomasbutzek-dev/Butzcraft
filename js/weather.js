@@ -9,8 +9,9 @@
  *   // Im Render-Loop: weather.getState(), weather.getIntensity()
  */
 
+import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
-import { ParticleSystem } from './particles.js?v=20260507b';
+import { ParticleSystem } from './particles.js?v=20260517a';
 import { BIOMES } from './world.js?v=20260507b';
 import { SoundManager } from './sound.js?v=20260507b';
 
@@ -40,6 +41,8 @@ export class WeatherSystem {
 
         // Blitz
         this.lightningTimer = 0;
+        this.lightningVisualTimer = 0;
+        this.lightningBolt = null;
         this.lightningFlash = 0;    // Countdown für weißen Flash (Sekunden)
         this.lightningActive = false;
         this.rainCyclesWithoutStorm = 0;
@@ -75,7 +78,7 @@ export class WeatherSystem {
         // Partikel-Updates
         if (this.state === 'rain' || this.state === 'thunderstorm') {
             if (!this.rainParticles) {
-                this.rainParticles = new ParticleSystem(this.scene, 'rain', W.RAIN_PARTICLES);
+                this.rainParticles = new ParticleSystem(this.scene, 'rain', W.RAIN_PARTICLES, this.world);
             }
             this.rainParticles.update(delta, playerPos, this.intensity);
 
@@ -99,7 +102,7 @@ export class WeatherSystem {
 
         if (this.state === 'snow') {
             if (!this.snowParticles) {
-                this.snowParticles = new ParticleSystem(this.scene, 'snow', W.SNOW_PARTICLES);
+                this.snowParticles = new ParticleSystem(this.scene, 'snow', W.SNOW_PARTICLES, this.world);
             }
             this.snowParticles.update(delta, playerPos, this.intensity);
         } else {
@@ -124,6 +127,10 @@ export class WeatherSystem {
         if (this.lightningFlash > 0) {
             this.lightningFlash -= delta;
             if (this.lightningFlash < 0) this.lightningFlash = 0;
+        }
+        if (this.lightningVisualTimer > 0) {
+            this.lightningVisualTimer -= delta;
+            if (this.lightningVisualTimer <= 0) this._clearLightningBolt();
         }
 
         // Feuer-Updates (alle 0.5s für Performance)
@@ -187,7 +194,7 @@ export class WeatherSystem {
                 this.state = 'thunderstorm';
                 this.stateTimer = this._randomDuration('storm');
                 this.targetIntensity = 0.8 + Math.random() * 0.2;
-                this.lightningTimer = W.LIGHTNING_MIN + Math.random() * (W.LIGHTNING_MAX - W.LIGHTNING_MIN);
+                this.lightningTimer = 0.5 + Math.random() * 2.0;
                 this.rainCyclesWithoutStorm = 0;
             } else {
                 this.state = 'clear';
@@ -251,6 +258,7 @@ export class WeatherSystem {
         }
 
         if (topY < 0) return;
+        this._showLightningBolt(cx, topY + 1, cz);
 
         // Feuer setzen wenn brennbar
         const hitBlock = this.world.getBlock(cx, topY, cz);
@@ -263,6 +271,49 @@ export class WeatherSystem {
                 this.world.fireBlocks.set(key, { remaining: W.FIRE_DURATION, x: cx, y: fireY, z: cz });
             }
         }
+    }
+
+    _showLightningBolt(x, y, z) {
+        if (!this.scene || typeof this.scene.add !== 'function') return;
+        this._clearLightningBolt();
+
+        const topY = Math.max(63, y + 18);
+        const points = [];
+        const segmentCount = 9;
+        for (let i = 0; i <= segmentCount; i++) {
+            const t = i / segmentCount;
+            const jitter = i === 0 || i === segmentCount ? 0 : 0.7;
+            points.push(new THREE.Vector3(
+                x + (Math.random() - 0.5) * jitter,
+                topY + (y - topY) * t,
+                z + (Math.random() - 0.5) * jitter
+            ));
+        }
+
+        const material = new THREE.LineBasicMaterial({
+            color: 0xeef6ff,
+            transparent: true,
+            opacity: 0.95,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            fog: false
+        });
+        const geometry = new THREE.BufferGeometry().setFromPoints(points);
+        const bolt = new THREE.Line(geometry, material);
+        bolt.frustumCulled = false;
+
+        this.lightningBolt = bolt;
+        this.lightningVisualTimer = 0.22;
+        this.scene.add(bolt);
+    }
+
+    _clearLightningBolt() {
+        if (!this.lightningBolt) return;
+        if (this.scene && typeof this.scene.remove === 'function') this.scene.remove(this.lightningBolt);
+        this.lightningBolt.geometry.dispose();
+        this.lightningBolt.material.dispose();
+        this.lightningBolt = null;
+        this.lightningVisualTimer = 0;
     }
 
     // --- Feuer-Mechanik ---
@@ -367,6 +418,7 @@ export class WeatherSystem {
     }
 
     dispose() {
+        this._clearLightningBolt();
         if (this.rainParticles) { this.rainParticles.dispose(); this.rainParticles = null; }
         if (this.snowParticles) { this.snowParticles.dispose(); this.snowParticles = null; }
         if (this.rainSoundPlaying) { SoundManager.playRainLoop(false); this.rainSoundPlaying = false; }

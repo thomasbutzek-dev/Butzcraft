@@ -141,11 +141,19 @@ app.post('/api/tester/log', (req, res) => {
 });
 
 const distDir = path.join(__dirname, 'dist');
+const isProduction = process.env.NODE_ENV === 'production';
+const hasDistIndex = fs.existsSync(path.join(distDir, 'index.html'));
 const staticRoots = [];
-if (process.env.NODE_ENV === 'production' && fs.existsSync(path.join(distDir, 'index.html'))) {
-    staticRoots.push(distDir);
+if (isProduction) {
+    if (hasDistIndex) staticRoots.push(distDir);
+} else {
+    // Development serves the repo root so source files and node_modules imports work.
+    if (hasDistIndex) staticRoots.push(distDir);
+    staticRoots.push(__dirname);
 }
-staticRoots.push(__dirname);
+if (staticRoots.length === 0) {
+    console.warn('Production build missing: dist/index.html not found. Run npm run build before starting with NODE_ENV=production.');
+}
 
 // Statisches Routing: Einstiegspunkte nicht cachen, damit neue Deploys sofort sichtbar sind.
 const staticOptions = {
@@ -164,7 +172,10 @@ staticRoots.forEach(root => {
 
 // Weiterleitung von Root auf index.html falls nicht automatisch gefunden
 app.get('/', (req, res) => {
-    const indexPath = fs.existsSync(path.join(distDir, 'index.html'))
+    if (isProduction && !hasDistIndex) {
+        return res.status(503).send('Production build missing. Run npm run build.');
+    }
+    const indexPath = hasDistIndex
         ? path.join(distDir, 'index.html')
         : path.join(__dirname, 'index.html');
     res.sendFile(indexPath);

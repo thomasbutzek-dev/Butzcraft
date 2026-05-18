@@ -5,8 +5,8 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { NPC_PROFESSIONS } from './npc.js?v=20260507b';
 import { createBlockHTML, getItemName } from './inventory.js?v=20260507b';
+import { getQuestProgress, removeQuestItems } from './quests.js?v=20260515b';
 
 let currentNPC = null;
 
@@ -30,6 +30,10 @@ export function openTradeUI(npc, controls) {
     const grid = overlay.querySelector('#trade-grid');
     if (!grid) return;
     grid.innerHTML = '';
+
+    if (prof.quest) {
+        grid.appendChild(buildQuestRow(prof.quest));
+    }
 
     prof.trades.forEach((trade, idx) => {
         const row = document.createElement('div');
@@ -72,6 +76,42 @@ export function openTradeUI(npc, controls) {
 
     overlay.style.display = 'flex';
     if (controls) controls.unlock();
+}
+
+function buildQuestRow(quest) {
+    const progress = getQuestProgress(window.inventorySlots, quest);
+    const row = document.createElement('div');
+    row.className = 'trade-row quest-row';
+
+    const giveDiv = document.createElement('div');
+    giveDiv.className = 'trade-item';
+    giveDiv.innerHTML = `
+        <div class="trade-icon">${createBlockHTML(quest.give.type)}</div>
+        <span class="trade-label">Auftrag: ${progress.current}/${progress.required} ${getItemName(quest.give.type)}</span>
+    `;
+
+    const arrow = document.createElement('div');
+    arrow.className = 'trade-arrow';
+    arrow.textContent = '->';
+
+    const receiveDiv = document.createElement('div');
+    receiveDiv.className = 'trade-item';
+    receiveDiv.innerHTML = `
+        <div class="trade-icon">${createBlockHTML(quest.receive.type)}</div>
+        <span class="trade-label">${quest.receive.count}x ${getItemName(quest.receive.type)}</span>
+    `;
+
+    const btn = document.createElement('button');
+    btn.className = 'trade-btn';
+    btn.textContent = progress.complete ? 'Abgeben' : `Fehlt ${progress.missing}`;
+    btn.disabled = !progress.complete;
+    btn.addEventListener('click', () => executeQuest(quest, btn));
+
+    row.appendChild(giveDiv);
+    row.appendChild(arrow);
+    row.appendChild(receiveDiv);
+    row.appendChild(btn);
+    return row;
 }
 
 /**
@@ -124,6 +164,23 @@ function executeTrade(trade, idx) {
             btn.textContent = 'Tauschen';
         }, 500);
     }
+}
+
+function executeQuest(quest, btn) {
+    const inventorySlots = window.inventorySlots;
+    if (!inventorySlots) return;
+
+    const progress = getQuestProgress(inventorySlots, quest);
+    if (!progress.complete) return;
+
+    if (!removeQuestItems(inventorySlots, quest)) return;
+    if (window.addItemToInventory) {
+        window.addItemToInventory(quest.receive.type, quest.receive.count);
+    }
+    if (window.updateInventoryUI) window.updateInventoryUI();
+
+    showTradeMessage(`Auftrag erledigt: +${quest.receive.count}x ${getItemName(quest.receive.type)}`, '#4caf50');
+    if (currentNPC) openTradeUI(currentNPC);
 }
 
 function showTradeMessage(text, color) {

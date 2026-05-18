@@ -5,10 +5,14 @@ class FakeAudioContext {
     constructor() {
         this.state = 'running';
         this.destination = {};
+        this.currentTime = 0;
+        this.sampleRate = 8000;
+        this.resumePromise = Promise.resolve();
+        this.sources = [];
     }
 
     resume() {
-        return Promise.resolve();
+        return this.resumePromise;
     }
 
     decodeAudioData() {
@@ -16,7 +20,7 @@ class FakeAudioContext {
     }
 
     createBufferSource() {
-        return {
+        const source = {
             buffer: null,
             onended: null,
             connect: vi.fn(),
@@ -24,11 +28,29 @@ class FakeAudioContext {
             stop: vi.fn(),
             disconnect: vi.fn()
         };
+        this.sources.push(source);
+        return source;
     }
 
     createGain() {
         return {
-            gain: { value: 0 },
+            gain: { value: 0, linearRampToValueAtTime: vi.fn() },
+            connect: vi.fn(),
+            disconnect: vi.fn()
+        };
+    }
+
+    createBuffer(channels, length) {
+        return {
+            getChannelData: () => new Float32Array(length)
+        };
+    }
+
+    createBiquadFilter() {
+        return {
+            type: '',
+            frequency: { value: 0 },
+            Q: { value: 0 },
             connect: vi.fn(),
             disconnect: vi.fn()
         };
@@ -45,6 +67,15 @@ function resetSoundManager() {
     SoundManager.musicLoading = false;
     SoundManager.musicTimer = null;
     SoundManager.musicSource = null;
+    SoundManager.uwSource = null;
+    SoundManager.uwGain = null;
+    SoundManager.uwWanted = false;
+    SoundManager.uwStarting = false;
+    SoundManager._rainSource = null;
+    SoundManager._rainFilter = null;
+    SoundManager._rainGain = null;
+    SoundManager._rainWanted = false;
+    SoundManager._rainStarting = false;
 }
 
 describe('SoundManager music loop', () => {
@@ -87,5 +118,61 @@ describe('SoundManager music loop', () => {
         SoundManager.playMusicSequence();
 
         expect(SoundManager.musicSource).toBe(firstSource);
+    });
+});
+
+describe('SoundManager looping ambience', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        resetSoundManager();
+        window.AudioContext = FakeAudioContext;
+        window.webkitAudioContext = undefined;
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+        resetSoundManager();
+    });
+
+    it('does not start underwater loop before the buffer is loaded', async () => {
+        SoundManager.ctx = new FakeAudioContext();
+
+        SoundManager.setUnderwater(true);
+        await Promise.resolve();
+
+        expect(SoundManager.uwSource).toBeNull();
+        expect(SoundManager.ctx.sources).toHaveLength(0);
+    });
+
+    it('cancels a pending underwater start when leaving water', async () => {
+        SoundManager.ctx = new FakeAudioContext();
+        SoundManager.buffers.underwater = { duration: 1 };
+        let resume;
+        SoundManager.ctx.resumePromise = new Promise(resolve => { resume = resolve; });
+
+        SoundManager.setUnderwater(true);
+        SoundManager.setUnderwater(false);
+        resume();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(SoundManager.uwSource).toBeNull();
+        expect(SoundManager.ctx.sources).toHaveLength(0);
+    });
+
+    it('does not start duplicate rain loops while audio resume is pending', async () => {
+        SoundManager.ctx = new FakeAudioContext();
+        let resume;
+        SoundManager.ctx.resumePromise = new Promise(resolve => { resume = resolve; });
+
+        SoundManager.playRainLoop(true);
+        SoundManager.playRainLoop(true);
+        resume();
+        await Promise.resolve();
+        await Promise.resolve();
+
+        expect(SoundManager._rainSource).toBeTruthy();
+        expect(SoundManager.ctx.sources).toHaveLength(1);
     });
 });

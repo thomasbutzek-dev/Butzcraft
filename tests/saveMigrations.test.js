@@ -75,6 +75,13 @@ describe('migrateSave – Edge Cases', () => {
         expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
         expect(migrated.pos).toEqual({ x: 0, y: 50, z: 0 });
     });
+
+    it('ergaenzt Blood-Moon-Reward-State fuer alte Saves', () => {
+        const data = { version: 4, inventory: [] };
+        const migrated = migrateSave(data);
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.lastBloodMoonRewardDay).toBe(-1);
+    });
 });
 
 describe('stampSaveVersion', () => {

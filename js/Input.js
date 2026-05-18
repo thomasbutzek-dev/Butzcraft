@@ -26,6 +26,11 @@ export const Input = {
             const tag = document.activeElement?.tagName;
             if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
             if (isInventoryOpenedProvider && isInventoryOpenedProvider()) return;
+            const handled =
+                e.code === 'KeyW' || e.code === 'KeyS' || e.code === 'KeyA' || e.code === 'KeyD' ||
+                e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' ||
+                e.code === 'ControlLeft' || e.code === 'ControlRight';
+            if (handled && e.cancelable) e.preventDefault();
 
             if (e.code === 'KeyW') this.moveF = true;
             if (e.code === 'KeyS') this.moveB = true;

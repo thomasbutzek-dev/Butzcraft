@@ -4,7 +4,7 @@ import { SoundManager } from './sound.js?v=20260507b';
 import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260507b';
 import { Physics } from './Physics.js?v=20260507b';
 
-const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5 } = CONFIG.MOBS;
+const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
 const { GRAVITY, MOB_JUMP_FORCE = 5.5 } = CONFIG.PHYSICS;
 const { HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
@@ -55,7 +55,7 @@ export class Mob {
     constructor(scene, type, x, y, z) {
         this.scene = scene;
         this.type = type;
-        this.health = (type === 'zombie' || type === 'skeleton') ? 20 : (type === 'turtle') ? 15 : (type === 'pig' || type === 'sheep' || type === 'cow') ? 12 : (type === 'geist') ? Infinity : 5;
+        this.health = (type === 'zombie' || type === 'skeleton') ? 20 : (type === 'spider') ? 8 : (type === 'turtle') ? 15 : (type === 'pig' || type === 'sheep' || type === 'cow') ? 12 : (type === 'geist') ? Infinity : 5;
         this.lastMilkTime = 0; // Für Kühe
         this.lastShotTime = 0; // Für Skelette
         this.isDead = false;
@@ -67,6 +67,8 @@ export class Mob {
             this._buildZombie();
         } else if (type === 'skeleton') {
             this._buildSkeleton();
+        } else if (type === 'spider') {
+            this._buildSpider();
         } else if (type === 'pig') {
             this._buildPig();
         } else if (type === 'chicken') {
@@ -213,6 +215,61 @@ export class Mob {
         
         const legL = box(0.22, 0.7, 0.22, 0x2d5a8e); legL.position.set(-0.17, 0.35, 0); this.group.add(legL); this.legs.push(legL);
         const legR = box(0.22, 0.7, 0.22, 0x2d5a8e); legR.position.set(0.17, 0.35, 0); this.group.add(legR); this.legs.push(legR);
+    }
+
+    _buildSpider() {
+        this.legs = [];
+        const box = (w, h, d, c) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c));
+        const dark = 0x051116;
+        const teal = 0x0b4650;
+        const tealDark = 0x082c35;
+        const red = 0xc00000;
+
+        const body = box(0.82, 0.34, 0.76, teal);
+        body.position.set(0, 0.42, -0.12);
+        this.group.add(body);
+
+        const abdomen = box(0.74, 0.42, 0.68, dark);
+        abdomen.position.set(0, 0.46, -0.62);
+        this.group.add(abdomen);
+
+        const head = box(0.62, 0.40, 0.48, tealDark);
+        head.position.set(0, 0.40, 0.38);
+        this.group.add(head);
+
+        const eyeGeo = new THREE.BoxGeometry(0.11, 0.11, 0.04);
+        const eyeMat = this._getTexMat(red);
+        for (const x of [-0.18, 0.18]) {
+            const eye = new THREE.Mesh(eyeGeo, eyeMat);
+            eye.position.set(x, 0.48, 0.64);
+            this.group.add(eye);
+        }
+        const mouth = box(0.38, 0.10, 0.05, red);
+        mouth.position.set(0, 0.31, 0.65);
+        this.group.add(mouth);
+
+        const legMat = this._getTexMat(tealDark);
+        for (const side of [-1, 1]) {
+            for (let i = 0; i < 4; i++) {
+                const z = 0.28 - i * 0.24;
+                const leg = new THREE.Group();
+                leg.position.set(side * 0.36, 0.30, z);
+
+                const upper = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.10, 0.10), legMat);
+                upper.position.x = side * 0.22;
+                upper.rotation.z = side * -0.18;
+                leg.add(upper);
+
+                const lower = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.09, 0.09), legMat);
+                lower.position.set(side * 0.60, -0.05, side * (i - 1.5) * 0.02);
+                lower.rotation.z = side * 0.22;
+                lower.rotation.y = side * (0.25 - i * 0.08);
+                leg.add(lower);
+
+                this.group.add(leg);
+                this.legs.push(leg);
+            }
+        }
     }
 
     _buildPig() {
@@ -866,7 +923,9 @@ export class Mob {
                 
                 const checkMobC = (np) => Physics.checkAABBCollision(world, np, 0.3, 0.6, 1.8, true);
 
-                if ((this.type === 'zombie' || this.type === 'skeleton') && dist < ZOMBIE_DETECTION_RANGE) {
+                const isHostileWalker = this.type === 'zombie' || this.type === 'skeleton' || this.type === 'spider';
+                const detectionRange = this.type === 'spider' ? SPIDER_DETECTION_RANGE : ZOMBIE_DETECTION_RANGE;
+                if (isHostileWalker && dist < detectionRange) {
                     const dir = _tempDir.subVectors(playerPos, pos);
                     dir.y = 0; dir.normalize();
                     
@@ -882,7 +941,7 @@ export class Mob {
                         // Zombie stoppt vor Wasser, aber versucht seitlich auszuweichen
                         this.velocity.x = 0; this.velocity.z = 0;
                     } else {
-                         const speed = this.type === 'skeleton' ? SKELETON_SPEED : ZOMBIE_SPEED;
+                         const speed = this.type === 'skeleton' ? SKELETON_SPEED : (this.type === 'spider' ? SPIDER_SPEED : ZOMBIE_SPEED);
                         if (this.type === 'skeleton' && dist < 10) {
                             this.velocity.x = 0; this.velocity.z = 0;
                         } else {
@@ -918,8 +977,8 @@ export class Mob {
                         }
 
                         if (!waterAhead) {
-                            this.velocity.x = dirX * ((this.type === 'zombie' || this.type === 'skeleton') ? ZOMBIE_SPEED : WANDER_SPEED);
-                            this.velocity.z = dirZ * ((this.type === 'zombie' || this.type === 'skeleton') ? ZOMBIE_SPEED : WANDER_SPEED);
+                            this.velocity.x = dirX * (isHostileWalker ? (this.type === 'spider' ? SPIDER_SPEED : ZOMBIE_SPEED) : WANDER_SPEED);
+                            this.velocity.z = dirZ * (isHostileWalker ? (this.type === 'spider' ? SPIDER_SPEED : ZOMBIE_SPEED) : WANDER_SPEED);
                             this.group.rotation.y = angle;
                         } else {
                             this.velocity.x = 0; this.velocity.z = 0;
@@ -941,6 +1000,10 @@ export class Mob {
                             this.legs[1].rotation.x = Math.sin(walkCycle + Math.PI) * 0.6; // Vorne rechts
                             this.legs[2].rotation.x = Math.sin(walkCycle + Math.PI) * 0.6; // Hinten links
                             this.legs[3].rotation.x = Math.sin(walkCycle) * 0.6;       // Hinten rechts
+                        } else if (this.legs.length === 8) {
+                            for (let i = 0; i < this.legs.length; i++) {
+                                this.legs[i].rotation.x = Math.sin(walkCycle + (i % 2) * Math.PI) * 0.35;
+                            }
                         }
                     }
                 } else if (this.legs) {
@@ -1024,6 +1087,7 @@ export class Mob {
                 }
 
                 if ((this.type === 'zombie' || this.type === 'skeleton') && dist < 2.0) onDamage(ZOMBIE_DAMAGE * delta);
+                if (this.type === 'spider' && dist < 1.6) onDamage(SPIDER_DAMAGE * delta);
             }
             takeDamage(amount, onKill) {
                 if (this.type === 'octopus') return; // Unsterblich

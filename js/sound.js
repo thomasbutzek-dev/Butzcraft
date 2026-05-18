@@ -293,26 +293,45 @@ export const SoundManager = {
         this.playSound('water_splash', 1.0, 0.9 + Math.random() * 0.2);
     },
 
+    _stopUnderwaterLoop() {
+        const source = this.uwSource;
+        const gain = this.uwGain;
+        this.uwSource = null;
+        this.uwGain = null;
+        this.uwStarting = false;
+        if (source) {
+            try { source.stop(); } catch(e) {}
+            try { source.disconnect(); } catch(e) {}
+        }
+        if (gain) {
+            try { gain.disconnect(); } catch(e) {}
+        }
+    },
+
     setUnderwater(state) {
         if (!this.ctx) return;
+        this.uwWanted = Boolean(state);
         if (state) {
-            if (this.uwSource) return;
-            this.ctx.resume().then(() => {
-                this.uwSource = this.ctx.createBufferSource();
-                this.uwSource.buffer = this.buffers['underwater'];
-                this.uwSource.loop = true;
-                this.uwGain = this.ctx.createGain();
-                this.uwGain.gain.value = 0.5;
-                this.uwSource.connect(this.uwGain);
-                this.uwGain.connect(this.ctx.destination);
-                this.uwSource.start(0);
-            });
+            if (this.uwSource || this.uwStarting || !this.buffers['underwater']) return;
+            this.uwStarting = true;
+            this.ctx.resume()
+                .then(() => {
+                    if (!this.uwWanted || this.uwSource || !this.buffers['underwater']) return;
+                    const source = this.ctx.createBufferSource();
+                    const gain = this.ctx.createGain();
+                    source.buffer = this.buffers['underwater'];
+                    source.loop = true;
+                    gain.gain.value = 0.5;
+                    source.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    source.start(0);
+                    this.uwSource = source;
+                    this.uwGain = gain;
+                })
+                .catch(e => console.warn(e))
+                .finally(() => { this.uwStarting = false; });
         } else {
-            if (this.uwSource) {
-                try { this.uwSource.stop(); } catch(e) {}
-                this.uwSource = null;
-                this.uwGain = null;
-            }
+            this._stopUnderwaterLoop();
         }
     },
 
@@ -326,9 +345,12 @@ export const SoundManager = {
      */
     playRainLoop(enable) {
         if (!this.ctx) return;
+        this._rainWanted = Boolean(enable);
         if (enable) {
-            if (this._rainSource) return;
+            if (this._rainSource || this._rainStarting) return;
+            this._rainStarting = true;
             this.ctx.resume().then(() => {
+                if (!this._rainWanted || this._rainSource) return;
                 // Weißes Rauschen generieren (2s Loop-Buffer)
                 const sr = this.ctx.sampleRate;
                 const len = sr * 2;
@@ -336,34 +358,44 @@ export const SoundManager = {
                 const data = buf.getChannelData(0);
                 for (let i = 0; i < len; i++) data[i] = (Math.random() * 2 - 1) * 0.5;
 
-                this._rainSource = this.ctx.createBufferSource();
-                this._rainSource.buffer = buf;
-                this._rainSource.loop = true;
+                const source = this.ctx.createBufferSource();
+                source.buffer = buf;
+                source.loop = true;
 
                 // Lowpass für weiches Regenrauschen
-                this._rainFilter = this.ctx.createBiquadFilter();
-                this._rainFilter.type = 'lowpass';
-                this._rainFilter.frequency.value = 2500;
-                this._rainFilter.Q.value = 0.7;
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 2500;
+                filter.Q.value = 0.7;
 
-                this._rainGain = this.ctx.createGain();
-                this._rainGain.gain.value = 0;
+                const gain = this.ctx.createGain();
+                gain.gain.value = 0;
                 // Fade-in über 2 Sekunden
-                this._rainGain.gain.linearRampToValueAtTime(0.18, this.ctx.currentTime + 2);
+                gain.gain.linearRampToValueAtTime(0.18, this.ctx.currentTime + 2);
 
-                this._rainSource.connect(this._rainFilter);
-                this._rainFilter.connect(this._rainGain);
-                this._rainGain.connect(this.ctx.destination);
-                this._rainSource.start(0);
-            });
+                source.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                source.start(0);
+                this._rainSource = source;
+                this._rainFilter = filter;
+                this._rainGain = gain;
+            }).catch(e => console.warn(e)).finally(() => { this._rainStarting = false; });
         } else {
             if (this._rainSource) {
-                if (this._rainGain) {
-                    // Fade-out über 1.5s
-                    this._rainGain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1.5);
-                }
                 const src = this._rainSource;
-                setTimeout(() => { try { src.stop(); } catch(e) {} }, 1600);
+                const filter = this._rainFilter;
+                const gain = this._rainGain;
+                if (gain) {
+                    // Fade-out über 1.5s
+                    gain.gain.linearRampToValueAtTime(0, this.ctx.currentTime + 1.5);
+                }
+                setTimeout(() => {
+                    try { src.stop(); } catch(e) {}
+                    try { src.disconnect(); } catch(e) {}
+                    try { filter && filter.disconnect(); } catch(e) {}
+                    try { gain && gain.disconnect(); } catch(e) {}
+                }, 1600);
                 this._rainSource = null;
                 this._rainFilter = null;
                 this._rainGain = null;

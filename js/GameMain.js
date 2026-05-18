@@ -4,7 +4,7 @@
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
         import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260507c';
-        import { Mob, updateProjectiles } from './mobs.js?v=20260511a';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260511a';
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
@@ -14,9 +14,12 @@
         import { PlayerInteraction } from './PlayerInteraction.js?v=20260507c';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260511a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260507c';
-        import { WeatherSystem } from './weather.js?v=20260507b';
+        import { WeatherSystem } from './weather.js?v=20260517a';
         import { NPC } from './npc.js?v=20260507b';
         import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260507c';
+        import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
+        import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
+        import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
         window.inventorySlots = inventorySlots;
@@ -47,6 +50,7 @@
         // Spielstart auf Mittag setzen
         let time = DAY_DURATION * 0.45, prevTime = performance.now(), spawnTimer = 0;
         let collectedEggs = 0, collectedWool = 0;
+        let lastBloodMoonRewardDay = -1;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
         window.droppedItems = [];
@@ -83,10 +87,10 @@
         }
 
         function lockControlsForDesktop() {
-            if (shouldUseTouchMode()) return;
+            if (shouldUseTouchMode()) return false;
+            if (!controls) return false;
             if (window.butzcraftPointerLockUnavailable) return false;
-            const policy = document.permissionsPolicy || document.featurePolicy;
-            if (policy && typeof policy.allowsFeature === 'function' && !policy.allowsFeature('pointer-lock')) {
+            if (typeof (controls.domElement || document.body).requestPointerLock !== 'function') {
                 window.butzcraftPointerLockUnavailable = true;
                 return false;
             }
@@ -113,11 +117,41 @@
                 controls.lock();
                 return true;
             } catch (err) {
-                window.butzcraftPointerLockUnavailable = true;
                 const msg = err && err.message ? err.message : String(err);
-                console.warn('[Input] Pointer Lock nicht verfuegbar, Desktop-Fallback aktiv:', msg);
+                console.warn('[Input] Pointer Lock konnte gerade nicht aktiviert werden:', msg);
                 return false;
             }
+        }
+
+        function isGameplayKey(e) {
+            return Boolean(
+                e &&
+                (
+                    e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD' ||
+                    e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' ||
+                    e.code === 'ControlLeft' || e.code === 'ControlRight' ||
+                    e.code === 'KeyE' || e.code === 'Tab' ||
+                    (e.key >= '1' && e.key <= '8')
+                )
+            );
+        }
+
+        function relockControlsFromInput(e) {
+            if (!isGameplayKey(e)) return;
+            if (!gameStarted || manuallyPaused || isBlockingOverlayOpen()) return;
+            if (!controls?.isLocked && !window.touchActive) lockControlsForDesktop();
+        }
+
+        function relockControlsFromPointer(e) {
+            if (e && e.button !== undefined && e.button !== 0) return;
+            const target = e?.target;
+            if (target?.closest?.('button, input, textarea, select, #save-section, #pause-load-list, #inventory-overlay, #furnace-overlay, #chest-overlay, #trade-overlay, #start-menu, #game-over')) return;
+            if (!gameStarted || !gameActive || isBlockingOverlayOpen()) return;
+            if (manuallyPaused) {
+                manuallyPaused = false;
+                hidePauseMenu();
+            }
+            if (!controls?.isLocked && !window.touchActive) lockControlsForDesktop();
         }
 
         window.butzcraftCanInteract = function() {
@@ -179,6 +213,51 @@
             return new URL(path.replace(/^\/+/, ''), window.location.href).toString();
         }
 
+        async function loadSaveData(name) {
+            try {
+                const browserSave = await loadBrowserSave(name);
+                if (browserSave) return browserSave;
+            } catch (err) {
+                if (err && err.message === 'Invalid name') throw err;
+                console.warn('[Save] Browser-Save nicht lesbar, versuche Server-Fallback:', err);
+            }
+
+            const res = await fetch(apiUrl(`api/load?name=${encodeURIComponent(name)}`));
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            return data;
+        }
+
+        async function listServerSaves() {
+            try {
+                const res = await fetch(apiUrl('api/saves'));
+                const saves = await res.json();
+                return Array.isArray(saves) ? saves : [];
+            } catch (err) {
+                return [];
+            }
+        }
+
+        async function listAllSaveNames() {
+            let browserSaves = [];
+            try {
+                browserSaves = await listBrowserSaves();
+            } catch (err) {
+                console.warn('[Save] Browser-Save-Liste nicht lesbar:', err);
+            }
+            const serverSaves = await listServerSaves();
+            return [...new Set([...browserSaves, ...serverSaves])];
+        }
+
+        function showSaveMessage(text, color = '#4caf50') {
+            const msg = document.getElementById('save-msg');
+            if (!msg) return;
+            msg.textContent = text;
+            msg.style.color = color;
+            msg.style.display = 'block';
+            setTimeout(() => msg.style.display = 'none', 3000);
+        }
+
         function updateVisibleChunksIfNeeded(playerPos, force = false) {
             const cx = Math.floor(playerPos.x / CHUNK_SIZE);
             const cz = Math.floor(playerPos.z / CHUNK_SIZE);
@@ -188,6 +267,32 @@
             _lastVisibleChunkX = cx;
             _lastVisibleChunkZ = cz;
             _lastVisibleRenderDist = rd;
+        }
+
+        function disposeDroppedItem(item) {
+            if (!item || !item.mesh) return;
+            scene.remove(item.mesh);
+            if (item.mesh.geometry) item.mesh.geometry.dispose();
+            if (item.mesh.material) {
+                if (Array.isArray(item.mesh.material)) item.mesh.material.forEach(m => m.dispose());
+                else item.mesh.material.dispose();
+            }
+        }
+
+        function resetRuntimeForLoadedGame() {
+            while (mobs.length > 0) {
+                const mob = mobs.pop();
+                if (mob && typeof mob.dispose === 'function') mob.dispose();
+                else if (mob && mob.group) scene.remove(mob.group);
+            }
+            while (droppedItems.length > 0) disposeDroppedItem(droppedItems.pop());
+            while (projectiles.length > 0) {
+                const projectile = projectiles.pop();
+                if (projectile && typeof projectile.dispose === 'function') projectile.dispose();
+            }
+            world.fireBlocks.clear();
+            world.spawnerMeta = {};
+            world.villages = [];
         }
 
         window.startNewGame = function() {
@@ -211,14 +316,8 @@
         window.loadGame = function(name) {
             console.log("DEBUG: loadGame starting for", name);
             SoundManager.init();
-            fetch(apiUrl(`api/load?name=${encodeURIComponent(name)}`))
-                .then(res => res.json())
+            loadSaveData(name)
                 .then(data => {
-                    if (data.error) {
-                        alert("Fehler beim Laden: " + data.error);
-                        return;
-                    }
-                    
                     document.getElementById('start-menu').style.display = 'none';
                     lockControlsForDesktop();
                     gameStarted = true;
@@ -229,6 +328,7 @@
                     // Vorher war die Inventory-Migration hier inline + oldInventoryMap aus inventory.js.
                     // Jetzt: ein Aufruf, alle nötigen Versions-Schritte werden angewendet.
                     data = migrateSave(data);
+                    resetRuntimeForLoadedGame();
 
                     const playerPos = camera.position;
                     playerPos.set(data.pos.x, data.pos.y, data.pos.z);
@@ -243,12 +343,13 @@
                     }
                     
                     collectedWool = data.collectedWool || 0;
+                    lastBloodMoonRewardDay = typeof data.lastBloodMoonRewardDay === 'number' ? data.lastBloodMoonRewardDay : -1;
                     updateInventoryUI();
                     updateUI();
                     
                     {
                         world.modifiedBlocks = data.modifiedBlocks || {};
-                        world.blockMeta = data.blockMeta || {};
+                        world.setBlockMetaData(data.blockMeta || {});
                         world.chestContents = data.chestContents || {};
                         world.lootedChests = new Set(data.lootedChests || []);
 
@@ -257,7 +358,7 @@
                             weatherSystem.deserialize(data.weather);
                             weatherSystem.loadFireBlocks(data.fireBlocks || {});
                         }
-                        if (data.villages) world.villages = data.villages;
+                        world.villages = Array.isArray(data.villages) ? data.villages : [];
 
                         // Tier 3: NPCs wiederherstellen
                         // Bestehende NPCs entfernen
@@ -276,15 +377,11 @@
                             }
                         }
 
-                        world.chunks.forEach(c => {
-                            if (c.mesh) scene.remove(c.mesh);
-                            if (c.waterMesh) scene.remove(c.waterMesh);
-                        });
-                        world.chunks.clear();
+                        world.disposeAllChunks({ reuseBuffers: true });
                         updateVisibleChunksIfNeeded(playerPos, true);
                     }
                 })
-                .catch(err => alert("Netzwerkfehler beim Laden!"));
+                .catch(err => alert("Fehler beim Laden: " + (err && err.message ? err.message : err)));
         };
 
 
@@ -298,6 +395,11 @@
             stats: document.getElementById('stats'),
             gameOver: document.getElementById('game-over')
         };
+        const UI_UPDATE_INTERVAL_MS = 100;
+        const STATS_UPDATE_INTERVAL_MS = 250;
+        let lastUiUpdateAt = 0;
+        let lastStatsUpdateAt = 0;
+        let lastStatsText = '';
 
         // --- SKY-COLOR CACHE (statt 8x new THREE.Color pro Frame) ---
         const SKY = {
@@ -316,6 +418,45 @@
             underwaterColor: new THREE.Color(0x003060)
         };
         const BLOOD_MOON_INTERVAL = CONFIG.GAMEPLAY.BLOOD_MOON_INTERVAL || 3;
+
+        function grantBloodMoonReward(dayCount) {
+            if (BLOOD_MOON_INTERVAL <= 0) return;
+            if (dayCount % BLOOD_MOON_INTERVAL !== BLOOD_MOON_INTERVAL - 1) return;
+            if (lastBloodMoonRewardDay === dayCount) return;
+            if (!window.player || window.player.health <= 0) return;
+
+            lastBloodMoonRewardDay = dayCount;
+            addItemToInventory(61, 1);
+            addItemToInventory(60, 4);
+            addItemToInventory(31, 2);
+            showSaveMessage('Blutmond ueberlebt: +1 Eisenbarren, +4 Kohle, +2 Knochen', '#FFD700');
+        }
+
+        window.trySleepInBed = function() {
+            const dayRatio = getDayRatio(time, DAY_DURATION);
+            const dayCount = Math.floor(time / DAY_DURATION);
+            const isBloodMoonNight = dayCount % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1);
+            const playerPos = controls.getObject().position;
+            const hostileNearby = mobs.some(m => (
+                !m.isDead &&
+                (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'spider' || m.type === 'geist') &&
+                m.group.position.distanceTo(playerPos) < 12
+            ));
+            const blockReason = getSleepBlockReason(dayRatio, isBloodMoonNight, hostileNearby);
+
+            if (blockReason === 'day') return { ok: false, message: 'Du kannst nur nachts schlafen.' };
+            if (blockReason === 'bloodMoon') return { ok: false, message: 'Der Blutmond laesst dich nicht schlafen.' };
+            if (blockReason === 'hostile') return { ok: false, message: 'Monster sind zu nah.' };
+
+            time = getWakeTime(time, DAY_DURATION);
+            mobs.forEach(m => {
+                if (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'spider' || m.type === 'geist') m.isDead = true;
+            });
+            window.player.health = Math.min(MAX_HEALTH, window.player.health + 10);
+            window.player.hunger = Math.max(0, window.player.hunger - 5);
+            updateUI();
+            return { ok: true, message: 'Gut geschlafen. Es ist Morgen.' };
+        };
 
         // ============================================================
         // Damage-Feedback (Sprint 5)
@@ -523,12 +664,12 @@
                 // Chunk-Meshes neu aufbauen — alte BufferGeometries sind nach Context-Loss ungültig.
                 if (window.world && window.world.chunks) {
                     for (const chunk of window.world.chunks.values()) {
-                        chunk.mesh = null;
-                        chunk.waterMesh = null;
+                        window.world.disposeChunkMeshes(chunk);
                         window.world.requestMesh(chunk.cx, chunk.cz);
                     }
                 }
             }, false);
+            document.addEventListener('pointerdown', relockControlsFromPointer, true);
 
             window.player = new Player(scene, camera, document.body, CONFIG);
             controls = window.player.controls;
@@ -674,8 +815,9 @@
                 // Wenn ein Textfeld fokussiert ist, keine Spielsteuerung auslösen
                 const tag = document.activeElement?.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+                if (isGameplayKey(e) && e.cancelable) e.preventDefault();
 
-                if (e.code === 'Escape') {
+                if (e.code === 'Tab') {
                     const furnaceOverlay = document.getElementById('furnace-overlay');
                     const chestOverlay = document.getElementById('chest-overlay');
                     const tradeOverlay = document.getElementById('trade-overlay');
@@ -686,6 +828,19 @@
                     if (manuallyPaused) window.resumeGame(); else window.pauseGame();
                     return;
                 }
+
+                if (e.code === 'Escape') {
+                    const furnaceOverlay = document.getElementById('furnace-overlay');
+                    const chestOverlay = document.getElementById('chest-overlay');
+                    const tradeOverlay = document.getElementById('trade-overlay');
+                    if (isInventoryOpened()) { toggleInventory(gameStarted, spawning, controls); return; }
+                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
+                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
+                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
+                    return;
+                }
+
+                relockControlsFromInput(e);
 
                 if (e.code === 'KeyE') {
                     // Ofen/Truhe/Handel zuerst schließen
@@ -723,16 +878,27 @@
         }
 
 
-        function updateUI() {
-            DOM.healthFill.style.width = Math.max(0, window.player.health) + '%';
-            DOM.hungerFill.style.width = Math.max(0, window.player.hunger) + '%';
-            const tm = Math.floor((time / DAY_DURATION) * 1440), hh = Math.floor(tm / 60) % 24, mm = tm % 60, dd = Math.floor(time / DAY_DURATION) + 1;
-            const dayRatioUI = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
-            const dayCountUI = Math.floor(time / DAY_DURATION);
-            const isBloodMoonUI = dayCountUI % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1);
-            const bloodMoonWarning = isBloodMoonUI && dayRatioUI > 0.65 && dayRatioUI <= 0.80 ? ' | \u{1F534} Blutmond!' : '';
-            const bloodMoonActive = isBloodMoonUI && (dayRatioUI > 0.80 || dayRatioUI < 0.20) ? ' | \u{1F7E5} BLUTMOND' : '';
-            DOM.timeInfo.innerText = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}${bloodMoonWarning}${bloodMoonActive}`;
+        function updateStatsHud(now, playerPos, biome, weatherIcon) {
+            const text = `Pos: ${Math.floor(playerPos.x)}, ${Math.floor(playerPos.y)}, ${Math.floor(playerPos.z)} | Biom: ${biome}${weatherIcon}`;
+            if (text === lastStatsText && now - lastStatsUpdateAt < STATS_UPDATE_INTERVAL_MS) return;
+            lastStatsText = text;
+            lastStatsUpdateAt = now;
+            DOM.stats.textContent = text;
+        }
+
+        function updateUI(force = true, now = performance.now()) {
+            if (force || now - lastUiUpdateAt >= UI_UPDATE_INTERVAL_MS) {
+                lastUiUpdateAt = now;
+                DOM.healthFill.style.width = Math.max(0, window.player.health) + '%';
+                DOM.hungerFill.style.width = Math.max(0, window.player.hunger) + '%';
+                const tm = Math.floor((time / DAY_DURATION) * 1440), hh = Math.floor(tm / 60) % 24, mm = tm % 60, dd = Math.floor(time / DAY_DURATION) + 1;
+                const dayRatioUI = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
+                const dayCountUI = Math.floor(time / DAY_DURATION);
+                const isBloodMoonUI = dayCountUI % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1);
+                const bloodMoonWarning = isBloodMoonUI && dayRatioUI > 0.65 && dayRatioUI <= 0.80 ? ' | \u{1F534} Blutmond!' : '';
+                const bloodMoonActive = isBloodMoonUI && (dayRatioUI > 0.80 || dayRatioUI < 0.20) ? ' | \u{1F7E5} BLUTMOND' : '';
+                DOM.timeInfo.textContent = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}${bloodMoonWarning}${bloodMoonActive}`;
+            }
             if (window.player.health <= 0 && gameActive && !spawning) {
                 gameActive = false;
                 controls.unlock();
@@ -752,8 +918,7 @@
             const list = document.getElementById('game-over-save-list');
             if (!section || !list) return;
             list.innerHTML = '';
-            fetch(apiUrl('api/saves'))
-                .then(r => r.json())
+            listAllSaveNames()
                 .then(names => {
                     if (!Array.isArray(names) || names.length === 0) {
                         section.style.display = 'none';
@@ -858,15 +1023,18 @@
                 else if (ws === 'thunderstorm') weatherIcon = ' | ⛈️ Gewitter';
                 else if (ws === 'snow') weatherIcon = ' | 🌨️ Schnee';
             }
-            DOM.stats.innerText = `Pos: ${Math.floor(playerPos.x)}, ${Math.floor(playerPos.y)}, ${Math.floor(playerPos.z)} | Biom: ${bAt}${weatherIcon}`;
-            updateUI();
+            updateStatsHud(now, playerPos, bAt, weatherIcon);
+            updateUI(false, now);
 
             // 4. SIMULATION (Nur wenn nicht pausiert)
             // Fix: Während spawning=true pausieren wir niemals automatisch
             // Touch-Mode kennt keinen PointerLock — touchActive zählt als "im Spiel aktiv".
             const isPaused = !gameStarted || manuallyPaused || (!spawning && isBlockingOverlayOpen());
             if (!isPaused) {
+                const previousDayCount = Math.floor(time / DAY_DURATION);
                 time += delta;
+                const currentDayCount = Math.floor(time / DAY_DURATION);
+                if (currentDayCount > previousDayCount) grantBloodMoonReward(previousDayCount);
 
                 // Tier 3: Wetter-System Update
                 if (weatherSystem) {
@@ -1013,41 +1181,32 @@
                     const SPAWNER_RANGE = CONFIG.DUNGEON.SPAWNER_RANGE;
                     const px = Math.floor(playerPos.x), py = Math.floor(playerPos.y), pz = Math.floor(playerPos.z);
                     
-                    // Scan für Spawner-Blöcke in Reichweite
-                    for (let dx = -SPAWNER_RANGE; dx <= SPAWNER_RANGE; dx += 4) {
-                        for (let dz = -SPAWNER_RANGE; dz <= SPAWNER_RANGE; dz += 4) {
-                            for (let dy = -SPAWNER_RANGE; dy <= SPAWNER_RANGE; dy += 4) {
-                                const sx = px + dx, sy = py + dy, sz = pz + dz;
-                                if (sy < 1 || sy >= 63) continue;
-                                const block = world.getBlock(sx, sy, sz);
-                                if (block !== 83) continue; // Nicht SPAWNER
-                                
-                                const sKey = `${sx},${sy},${sz}`;
-                                if (!world.spawnerMeta[sKey]) {
-                                    world.spawnerMeta[sKey] = { lastSpawn: 0, mobCount: 0 };
-                                }
-                                const meta = world.spawnerMeta[sKey];
-                                const now = performance.now() / 1000;
-                                const interval = CONFIG.DUNGEON.SPAWNER_INTERVAL_MIN + 
-                                    Math.random() * (CONFIG.DUNGEON.SPAWNER_INTERVAL_MAX - CONFIG.DUNGEON.SPAWNER_INTERVAL_MIN);
-                                
-                                if (now - meta.lastSpawn > interval && meta.mobCount < CONFIG.DUNGEON.SPAWNER_MAX_MOBS) {
-                                    // Spawn-Position: zufällig um den Spawner herum (innerhalb des Dungeons)
-                                    const spX = sx + (Math.random() - 0.5) * 4;
-                                    const spZ = sz + (Math.random() - 0.5) * 4;
-                                    const spY = sy + 1;
-                                    
-                                    // Luft über dem Spawn-Punkt prüfen
-                                    if (world.getBlock(Math.floor(spX), spY, Math.floor(spZ)) === 0 &&
-                                        world.getBlock(Math.floor(spX), spY + 1, Math.floor(spZ)) === 0) {
-                                        const mobType = Math.random() < 0.6 ? 'zombie' : 'skeleton';
-                                        const newMob = new Mob(scene, mobType, spX, spY, spZ);
-                                        newMob._spawnerKey = sKey; // Spawner-Referenz für Zähler
-                                        mobs.push(newMob);
-                                        meta.lastSpawn = now;
-                                        meta.mobCount++;
-                                    }
-                                }
+                    const now = performance.now() / 1000;
+                    const nearbySpawners = findSpawnerBlocksInRange(world, px, py, pz, SPAWNER_RANGE);
+                    for (const spawner of nearbySpawners) {
+                        const sx = spawner.x, sy = spawner.y, sz = spawner.z;
+                        const sKey = spawner.key;
+                        if (!world.spawnerMeta[sKey]) {
+                            world.spawnerMeta[sKey] = { lastSpawn: now - CONFIG.DUNGEON.SPAWNER_INTERVAL_MAX, mobCount: 0 };
+                        }
+                        const meta = world.spawnerMeta[sKey];
+                        const interval = CONFIG.DUNGEON.SPAWNER_INTERVAL_MIN +
+                            Math.random() * (CONFIG.DUNGEON.SPAWNER_INTERVAL_MAX - CONFIG.DUNGEON.SPAWNER_INTERVAL_MIN);
+
+                        if (now - meta.lastSpawn > interval && meta.mobCount < CONFIG.DUNGEON.SPAWNER_MAX_MOBS) {
+                            // Spawn-Position: zufällig um den Spawner herum (innerhalb des Dungeons)
+                            const spX = sx + (Math.random() - 0.5) * 4;
+                            const spZ = sz + (Math.random() - 0.5) * 4;
+                            const spY = sy + 1;
+
+                            // Luft über dem Spawn-Punkt prüfen
+                            if (canSpawnerSpawnAt(world, spX, spY, spZ)) {
+                                const mobType = 'spider';
+                                const newMob = new Mob(scene, mobType, spX, spY, spZ);
+                                newMob._spawnerKey = sKey; // Spawner-Referenz für Zähler
+                                mobs.push(newMob);
+                                meta.lastSpawn = now;
+                                meta.mobCount++;
                             }
                         }
                     }
@@ -1167,8 +1326,7 @@
             setStatus(startList, 'Lade...', '#aaa');
             setStatus(pauseList, 'Lade...', '#aaa');
 
-            fetch(apiUrl('api/saves'))
-                .then(res => res.json())
+            listAllSaveNames()
                 .then(saves => {
                     if (startList) startList.textContent = '';
                     if (pauseList) pauseList.textContent = '';
@@ -1185,8 +1343,8 @@
                     });
                 })
                 .catch(err => {
-                    setStatus(startList, 'Speicherstaende nur im Server-Modus', '#aaa');
-                    setStatus(pauseList, 'Speicherstaende nur im Server-Modus', '#aaa');
+                    setStatus(startList, 'Speicherstaende nicht lesbar', '#aaa');
+                    setStatus(pauseList, 'Speicherstaende nicht lesbar', '#aaa');
                 });
         };
 
@@ -1204,6 +1362,7 @@
                 inventory: inventorySlots,
                 collectedEggs: collectedEggs,
                 collectedWool: collectedWool,
+                lastBloodMoonRewardDay: lastBloodMoonRewardDay,
                 modifiedBlocks: world.modifiedBlocks,
                 blockMeta: world.blockMeta,
                 chestContents: world.chestContents,
@@ -1215,24 +1374,73 @@
                 npcs: npcs.filter(n => !n.isDead).map(n => n.serialize())
             });
             
-            fetch(apiUrl('api/save'), {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, gameData })
-            })
-            .then(res => res.json())
-            .then(res => {
-                if (res.success) {
+            if (!isValidSaveName(name)) {
+                alert("Ungueltiger Name. Erlaubt sind Buchstaben, Zahlen, Leerzeichen, _ und -.");
+                return;
+            }
+
+            saveBrowserSave(name, gameData)
+                .then(() => {
                     currentSaveName = name;
-                    const msg = document.getElementById('save-msg');
-                    msg.style.display = 'block';
-                    setTimeout(() => msg.style.display = 'none', 3000);
+                    showSaveMessage('Spiel gespeichert!');
                     window.loadGamesList();
-                } else {
-                    alert("Fehler beim Speichern auf dem Server: " + res.error);
+                })
+                .catch(err => alert("Fehler beim Speichern: " + (err && err.message ? err.message : err)));
+        };
+
+        window.exportSaveGame = function() {
+            const inputName = document.getElementById('save-input').value.trim();
+            const name = inputName || currentSaveName;
+            if (!name) {
+                alert("Bitte erst einen Spielstand speichern oder einen Namen eingeben.");
+                return;
+            }
+            loadSaveData(name)
+                .then(gameData => {
+                    const blob = new Blob([serializeSaveFile(name, gameData)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = `${name}.json`;
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    URL.revokeObjectURL(url);
+                })
+                .catch(err => alert("Fehler beim Export: " + (err && err.message ? err.message : err)));
+        };
+
+        window.importSaveGame = function() {
+            const input = document.getElementById('save-import-input');
+            if (!input) return;
+            input.value = '';
+            input.click();
+        };
+
+        window.handleSaveImport = function(input) {
+            const file = input && input.files && input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = () => {
+                try {
+                    const raw = JSON.parse(reader.result);
+                    const save = normalizeImportedSave(raw, file.name);
+                    saveBrowserSave(save.name, save.gameData)
+                        .then(() => {
+                            currentSaveName = save.name;
+                            const nameInput = document.getElementById('save-input');
+                            if (nameInput) nameInput.value = save.name;
+                            showSaveMessage('Spielstand importiert!');
+                            window.loadGamesList();
+                        })
+                        .catch(err => alert("Fehler beim Import: " + (err && err.message ? err.message : err)));
+                } catch (err) {
+                    alert("Fehler beim Import: Ungueltige JSON-Datei.");
                 }
-            })
-            .catch(err => alert("Fehler beim Speichern: Server nicht erreichbar?"));
+            };
+            reader.onerror = () => alert("Fehler beim Import: Datei konnte nicht gelesen werden.");
+            reader.readAsText(file);
         };
 
         window.loadGamesList(); // Initial laden

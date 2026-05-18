@@ -238,12 +238,12 @@ export class PlayerInteraction {
                     const partnerType = this.world.getBlock(bx, partnerY, bz);
                     if (brokenType === 33 && partnerType === 34) {
                         this.world.setBlock(bx, by + 1, bz, 0);
-                        delete this.world.blockMeta[`${bx},${by + 1},${bz}`];
+                        this.world.deleteBlockMeta(bx, by + 1, bz);
                     } else if (brokenType === 34 && partnerType === 33) {
                         this.world.setBlock(bx, by - 1, bz, 0);
-                        delete this.world.blockMeta[`${bx},${by - 1},${bz}`];
+                        this.world.deleteBlockMeta(bx, by - 1, bz);
                     }
-                    delete this.world.blockMeta[`${bx},${by},${bz}`];
+                    this.world.deleteBlockMeta(bx, by, bz);
                     this.context.addItemToInventory(33, 1);
                 // BETT abbauen
                 } else if (brokenType === 38 || brokenType === 39) {
@@ -304,6 +304,11 @@ export class PlayerInteraction {
                 } else if (brokenType === 83) {
                     const spawnerKey = `${bx},${by},${bz}`;
                     delete this.world.spawnerMeta[spawnerKey];
+                    if (Array.isArray(this.mobs)) {
+                        for (const mob of this.mobs) {
+                            if (mob && mob._spawnerKey === spawnerKey) mob.isDead = true;
+                        }
+                    }
                     this.context.addItemToInventory(85, 2); // 2x Cobblestone
                     this.showMessage('Spawner zerstört! 💀', '#8B0000', 20);
                 // FEUER: Feuer löschen, kein Drop
@@ -324,6 +329,16 @@ export class PlayerInteraction {
                 p.add(h.face.normal.clone().multiplyScalar(-0.5));
                 const harvestX = Math.floor(p.x), harvestY = Math.floor(p.y), harvestZ = Math.floor(p.z);
                 const harvestBlock = this.world.getBlock(harvestX, harvestY, harvestZ);
+
+                if (harvestBlock === 38 || harvestBlock === 39) {
+                    if (typeof window.trySleepInBed === 'function') {
+                        const result = window.trySleepInBed();
+                        if (result && result.message) {
+                            this.showMessage(result.message, result.ok ? '#ffe066' : '#ff9800', 20);
+                        }
+                    }
+                    return;
+                }
 
                 // OFEN: Rechtsklick öffnet Ofen-UI
                 if (harvestBlock === 59) {
@@ -396,9 +411,9 @@ export class PlayerInteraction {
 
                     if (this.world.getBlock(px, py + 1, pz) === 0) {
                         this.world.setBlock(px, py, pz, 33);
-                        this.world.blockMeta[`${px},${py},${pz}`] = rotation;
+                        this.world.setBlockMeta(px, py, pz, rotation);
                         this.world.setBlock(px, py + 1, pz, 34);
-                        this.world.blockMeta[`${px},${py + 1},${pz}`] = rotation;
+                        this.world.setBlockMeta(px, py + 1, pz, rotation);
                         currentItem.count--;
                     } else {
                         this.showMessage("Kein Platz für die Tür!", "#ff9800", 20);

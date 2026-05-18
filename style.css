@@ -530,6 +530,7 @@ body {
             padding-top: 20px;
             border-top: 1px solid rgba(255,255,255,0.2);
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             justify-content: center;
         }
@@ -887,6 +888,11 @@ body { user-select: none; -webkit-user-select: none; }
     border-color: rgba(255, 215, 0, 0.2);
 }
 
+.quest-row {
+    background: rgba(255, 215, 0, 0.08);
+    border-color: rgba(255, 215, 0, 0.28);
+}
+
 .trade-item {
     display: flex;
     align-items: center;
@@ -933,6 +939,18 @@ body { user-select: none; -webkit-user-select: none; }
 .trade-btn:hover {
     background: #66bb6a;
     transform: scale(1.05);
+}
+
+.trade-btn:disabled {
+    background: #666;
+    color: #cfcfcf;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.trade-btn:disabled:hover {
+    background: #666;
+    transform: none;
 }
 
 .trade-btn:active {

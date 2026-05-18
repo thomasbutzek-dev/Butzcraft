@@ -14,6 +14,23 @@ import { isTouchDevice } from './touch.js?v=20260507b';
 
 const _dummy = new THREE.Object3D();
 const _color = new THREE.Color();
+const PRECIPITATION_PASSTHROUGH_IDS = new Set([0, 4, 8]);
+
+export function blocksPrecipitation(blockType) {
+    return blockType > 0 && !PRECIPITATION_PASSTHROUGH_IDS.has(blockType);
+}
+
+export function findPrecipitationImpactY(world, x, fromY, toY, z) {
+    if (!world || typeof world.getBlock !== 'function') return null;
+    const bx = Math.floor(x);
+    const bz = Math.floor(z);
+    const startY = Math.floor(Math.max(fromY, toY));
+    const endY = Math.floor(Math.min(fromY, toY));
+    for (let y = startY; y >= endY; y--) {
+        if (blocksPrecipitation(world.getBlock(bx, y, bz))) return y;
+    }
+    return null;
+}
 
 export class ParticleSystem {
     /**
@@ -21,9 +38,10 @@ export class ParticleSystem {
      * @param {'rain'|'snow'} type
      * @param {number} maxCount — Desktop-Partikelzahl (Mobile = ×0.5)
      */
-    constructor(scene, type, maxCount) {
+    constructor(scene, type, maxCount, world = null) {
         this.scene = scene;
         this.type = type;
+        this.world = world;
         const mobile = isTouchDevice();
         this.count = mobile ? Math.floor(maxCount * 0.5) : maxCount;
         this.spawnRadius = 20;  // Partikel-Radius um Spieler
@@ -88,10 +106,7 @@ export class ParticleSystem {
                 // Überschüssige Partikel deaktivieren
                 if (p.alive) {
                     p.alive = false;
-                    _dummy.position.set(0, -1000, 0);
-                    _dummy.scale.set(0, 0, 0);
-                    _dummy.updateMatrix();
-                    this.mesh.setMatrixAt(i, _dummy.matrix);
+                    this._hideParticle(i, p);
                 }
                 continue;
             }
@@ -115,9 +130,15 @@ export class ParticleSystem {
             }
 
             // Bewegen
+            const prevY = p.y;
             p.x += p.vx * delta;
             p.y += p.vy * delta;
             p.z += p.vz * delta;
+
+            if (findPrecipitationImpactY(this.world, p.x, prevY, p.y, p.z) !== null) {
+                this._hideParticle(i, p);
+                continue;
+            }
 
             // Schneeflocken: leichtes Driften
             if (this.type === 'snow') {
@@ -133,10 +154,7 @@ export class ParticleSystem {
             const dz = p.z - playerPos.z;
             if (dy < -20 || Math.abs(dx) > r + 5 || Math.abs(dz) > r + 5) {
                 p.alive = false;
-                _dummy.position.set(0, -1000, 0);
-                _dummy.scale.set(0, 0, 0);
-                _dummy.updateMatrix();
-                this.mesh.setMatrixAt(i, _dummy.matrix);
+                this._hideParticle(i, p);
                 continue;
             }
 
@@ -154,6 +172,14 @@ export class ParticleSystem {
         }
 
         this.mesh.instanceMatrix.needsUpdate = true;
+    }
+
+    _hideParticle(index, particle) {
+        particle.alive = false;
+        _dummy.position.set(0, -1000, 0);
+        _dummy.scale.set(0, 0, 0);
+        _dummy.updateMatrix();
+        this.mesh.setMatrixAt(index, _dummy.matrix);
     }
 
     /**

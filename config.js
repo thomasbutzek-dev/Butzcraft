@@ -47,6 +47,9 @@ export const CONFIG = {
         ZOMBIE_DETECTION_RANGE: 20,
         ZOMBIE_SPEED: 1.5,
         ZOMBIE_DAMAGE: 8,           // Schaden pro Sekunde bei Kontakt
+        SPIDER_DETECTION_RANGE: 12,
+        SPIDER_SPEED: 1.2,
+        SPIDER_DAMAGE: 2,           // Kleiner Dungeon-Einstieg: wenig Schaden pro Sekunde
         WANDER_SPEED: 1.0,
         MOB_JUMP_FORCE: 5,
         CHICKEN_EGG_TIME_MIN: 15000, // ms
@@ -115,8 +118,8 @@ export const CONFIG = {
     // Dungeon-System (Tier 3)
     DUNGEON: {
         SPAWN_CHANCE: 0.05,     // 5% Chance pro Chunk
-        Y_MIN: 8,               // Mindest-Y-Level für Dungeon
-        Y_MAX: 18,              // Max-Y-Level für Dungeon
+        Y_MIN: 18,              // Sicherheits-Untergrenze; echte Tiefe liegt ca. 10-14 Bloecke unter der Oberflaeche
+        Y_MAX: 30,              // Orientierung fuer flachere Dungeon-Generation
         SPAWNER_RANGE: 16,      // Aktivierungs-Radius um Spawner
         SPAWNER_INTERVAL_MIN: 15, // Min. Spawn-Intervall (Sekunden)
         SPAWNER_INTERVAL_MAX: 25, // Max. Spawn-Intervall

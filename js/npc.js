@@ -27,6 +27,7 @@ const NPC_PROFESSIONS = [
         name: 'Schmied',
         color: 0x555555,
         apronColor: 0x8B4513,
+        quest: { give: { type: 60, count: 12 }, receive: { type: 61, count: 2 } },
         trades: [
             { give: { type: 60, count: 10 }, receive: { type: 61, count: 1 } },  // 10 Kohle → 1 Eisen-Barren
             { give: { type: 57, count: 5 },  receive: { type: 65, count: 1 } },  // 5 Eisen-Erz → 1 Eisen-Spitzhacke
@@ -37,6 +38,7 @@ const NPC_PROFESSIONS = [
         name: 'Bauer',
         color: 0x8B6914,
         apronColor: 0x228B22,
+        quest: { give: { type: 51, count: 12 }, receive: { type: 88, count: 3 } },
         trades: [
             { give: { type: 51, count: 8 },  receive: { type: 22, count: 2 } },  // 8 Beeren → 2 Fleisch
             { give: { type: 5, count: 10 },  receive: { type: 26, count: 20 } }, // 10 Holz → 20 Planken
@@ -47,6 +49,7 @@ const NPC_PROFESSIONS = [
         name: 'Händler',
         color: 0x4169E1,
         apronColor: 0xFFD700,
+        quest: { give: { type: 62, count: 2 }, receive: { type: 65, count: 1 } },
         trades: [
             { give: { type: 62, count: 1 },  receive: { type: 19, count: 8 } },  // 1 Gold-Barren → 8 Wolle
             { give: { type: 61, count: 2 },  receive: { type: 32, count: 4 } },  // 2 Eisen-Barren → 4 Fenster
@@ -57,6 +60,7 @@ const NPC_PROFESSIONS = [
         name: 'Bibliothekar',
         color: 0xF5F5DC,
         apronColor: 0x800020,
+        quest: { give: { type: 31, count: 6 }, receive: { type: 82, count: 4 } },
         trades: [
             { give: { type: 26, count: 20 }, receive: { type: 29, count: 10 } }, // 20 Planken → 10 Steinziegel
             { give: { type: 31, count: 5 },  receive: { type: 82, count: 3 } },  // 5 Knochen → 3 Gravierter Sandstein

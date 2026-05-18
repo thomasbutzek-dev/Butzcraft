@@ -4,7 +4,7 @@ echo Starte Butzcraft-Server (Node.js)...
 echo.
 
 :: Pruefe ob Port 3000 schon belegt ist (typischer Crash-Grund)
-netstat -ano | findstr :3000 | findstr LISTENING > nul
+powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" > nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     echo [WARNUNG] Port 3000 ist bereits belegt!
     echo Vermutlich laeuft schon ein Server. Ich oeffne nur den Browser.
@@ -26,7 +26,7 @@ echo Warte auf Server-Start...
 set RETRIES=0
 :WAIT_LOOP
 timeout /t 1 /nobreak > nul
-netstat -ano | findstr :3000 | findstr LISTENING > nul
+powershell -NoProfile -Command "if (Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue) { exit 0 } else { exit 1 }" > nul 2>&1
 if %ERRORLEVEL% EQU 0 goto SERVER_READY
 if exist server.log (
     findstr "127.0.0.1" server.log > nul 2>&1

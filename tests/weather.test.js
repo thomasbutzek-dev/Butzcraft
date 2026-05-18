@@ -82,6 +82,40 @@ describe('WeatherSystem transitions', () => {
         expect(weather.rainCyclesWithoutStorm).toBe(0);
     });
 
+    it('schedules the first thunderstorm lightning promptly', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0);
+        const weather = createWeather();
+
+        weather.state = 'rain';
+        weather._transitionState(BIOMES.PLAINS);
+
+        expect(weather.getState()).toBe('thunderstorm');
+        expect(weather.lightningTimer).toBeGreaterThanOrEqual(0.5);
+        expect(weather.lightningTimer).toBeLessThan(3);
+    });
+
+    it('adds and clears a visible lightning bolt', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        const added = [];
+        const removed = [];
+        const scene = {
+            add: (obj) => added.push(obj),
+            remove: (obj) => removed.push(obj)
+        };
+        const weather = new WeatherSystem(scene, { fireBlocks: new Map() });
+
+        weather._showLightningBolt(1, 20, 2);
+
+        expect(added).toHaveLength(1);
+        expect(weather.lightningBolt).toBe(added[0]);
+        expect(weather.lightningVisualTimer).toBeGreaterThan(0);
+
+        weather.update(0.3, { x: 0, y: 0, z: 0 }, BIOMES.PLAINS);
+
+        expect(removed).toContain(added[0]);
+        expect(weather.lightningBolt).toBeNull();
+    });
+
     it('persists rainy cycles without thunderstorms', () => {
         const weather = createWeather();
         weather.rainCyclesWithoutStorm = 2;

@@ -89,33 +89,15 @@ function renderFurnaceUI() {
 }
 
 function handleFurnaceSlotClick(slotId) {
-    const inv = window.inventorySlots;
-    const selIdx = window.getSelectedSlot ? window.getSelectedSlot() : 0;
-    const hand = inv && inv[selIdx];
-
     if (slotId === 'furnace-input-slot') {
-        if (hand && hand.count > 0 && SMELT_RECIPES[hand.type]) {
-            if (furnaceInput.type === hand.type && furnaceInput.count < 64) {
-                furnaceInput.count++; hand.count--;
-            } else if (furnaceInput.count === 0) {
-                furnaceInput = { type: hand.type, count: 1 }; hand.count--;
-            }
-            if (hand.count <= 0) hand.type = 0;
-            if (window.updateInventoryUI) window.updateInventoryUI();
-        } else if (furnaceInput.count > 0) {
+        if (!moveOneFromInventoryToFurnace(furnaceInput, type => SMELT_RECIPES[type])) {
+            if (furnaceInput.count <= 0) return;
             if (window.addItemToInventory) window.addItemToInventory(furnaceInput.type, furnaceInput.count);
             furnaceInput = { type: 0, count: 0 };
         }
     } else if (slotId === 'furnace-fuel-slot') {
-        if (hand && hand.count > 0 && FUEL_ITEMS.has(hand.type)) {
-            if (furnaceFuel.type === hand.type && furnaceFuel.count < 64) {
-                furnaceFuel.count++; hand.count--;
-            } else if (furnaceFuel.count === 0) {
-                furnaceFuel = { type: hand.type, count: 1 }; hand.count--;
-            }
-            if (hand.count <= 0) hand.type = 0;
-            if (window.updateInventoryUI) window.updateInventoryUI();
-        } else if (furnaceFuel.count > 0) {
+        if (!moveOneFromInventoryToFurnace(furnaceFuel, type => FUEL_ITEMS.has(type))) {
+            if (furnaceFuel.count <= 0) return;
             if (window.addItemToInventory) window.addItemToInventory(furnaceFuel.type, furnaceFuel.count);
             furnaceFuel = { type: 0, count: 0 };
         }
@@ -127,6 +109,39 @@ function handleFurnaceSlotClick(slotId) {
         }
     }
     renderFurnaceUI();
+}
+
+function moveOneFromInventoryToFurnace(targetSlot, acceptsType) {
+    if (!targetSlot || targetSlot.count >= 64) return false;
+
+    const source = findFurnaceSourceSlot(targetSlot, acceptsType);
+    if (!source) return false;
+
+    if (targetSlot.count === 0) targetSlot.type = source.type;
+    targetSlot.count++;
+    source.count--;
+    if (source.count <= 0) {
+        source.type = 0;
+        source.count = 0;
+    }
+    if (window.updateInventoryUI) window.updateInventoryUI();
+    return true;
+}
+
+function findFurnaceSourceSlot(targetSlot, acceptsType) {
+    const inv = window.inventorySlots;
+    if (!inv) return null;
+
+    const canUse = (slot) => {
+        if (!slot || slot.count <= 0 || !acceptsType(slot.type)) return false;
+        return targetSlot.count === 0 || targetSlot.type === slot.type;
+    };
+
+    const selIdx = window.getSelectedSlot ? window.getSelectedSlot() : 0;
+    if (canUse(inv[selIdx])) return inv[selIdx];
+
+    if (targetSlot.count === 0) return inv.find(canUse) || null;
+    return null;
 }
 
 // Tick-Funktion — wird jeden Frame aus dem Game-Loop aufgerufen
