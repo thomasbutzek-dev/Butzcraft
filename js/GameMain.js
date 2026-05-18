@@ -675,7 +675,8 @@
                 const tag = document.activeElement?.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
 
-                if (e.code === 'Escape') {
+                if (e.code === 'Tab') {
+                    if (e.cancelable) e.preventDefault();
                     const furnaceOverlay = document.getElementById('furnace-overlay');
                     const chestOverlay = document.getElementById('chest-overlay');
                     const tradeOverlay = document.getElementById('trade-overlay');
@@ -684,6 +685,17 @@
                     if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
                     if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
                     if (manuallyPaused) window.resumeGame(); else window.pauseGame();
+                    return;
+                }
+
+                if (e.code === 'Escape') {
+                    const furnaceOverlay = document.getElementById('furnace-overlay');
+                    const chestOverlay = document.getElementById('chest-overlay');
+                    const tradeOverlay = document.getElementById('trade-overlay');
+                    if (isInventoryOpened()) { if (e.cancelable) e.preventDefault(); toggleInventory(gameStarted, spawning, controls); return; }
+                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { if (e.cancelable) e.preventDefault(); window.closeFurnace && window.closeFurnace(); return; }
+                    if (chestOverlay && chestOverlay.style.display !== 'none') { if (e.cancelable) e.preventDefault(); window.closeChest && window.closeChest(); return; }
+                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { if (e.cancelable) e.preventDefault(); closeTradeUI(controls); return; }
                     return;
                 }
 
