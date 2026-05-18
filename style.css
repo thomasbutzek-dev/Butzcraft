@@ -63,6 +63,7 @@ body {
             width: 100%;
             display: flex;
             justify-content: space-between;
+            align-items: flex-start;
             padding: 10px;
             box-sizing: border-box;
             z-index: 200;
@@ -89,6 +90,16 @@ body {
             font-size: 12px;
         }
 
+        #fps-counter {
+            background: rgba(0, 0, 0, 0.4);
+            padding: 5px 8px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #7CFF7A;
+            margin-top: 4px;
+        }
+
         #time-info {
             background: rgba(0, 0, 0, 0.4);
             padding: 8px;
@@ -96,6 +107,7 @@ body {
             font-family: monospace;
             font-size: 12px;
             text-align: right;
+            align-self: flex-start;
         }
 
         #bottom-ui {
@@ -995,6 +1007,7 @@ html.touch-device body {
     }
 
     #stats,
+    #fps-counter,
     #time-info {
         max-width: 46vw;
         font-size: 10px;

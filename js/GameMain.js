@@ -393,13 +393,17 @@
             hungerFill: document.getElementById('hunger-fill'),
             timeInfo: document.getElementById('time-info'),
             stats: document.getElementById('stats'),
+            fpsCounter: document.getElementById('fps-counter'),
             gameOver: document.getElementById('game-over')
         };
         const UI_UPDATE_INTERVAL_MS = 100;
         const STATS_UPDATE_INTERVAL_MS = 250;
+        const FPS_UPDATE_INTERVAL_MS = 500;
         let lastUiUpdateAt = 0;
         let lastStatsUpdateAt = 0;
         let lastStatsText = '';
+        let fpsFrameCount = 0;
+        let fpsWindowStartedAt = performance.now();
 
         // --- SKY-COLOR CACHE (statt 8x new THREE.Color pro Frame) ---
         const SKY = {
@@ -886,6 +890,16 @@
             DOM.stats.textContent = text;
         }
 
+        function updateFpsCounter(now) {
+            fpsFrameCount++;
+            const elapsed = now - fpsWindowStartedAt;
+            if (elapsed < FPS_UPDATE_INTERVAL_MS) return;
+            const fps = Math.round((fpsFrameCount * 1000) / elapsed);
+            DOM.fpsCounter.textContent = `FPS: ${fps}`;
+            fpsFrameCount = 0;
+            fpsWindowStartedAt = now;
+        }
+
         function updateUI(force = true, now = performance.now()) {
             if (force || now - lastUiUpdateAt >= UI_UPDATE_INTERVAL_MS) {
                 lastUiUpdateAt = now;
@@ -946,6 +960,7 @@
             // damit nach Restore kein riesiger delta-Spike entsteht (würde Wall-Phasing auslösen).
             if (window.webglContextLost) { prevTime = performance.now(); return; }
             const now = performance.now();
+            updateFpsCounter(now);
             const delta = Math.min((now - prevTime) / 1000, 0.02);
             prevTime = now;
 
