@@ -177,10 +177,106 @@
             if (inst) inst.style.display = 'none';
         }
 
+        const CONTROLS_HINT_HIDE_MS = 8500;
+        const FIRST_OBJECTIVE_TYPES = new Set([
+            BLOCK_TYPES.WOOD,
+            BLOCK_TYPES.JUNGLE_WOOD,
+            BLOCK_TYPES.PALM_WOOD,
+            BLOCK_TYPES.PLANKS,
+            BLOCK_TYPES.WORKBENCH
+        ]);
+        let controlsHintTimer = null;
+        let controlsHintShownForRun = false;
+        let firstObjectiveDoneForRun = false;
+
+        function getControlsHintText() {
+            if (shouldUseTouchMode() || window.innerWidth <= 760) {
+                return 'Linker Daumen bewegt · rechts umsehen · tippen abbauen · Buttons bauen, springen, Inventar, Pause';
+            }
+            return 'WASD bewegen · Maus umsehen · Linksklick abbauen · Rechtsklick bauen · E Inventar';
+        }
+
+        function hideControlsHint() {
+            const hint = document.getElementById('controls-hint');
+            if (!hint) return;
+            hint.classList.remove('visible');
+            hint.setAttribute('aria-hidden', 'true');
+            if (controlsHintTimer) {
+                clearTimeout(controlsHintTimer);
+                controlsHintTimer = null;
+            }
+        }
+
+        function showControlsHint() {
+            const hint = document.getElementById('controls-hint');
+            const text = document.getElementById('controls-hint-text');
+            if (!hint || !text) return;
+            text.textContent = getControlsHintText();
+            hint.setAttribute('aria-hidden', 'false');
+            hint.classList.add('visible');
+            if (controlsHintTimer) clearTimeout(controlsHintTimer);
+            controlsHintTimer = setTimeout(() => {
+                hideControlsHint();
+                updateFirstObjective();
+            }, CONTROLS_HINT_HIDE_MS);
+        }
+
+        function playerHasFirstObjectiveItem() {
+            return inventorySlots.some(slot => slot && slot.count > 0 && FIRST_OBJECTIVE_TYPES.has(slot.type));
+        }
+
+        function hideFirstObjective() {
+            const el = document.getElementById('first-objective');
+            if (!el) return;
+            el.classList.remove('visible');
+            el.setAttribute('aria-hidden', 'true');
+        }
+
+        function showFirstObjective() {
+            const el = document.getElementById('first-objective');
+            if (!el) return;
+            el.classList.add('visible');
+            el.setAttribute('aria-hidden', 'false');
+        }
+
+        function updateFirstObjective() {
+            if (firstObjectiveDoneForRun) {
+                hideFirstObjective();
+                return;
+            }
+            if (playerHasFirstObjectiveItem()) {
+                firstObjectiveDoneForRun = true;
+                hideFirstObjective();
+                return;
+            }
+            const controlsHint = document.getElementById('controls-hint');
+            const controlsHintVisible = controlsHint && controlsHint.classList.contains('visible');
+            if (!gameStarted || spawning || manuallyPaused || isBlockingOverlayOpen() || controlsHintVisible) {
+                hideFirstObjective();
+                return;
+            }
+            showFirstObjective();
+        }
+
+        function resetControlsHintForRun() {
+            controlsHintShownForRun = false;
+            firstObjectiveDoneForRun = playerHasFirstObjectiveItem();
+            hideControlsHint();
+            hideFirstObjective();
+        }
+
+        function showControlsHintOnceReady() {
+            if (controlsHintShownForRun || !gameStarted || spawning || manuallyPaused || isBlockingOverlayOpen()) return;
+            controlsHintShownForRun = true;
+            showControlsHint();
+        }
+
         window.pauseGame = function() {
             if (!gameStarted || spawning || isBlockingOverlayOpen()) return;
             manuallyPaused = true;
             if (controls?.isLocked) controls.unlock();
+            hideControlsHint();
+            hideFirstObjective();
             showPauseMenu();
         };
 
@@ -313,6 +409,7 @@
             lockControlsForDesktop();
             hidePauseMenu();
             gameStarted = true;
+            resetControlsHintForRun();
             window.__butzcraftStartRequested = false;
             console.log("DEBUG: startNewGame finished, gameStarted set to true");
         };
@@ -329,6 +426,7 @@
                     document.getElementById('start-menu').style.display = 'none';
                     lockControlsForDesktop();
                     gameStarted = true;
+                    resetControlsHintForRun();
                     currentSaveName = name;
                     document.getElementById('save-input').value = name;
 
@@ -412,6 +510,21 @@
         let lastStatsText = '';
         let fpsFrameCount = 0;
         let fpsWindowStartedAt = performance.now();
+        let debugHudVisible = false;
+
+        function setDebugHudVisible(visible) {
+            debugHudVisible = Boolean(visible);
+            DOM.stats.classList.toggle('debug-visible', debugHudVisible);
+            DOM.fpsCounter.classList.toggle('debug-visible', debugHudVisible);
+            DOM.stats.setAttribute('aria-hidden', debugHudVisible ? 'false' : 'true');
+            DOM.fpsCounter.setAttribute('aria-hidden', debugHudVisible ? 'false' : 'true');
+        }
+
+        function toggleDebugHud() {
+            setDebugHudVisible(!debugHudVisible);
+        }
+
+        setDebugHudVisible(false);
 
         // --- SKY-COLOR CACHE (statt 8x new THREE.Color pro Frame) ---
         const SKY = {
@@ -848,6 +961,11 @@
                 // Wenn ein Textfeld fokussiert ist, keine Spielsteuerung auslösen
                 const tag = document.activeElement?.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+                if (e.code === 'F3') {
+                    if (e.cancelable) e.preventDefault();
+                    toggleDebugHud();
+                    return;
+                }
                 if (isGameplayKey(e) && e.cancelable) e.preventDefault();
 
                 if (e.code === 'Tab') {
@@ -950,6 +1068,7 @@
             if (window.player.health <= 0 && gameActive && !spawning) {
                 gameActive = false;
                 controls.unlock();
+                hideFirstObjective();
                 DOM.gameOver.style.display = 'flex';
                 // Sprint 6: Death-Overlay um "Spielstand laden"-Liste erweitern.
                 // Lädt asynchron — User muss nicht warten, falls die Server-Liste leer ist.
@@ -1074,6 +1193,7 @@
             }
             updateStatsHud(now, playerPos, bAt, weatherIcon);
             updateUI(false, now);
+            updateFirstObjective();
 
             // 4. SIMULATION (Nur wenn nicht pausiert)
             // Fix: Während spawning=true pausieren wir niemals automatisch
@@ -1105,6 +1225,7 @@
                         }
                     }
                 }
+                showControlsHintOnceReady();
 
                 // Wrapped onDamage: appliziert Schaden UND triggert Feedback (Flash + Pain-Sound + Shake).
                 // _lastPainAt verhindert Sound-Spam bei kontinuierlichem Zombie-Damage (≤ 1 Sound/300ms).

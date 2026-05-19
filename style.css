@@ -88,6 +88,7 @@ body {
             border-radius: 4px;
             font-family: monospace;
             font-size: 12px;
+            display: none;
         }
 
         #fps-counter {
@@ -98,6 +99,12 @@ body {
             font-size: 12px;
             color: #7CFF7A;
             margin-top: 4px;
+            display: none;
+        }
+
+        #stats.debug-visible,
+        #fps-counter.debug-visible {
+            display: block;
         }
 
         #time-info {
@@ -403,6 +410,16 @@ body {
             z-index: 1000 !important;
         }
 
+        @media (prefers-reduced-motion: reduce) {
+            #controls-hint {
+                transition: none;
+            }
+
+            #first-objective {
+                transition: none;
+            }
+        }
+
         #instructions h1 {
             margin-top: 0;
             margin-bottom: 0.5rem;
@@ -410,6 +427,79 @@ body {
             letter-spacing: 4px;
             text-transform: uppercase;
             color: #ffeb3b;
+        }
+
+        #controls-hint {
+            position: fixed;
+            top: 72px;
+            left: 50%;
+            transform: translate(-50%, -8px);
+            width: min(520px, calc(100vw - 32px));
+            padding: 10px 14px;
+            box-sizing: border-box;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.62);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            color: #fff;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            z-index: 900;
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+
+        #controls-hint.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 0);
+        }
+
+        .controls-hint-title {
+            color: #ffe066;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 4px;
+            text-transform: uppercase;
+        }
+
+        #controls-hint-text {
+            font-size: 13px;
+            line-height: 1.35;
+        }
+
+        #first-objective {
+            position: fixed;
+            top: 124px;
+            left: 50%;
+            transform: translate(-50%, -6px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(0, 0, 0, 0.58);
+            border: 1px solid rgba(255, 224, 102, 0.35);
+            color: #fff;
+            font-size: 13px;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            z-index: 890;
+            transition: opacity 0.22s ease, transform 0.22s ease;
+        }
+
+        #first-objective.visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, 0);
+        }
+
+        #first-objective span {
+            color: #ffe066;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
         }
 
         .pause-save-list {
@@ -812,8 +902,8 @@ body { user-select: none; -webkit-user-select: none; }
 
 /* ===== MOBILE / TOUCH RESPONSIVE ===== */
 
-/* ESC-Hinweis nur auf Geräten ohne Maus sinnlos */
-@media (pointer: coarse) {
+/* ESC-Hinweis nur auf Geraeten ohne Maus oder mit engem Layout sinnlos */
+@media (pointer: coarse), (max-width: 760px) {
     #esc-hint { display: none !important; }
 }
 
@@ -1161,6 +1251,27 @@ html.touch-device body {
         line-height: 1.4;
     }
 
+    #controls-hint {
+        top: 84px;
+        width: min(360px, calc(100vw - 24px));
+        padding: 9px 12px;
+    }
+
+    .controls-hint-title {
+        font-size: 11px;
+    }
+
+    #controls-hint-text {
+        font-size: 12px;
+    }
+
+    #first-objective {
+        top: 138px;
+        max-width: calc(100vw - 24px);
+        box-sizing: border-box;
+        font-size: 12px;
+    }
+
     #save-section {
         flex-wrap: wrap;
         gap: 8px;
@@ -1213,7 +1324,7 @@ html.touch-device body {
     #bottom-ui {
         position: fixed;
         left: 50%;
-        bottom: calc(clamp(264px, 32svh, 300px) + env(safe-area-inset-bottom));
+        bottom: calc(clamp(150px, 18svh, 176px) + env(safe-area-inset-bottom));
         transform: translateX(-50%);
         width: min(92vw, 336px);
         margin-bottom: 0;

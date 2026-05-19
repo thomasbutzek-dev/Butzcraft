@@ -3,6 +3,7 @@ import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
 import { openFurnace } from './furnace.js?v=20260507b';
 import { createBlockHTML, getItemName } from './inventory.js?v=20260507b';
+import { BLOCK_COLORS } from './blocks.js?v=20260507b';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
@@ -36,6 +37,63 @@ export class PlayerInteraction {
         this.context = context; 
         
         this.raycaster = new THREE.Raycaster();
+    }
+
+    spawnBlockBreakParticles(x, y, z, blockType, normal) {
+        const color = BLOCK_COLORS[blockType] || 0xaaaaaa;
+        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 });
+        const geometry = new THREE.BoxGeometry(0.09, 0.09, 0.09);
+        const particles = [];
+        const baseNormal = normal ? normal.clone() : new THREE.Vector3(0, 1, 0);
+
+        for (let i = 0; i < 10; i++) {
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.position.set(
+                x + 0.5 + (Math.random() - 0.5) * 0.55,
+                y + 0.5 + (Math.random() - 0.5) * 0.55,
+                z + 0.5 + (Math.random() - 0.5) * 0.55
+            );
+            this.scene.add(mesh);
+            particles.push({
+                mesh,
+                velocity: baseNormal.clone().multiplyScalar(1.6 + Math.random() * 1.4).add(new THREE.Vector3(
+                    (Math.random() - 0.5) * 2.2,
+                    Math.random() * 1.6,
+                    (Math.random() - 0.5) * 2.2
+                ))
+            });
+        }
+
+        const startedAt = performance.now();
+        const lifetimeMs = 360;
+        let lastAt = startedAt;
+        const tick = (now) => {
+            const delta = Math.min((now - lastAt) / 1000, 0.04);
+            lastAt = now;
+            const age = now - startedAt;
+            const alpha = Math.max(0, 1 - age / lifetimeMs);
+            material.opacity = alpha * 0.9;
+
+            for (const particle of particles) {
+                particle.velocity.y -= 5.5 * delta;
+                particle.mesh.position.addScaledVector(particle.velocity, delta);
+                particle.mesh.rotation.x += delta * 8;
+                particle.mesh.rotation.y += delta * 6;
+                const scale = 0.65 + alpha * 0.35;
+                particle.mesh.scale.setScalar(scale);
+            }
+
+            if (age < lifetimeMs) {
+                requestAnimationFrame(tick);
+                return;
+            }
+
+            for (const particle of particles) this.scene.remove(particle.mesh);
+            geometry.dispose();
+            material.dispose();
+        };
+
+        requestAnimationFrame(tick);
     }
 
     init(controls, getGameActive, getSpawning) {
@@ -209,6 +267,7 @@ export class PlayerInteraction {
 
                 this.world.setBlock(bx, by, bz, isNextToWater ? 4 : 0);
                 this.SoundManager.playDig(brokenType);
+                this.spawnBlockBreakParticles(bx, by, bz, brokenType, h.face.normal);
 
                 // Werkzeug-Haltbarkeit reduzieren
                 const toolInfo = getToolInfo(currentItem ? currentItem.type : 0);
