@@ -129,6 +129,9 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 });
                 this.queuedChunks = new Set();
                 this.chunkPool = [];
+                this.viewCenterX = null;
+                this.viewCenterZ = null;
+                this.viewRenderDistance = CONFIG.WORLD.RENDER_DIST;
                 // Race-Fix: Wenn ein Re-Mesh angefordert wird während einer pending ist,
                 // merken wir uns das hier. Nach Abschluss des aktuellen Meshings wird
                 // automatisch ein erneutes angestoßen — sonst bleibt z.B. ein Chunk
@@ -148,6 +151,11 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                         const { cx, cz, data, epoch } = msg;
                         if (epoch !== undefined && epoch !== this.meshEpoch) return;
                         this.queuedChunks.delete(this.getChunkKey(cx, cz));
+
+                        if (!this.isChunkInsideActiveView(cx, cz, 1)) {
+                            if (data) this.chunkPool.push(data);
+                            return;
+                        }
                         
                         // Modified Blocks anwenden
                         for (const key in this.modifiedBlocks) {
@@ -388,6 +396,12 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 }
             }
 
+            isChunkInsideActiveView(cx, cz, margin = 0) {
+                if (this.viewCenterX === null || this.viewCenterZ === null) return true;
+                const rd = this.viewRenderDistance + margin;
+                return Math.abs(cx - this.viewCenterX) <= rd && Math.abs(cz - this.viewCenterZ) <= rd;
+            }
+
             // Fordert ein Mesh-Update beim Worker an (mit Nachbar-Chunk-Daten)
             requestMesh(cx, cz) {
                 const key = this.getChunkKey(cx, cz);
@@ -502,6 +516,9 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 // Live-Read aus CONFIG: ermöglicht Render-Distance-Setting zur Laufzeit.
                 const RD = CONFIG.WORLD.RENDER_DIST;
                 const pcx = Math.floor(pX / CHUNK_SIZE), pcz = Math.floor(pZ / CHUNK_SIZE);
+                this.viewCenterX = pcx;
+                this.viewCenterZ = pcz;
+                this.viewRenderDistance = RD;
                 for (let x = pcx - RD; x <= pcx + RD; x++) {
                     for (let z = pcz - RD; z <= pcz + RD; z++) this.generateChunk(x, z);
                 }

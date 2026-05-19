@@ -269,6 +269,14 @@
             _lastVisibleRenderDist = rd;
         }
 
+        function getRenderDistanceFogDensity() {
+            return THREE.MathUtils.clamp(0.06 / Math.max(1, CONFIG.WORLD.RENDER_DIST), 0.005, 0.035);
+        }
+
+        function applyRenderDistanceVisuals() {
+            if (scene?.fog && !window.player?.inWater) scene.fog.density = getRenderDistanceFogDensity();
+        }
+
         function disposeDroppedItem(item) {
             if (!item || !item.mesh) return;
             scene.remove(item.mesh);
@@ -545,7 +553,7 @@
             // Nebel für weicheren Horizont und SkyDome für Rendering wie in Visualisierung
             const fogColor = new THREE.Color(0x87ceeb);
             scene.background = fogColor;
-            scene.fog = new THREE.FogExp2(fogColor, 0.015);
+            scene.fog = new THREE.FogExp2(fogColor, getRenderDistanceFogDensity());
             
             // --- HIMMEL-GRADIENT ---
             const vertexShader = `
@@ -632,7 +640,9 @@
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
             renderer.domElement.id = 'game-canvas';
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            const DEFAULT_RENDER_SCALE = 1;
+            let renderScale = DEFAULT_RENDER_SCALE;
+            renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
@@ -773,29 +783,48 @@
 
             // --- Render Distance Setting (persistiert in localStorage) ---
             const RD_STORAGE_KEY = 'butzcraft.renderDistance';
+            const RS_STORAGE_KEY = 'butzcraft.renderScale';
             const RD_ALLOWED = [2, 4, 6, 8, 12];
+            const RS_ALLOWED = [0.5, 0.75, 1];
             const applyRenderDistance = (value) => {
                 const n = parseInt(value, 10);
                 if (!RD_ALLOWED.includes(n)) return;
                 CONFIG.WORLD.RENDER_DIST = n;
                 try { localStorage.setItem(RD_STORAGE_KEY, String(n)); } catch (e) { /* QuotaExceeded etc. ignorieren */ }
+                applyRenderDistanceVisuals();
                 // Sofort wirksam machen, wenn Spieler bereits in der Welt ist
                 if (window.player && window.player.controls) {
                     const p = window.player.controls.getObject().position;
                     updateVisibleChunksIfNeeded(p, true);
                 }
             };
+            const applyRenderScale = (value) => {
+                const n = parseFloat(value);
+                if (!RS_ALLOWED.includes(n)) return;
+                renderScale = n;
+                renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                try { localStorage.setItem(RS_STORAGE_KEY, String(n)); } catch (e) { /* QuotaExceeded etc. ignorieren */ }
+            };
             window.applyRenderDistance = applyRenderDistance;
+            window.applyRenderScale = applyRenderScale;
             // Initial-Apply: aus localStorage laden, falls vorhanden
             try {
                 const stored = localStorage.getItem(RD_STORAGE_KEY);
                 if (stored) applyRenderDistance(stored);
+                const storedScale = localStorage.getItem(RS_STORAGE_KEY);
+                if (storedScale) applyRenderScale(storedScale);
             } catch (e) { /* Storage disabled (Privacy-Mode) */ }
             // UI-Verdrahtung
             const rdSelect = document.getElementById('render-distance-select');
             if (rdSelect) {
                 rdSelect.value = String(CONFIG.WORLD.RENDER_DIST);
                 rdSelect.addEventListener('change', (e) => applyRenderDistance(e.target.value));
+            }
+            const rsSelect = document.getElementById('render-scale-select');
+            if (rsSelect) {
+                rsSelect.value = String(renderScale);
+                rsSelect.addEventListener('change', (e) => applyRenderScale(e.target.value));
             }
 
             window.playerInteraction = new PlayerInteraction(camera, scene, world, mobs, SoundManager, {
@@ -866,7 +895,12 @@
             });
             document.addEventListener('keyup', e => {
             });
-            window.addEventListener('resize', () => { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); });
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
             window.camera = camera;
             window.controls = controls;
             window.world = world;
@@ -1020,7 +1054,7 @@
                     // Sky-Farbe mit Wetter-Verdunkelung
                     const wH = SKY.weatherColor.copy(SKY.hColor).multiplyScalar(weatherSkyMult);
                     scene.background = wH;
-                    if (scene.fog) { scene.fog.color.copy(wH); scene.fog.density = 0.015 + weatherFogExtra; }
+                    if (scene.fog) { scene.fog.color.copy(wH); scene.fog.density = getRenderDistanceFogDensity() + weatherFogExtra; }
                 }
                 if (skyUniforms) {
                     skyUniforms.bottomColor.value.copy(SKY.hColor).multiplyScalar(weatherSkyMult);
