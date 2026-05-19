@@ -562,12 +562,15 @@ export class PlayerInteraction {
                     slot.title = getItemName(item.type);
                     slot.style.cursor = 'pointer';
                     slot.onclick = () => {
-                        this.context.addItemToInventory(item.type, item.count);
+                        const currentItem = contents[i];
+                        if (!currentItem || currentItem.count <= 0) return;
+                        this.context.addItemToInventory(currentItem.type, currentItem.count);
                         contents[i] = { type: 0, count: 0 };
                         this.world.chestContents[key] = contents;
                         slot.innerHTML = '';
                         slot.title = '';
                         slot.style.cursor = '';
+                        slot.onclick = null;
                         this.context.updateInventoryUI();
                     };
                 }

@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Butzcraft Charakter-Editor</title>
+    <link rel="stylesheet" href="character-editor.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/node_modules/three/build/three.module.js",
+                "three/addons/": "/node_modules/three/examples/jsm/"
+            }
+        }
+    </script>
+</head>
+
+<body>
+    <main class="editor-shell">
+        <section class="preview-panel" aria-label="Charakter-Vorschau">
+            <div id="character-preview"></div>
+            <div class="preview-actions">
+                <button id="randomize-button" type="button" title="Zufälliger Look">↻</button>
+                <button id="reset-button" type="button" title="Zurücksetzen">×</button>
+            </div>
+        </section>
+
+        <section class="controls-panel" aria-label="Charakter-Einstellungen">
+            <header>
+                <img src="logo.png" alt="Butzcraft" class="editor-logo">
+                <h1>Charakter-Editor</h1>
+            </header>
+
+            <form id="character-form">
+                <label>
+                    Name
+                    <input id="display-name" name="displayName" type="text" maxlength="20" autocomplete="off">
+                </label>
+
+                <fieldset>
+                    <legend>Geschlecht</legend>
+                    <div class="segmented two">
+                        <label class="identity-option male"><input type="radio" name="gender" value="male"> Männlich</label>
+                        <label class="identity-option female"><input type="radio" name="gender" value="female"> Weiblich</label>
+                    </div>
+                </fieldset>
+
+                <fieldset>
+                    <legend>Körper</legend>
+                    <div class="segmented">
+                        <label><input type="radio" name="bodyType" value="classic"> Klassisch</label>
+                        <label><input type="radio" name="bodyType" value="slim"> Schmal</label>
+                        <label><input type="radio" name="bodyType" value="sturdy"> Kräftig</label>
+                    </div>
+                </fieldset>
+
+                <fieldset class="color-grid">
+                    <legend>Farben</legend>
+                    <label>Haut <input type="color" name="skin" value="#c98f64"></label>
+                    <label>Haare <input type="color" name="hair" value="#2f2219"></label>
+                    <label>Augen <input type="color" name="eyes" value="#4aa3df"></label>
+                    <label>Shirt <input type="color" name="shirt" value="#3f8f5f"></label>
+                    <label>Hose <input type="color" name="pants" value="#2f5f9f"></label>
+                    <label>Schuhe <input type="color" name="boots" value="#2b2420"></label>
+                    <label>Akzent <input type="color" name="accent" value="#d4a94f"></label>
+                </fieldset>
+
+                <div class="select-row">
+                    <label>
+                        Haare
+                        <select name="hairStyle">
+                            <option value="short">Kurz</option>
+                            <option value="flat">Flach</option>
+                            <option value="mohawk">Iro</option>
+                            <option value="curly">Lockig</option>
+                            <option value="long">Lang</option>
+                            <option value="ponytail">Zopf</option>
+                            <option value="cap">Kappe</option>
+                            <option value="none">Keine</option>
+                        </select>
+                    </label>
+                    <label>
+                        Extra
+                        <select name="accessory">
+                            <option value="none">Keins</option>
+                            <option value="cape">Cape</option>
+                            <option value="pack">Rucksack</option>
+                            <option value="scarf">Schal</option>
+                            <option value="goggles">Brille</option>
+                        </select>
+                    </label>
+                </div>
+
+                <fieldset class="select-grid">
+                    <legend>Texturen</legend>
+                    <label>
+                        Hautdetails
+                        <select name="skinDetail">
+                            <option value="soft">Weich</option>
+                            <option value="freckles">Sommersprossen</option>
+                            <option value="scar">Narbe</option>
+                            <option value="sunmark">Sonnenmal</option>
+                        </select>
+                    </label>
+                    <label>
+                        Material
+                        <select name="fabric">
+                            <option value="plain">Glatt</option>
+                            <option value="woven">Gewebt</option>
+                            <option value="leather">Leder</option>
+                            <option value="iron">Eisen</option>
+                        </select>
+                    </label>
+                    <label>
+                        Muster
+                        <select name="outfitPattern">
+                            <option value="none">Keins</option>
+                            <option value="trim">Kanten</option>
+                            <option value="stripes">Streifen</option>
+                            <option value="checker">Karo</option>
+                            <option value="panel">Paneele</option>
+                        </select>
+                    </label>
+                </fieldset>
+            </form>
+
+            <div class="profile-actions">
+                <button id="save-button" type="button">Speichern</button>
+                <button id="export-button" type="button">Export</button>
+                <label class="import-button">
+                    Import
+                    <input id="import-file" type="file" accept="application/json,.json">
+                </label>
+            </div>
+
+            <details class="profile-json-panel">
+                <summary>Profil JSON</summary>
+                <textarea id="profile-json" spellcheck="false" aria-label="Charakterprofil JSON"></textarea>
+            </details>
+            <p id="status-line" role="status"></p>
+        </section>
+    </main>
+
+    <script type="module" src="js/characterEditor.js"></script>
+</body>
+
+</html>

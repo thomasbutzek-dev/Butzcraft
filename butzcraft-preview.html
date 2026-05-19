@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="de">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Butzcraft - Vorschau, Guide & Charakter-Editor</title>
+    <link rel="stylesheet" href="butzcraft-preview.css">
+    <link rel="icon" type="image/png" href="favicon.png">
+</head>
+
+<body>
+    <header class="hero" id="start">
+        <nav class="top-nav" aria-label="Hauptnavigation">
+            <a href="#start" class="brand"><img src="logo.png" alt="Butzcraft"></a>
+            <div class="nav-links">
+                <a href="#clips">Ausschnitte</a>
+                <a href="#guide">Einstieg</a>
+                <a href="#crafting">Crafting</a>
+                <a href="#editor">Editor</a>
+                <a href="#faq">FAQ</a>
+            </div>
+        </nav>
+
+        <div class="hero-content">
+            <img src="logo.png" alt="BUTZCRAFT" class="hero-logo">
+            <p class="hero-kicker">Survival, Crafting, Dungeons und Dorfbewohner in einer blockigen 3D-Welt.</p>
+            <div class="hero-actions">
+                <a class="primary-action" href="index.html">Spiel starten</a>
+                <a class="secondary-action" href="#editor">Charakter testen</a>
+            </div>
+        </div>
+    </header>
+
+    <main>
+        <section class="section intro-band" aria-labelledby="intro-title">
+            <div class="section-inner intro-grid">
+                <div>
+                    <p class="eyebrow">Einstieg</p>
+                    <h1 id="intro-title">Wach auf, sammle Holz, ueberlebe die Nacht.</h1>
+                    <p>
+                        Butzcraft startet direkt in einer offenen Welt. Du sammelst Ressourcen, baust Werkzeuge,
+                        erkundest Biome, handelst mit Dorfbewohnern und bereitest dich auf die Nacht vor.
+                    </p>
+                </div>
+                <div class="stat-strip" aria-label="Spielinhalte">
+                    <div><strong>3x3</strong><span>Crafting</span></div>
+                    <div><strong>Tag/Nacht</strong><span>Survival</span></div>
+                    <div><strong>NPCs</strong><span>Handel & Quests</span></div>
+                    <div><strong>Bald</strong><span>Multiplayer</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="clips" aria-labelledby="clips-title">
+            <div class="section-inner">
+                <div class="section-heading">
+                    <p class="eyebrow">Ausschnitte & Filme</p>
+                    <h2 id="clips-title">Kurze Szenen aus der Welt</h2>
+                </div>
+
+                <div class="clip-grid">
+                    <article class="clip-card forest">
+                        <div class="clip-stage" aria-hidden="true">
+                            <span class="sun"></span>
+                            <span class="cloud cloud-a"></span>
+                            <span class="cloud cloud-b"></span>
+                            <span class="player"></span>
+                            <span class="tree tree-a"></span>
+                            <span class="tree tree-b"></span>
+                        </div>
+                        <h3>Start im Wald</h3>
+                        <p>Holz schlagen, Planken herstellen, Werkbank setzen.</p>
+                    </article>
+
+                    <article class="clip-card cave">
+                        <div class="clip-stage" aria-hidden="true">
+                            <span class="torch"></span>
+                            <span class="ore ore-a"></span>
+                            <span class="ore ore-b"></span>
+                            <span class="miner"></span>
+                        </div>
+                        <h3>Abstieg in die Hoehle</h3>
+                        <p>Kohle, Eisen und Gold sammeln, bevor Hunger und Gegner dich ausbremsen.</p>
+                    </article>
+
+                    <article class="clip-card night">
+                        <div class="clip-stage" aria-hidden="true">
+                            <span class="moon"></span>
+                            <span class="mob mob-a"></span>
+                            <span class="mob mob-b"></span>
+                            <span class="shelter"></span>
+                        </div>
+                        <h3>Nacht und Dungeons</h3>
+                        <p>Zombies, Skelette, Spawner und Dunkelheit machen aus Vorbereitung Ueberleben.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section guide-band" id="guide" aria-labelledby="guide-title">
+            <div class="section-inner">
+                <div class="section-heading">
+                    <p class="eyebrow">Tutorial</p>
+                    <h2 id="guide-title">Die ersten zehn Minuten</h2>
+                </div>
+
+                <ol class="steps">
+                    <li><strong>Bewegen:</strong> WASD, mit der Leertaste springen oder im Wasser auftauchen.</li>
+                    <li><strong>Sammeln:</strong> Holz, Stein und Nahrung haben Vorrang.</li>
+                    <li><strong>Inventar:</strong> Mit E oeffnest du Inventar, Crafting, Ofen, Truhen und Handel.</li>
+                    <li><strong>Craften:</strong> Aus Holz werden Planken, aus Planken Stoecke und eine Werkbank.</li>
+                    <li><strong>Absichern:</strong> Baue vor der Nacht ein Bett, eine Tuer oder einen kleinen Unterschlupf.</li>
+                    <li><strong>Erkunden:</strong> Suche Erze, Doerfer, NPCs und Dungeons mit Spawnern.</li>
+                </ol>
+            </div>
+        </section>
+
+        <section class="section" id="crafting" aria-labelledby="crafting-title">
+            <div class="section-inner">
+                <div class="section-heading">
+                    <p class="eyebrow">Crafting-Anleitung</p>
+                    <h2 id="crafting-title">Wichtige Rezepte</h2>
+                </div>
+
+                <div class="recipe-grid">
+                    <article class="recipe-card">
+                        <h3>Grundlagen</h3>
+                        <p>Holz -> 4 Planken</p>
+                        <p>2 Planken -> 4 Stoecke</p>
+                        <p>4 Planken -> Werkbank</p>
+                    </article>
+                    <article class="recipe-card">
+                        <h3>Bauen</h3>
+                        <p>4 Stein -> 4 Steinziegel</p>
+                        <p>4 Sand -> 4 Sandstein</p>
+                        <p>Planken + Eis -> Fenster</p>
+                    </article>
+                    <article class="recipe-card">
+                        <h3>Ueberleben</h3>
+                        <p>Stoecke + Planken -> Tuer</p>
+                        <p>Wolle + Planken -> Bett</p>
+                        <p>8 Stein im Ring -> Ofen</p>
+                    </article>
+                    <article class="recipe-card">
+                        <h3>Werkzeuge</h3>
+                        <p>3 Material + 2 Stoecke -> Spitzhacke</p>
+                        <p>L-Form + Stoecke -> Axt</p>
+                        <p>1 Material + 2 Stoecke -> Schaufel</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section challenge-band" id="challenges" aria-labelledby="challenges-title">
+            <div class="section-inner">
+                <div class="section-heading">
+                    <p class="eyebrow">Herausforderungen</p>
+                    <h2 id="challenges-title">Woran du scheitern kannst</h2>
+                </div>
+
+                <div class="challenge-list">
+                    <article>
+                        <h3>Hunger & Gesundheit</h3>
+                        <p>Nahrung ist nicht Deko. Ohne Vorrat wird Erkunden schnell riskant.</p>
+                    </article>
+                    <article>
+                        <h3>Nachtgegner</h3>
+                        <p>Zombies und Skelette werden nachts gefaehrlich, besonders ohne sicheren Rueckweg.</p>
+                    </article>
+                    <article>
+                        <h3>Hoehlen & Spawner</h3>
+                        <p>Dungeons liefern Beute, aber Spawner halten Druck aufrecht.</p>
+                    </article>
+                    <article>
+                        <h3>Ressourcen-Kette</h3>
+                        <p>Holz, Stein, Kohle, Eisen und Gold bauen aufeinander auf.</p>
+                    </article>
+                    <article>
+                        <h3>NPC-Aufgaben</h3>
+                        <p>Schmied, Bauer, Haendler und Bibliothekar tauschen Waren und belohnen Quests.</p>
+                    </article>
+                    <article>
+                        <h3>Wetter & Biome</h3>
+                        <p>Wasser, Schnee, Wueste und Dschungel veraendern Wege, Sicht und Ressourcen.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="section editor-band" id="editor" aria-labelledby="editor-title">
+            <div class="section-inner editor-layout">
+                <div>
+                    <p class="eyebrow">Vorschau</p>
+                    <h2 id="editor-title">Charakter-Editor testen</h2>
+                    <p>
+                        Probier Name, Koerperform, Farben, Haare, Accessoires und Texturen aus.
+                        Die Vorschau laeuft hier eingebettet, ohne die eigentliche Spielseite zu ersetzen.
+                    </p>
+                    <a class="secondary-action" href="character-editor.html">Editor separat oeffnen</a>
+                </div>
+                <div class="editor-frame-wrap">
+                    <iframe src="character-editor.html" title="Butzcraft Charakter-Editor Vorschau"></iframe>
+                </div>
+            </div>
+        </section>
+
+        <section class="section multiplayer-band" aria-labelledby="multi-title">
+            <div class="section-inner multi-grid">
+                <div>
+                    <p class="eyebrow">Teaser</p>
+                    <h2 id="multi-title">Multiplayer kommt bald</h2>
+                    <p>
+                        Gemeinsame Welten, zusammen bauen, Ressourcen teilen und nachts Ruecken an Ruecken
+                        ueberleben: Der Multiplayer ist als naechster grosser Schritt angekuendigt.
+                    </p>
+                </div>
+                <div class="multi-signal" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span>
+                </div>
+            </div>
+        </section>
+
+        <section class="section" id="faq" aria-labelledby="faq-title">
+            <div class="section-inner">
+                <div class="section-heading">
+                    <p class="eyebrow">FAQ</p>
+                    <h2 id="faq-title">Haeufige Fragen</h2>
+                </div>
+
+                <div class="faq-grid">
+                    <details>
+                        <summary>Wie starte ich Butzcraft lokal?</summary>
+                        <p>Nutze die Startdatei oder oeffne den lokalen Server. Direktes Oeffnen als Datei laedt die Engine nicht sauber.</p>
+                    </details>
+                    <details>
+                        <summary>Wie speichere ich?</summary>
+                        <p>Im Pausenmenue kannst du Spielstaende speichern, laden, exportieren und importieren.</p>
+                    </details>
+                    <details>
+                        <summary>Wie craftet man?</summary>
+                        <p>Oeffne das Inventar mit E, lege Zutaten ins 3x3-Feld und nimm das Ergebnis aus dem Ausgabeslot.</p>
+                    </details>
+                    <details>
+                        <summary>Was ist der beste Start?</summary>
+                        <p>Holz sammeln, Werkbank bauen, Steinwerkzeuge craften, Nahrung sichern und vor der Nacht einen Schutzraum bauen.</p>
+                    </details>
+                    <details>
+                        <summary>Gibt es Handel?</summary>
+                        <p>Ja. In Doerfern findest du NPCs wie Schmied, Bauer, Haendler und Bibliothekar.</p>
+                    </details>
+                    <details>
+                        <summary>Ist Multiplayer schon spielbar?</summary>
+                        <p>Noch nicht. Diese Seite zeigt ihn als Teaser fuer eine kommende Version.</p>
+                    </details>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+
+</html>

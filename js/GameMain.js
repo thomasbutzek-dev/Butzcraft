@@ -178,16 +178,45 @@
         }
 
         const CONTROLS_HINT_HIDE_MS = 8500;
-        const FIRST_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.WOOD,
-            BLOCK_TYPES.JUNGLE_WOOD,
-            BLOCK_TYPES.PALM_WOOD,
-            BLOCK_TYPES.PLANKS,
-            BLOCK_TYPES.WORKBENCH
+        const WOOD_OBJECTIVE_TYPES = new Set([
+            BLOCK_TYPES.WOOD, BLOCK_TYPES.JUNGLE_WOOD, BLOCK_TYPES.PALM_WOOD,
+            BLOCK_TYPES.PLANKS, BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
+            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
+            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
         ]);
+        const PLANK_OBJECTIVE_TYPES = new Set([
+            BLOCK_TYPES.PLANKS, BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
+            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
+            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
+        ]);
+        const STICK_OBJECTIVE_TYPES = new Set([
+            BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
+            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
+            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
+            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
+        ]);
+        const WORKBENCH_OBJECTIVE_TYPES = new Set([
+            BLOCK_TYPES.WORKBENCH,
+            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
+            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
+            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
+        ]);
+        const STONE_OBJECTIVE_TYPES = new Set([
+            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK,
+            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
+            BLOCK_TYPES.FURNACE
+        ]);
+        const MINI_OBJECTIVES = [
+            { label: 'Erstes Ziel', text: 'Sammle Holz', completeTypes: WOOD_OBJECTIVE_TYPES },
+            { label: 'Weiter', text: 'Stelle Holzbretter her', completeTypes: PLANK_OBJECTIVE_TYPES },
+            { label: 'Werkzeugbasis', text: 'Mache Stöcke', completeTypes: STICK_OBJECTIVE_TYPES },
+            { label: 'Arbeitsplatz', text: 'Baue eine Werkbank', completeTypes: WORKBENCH_OBJECTIVE_TYPES },
+            { label: 'Steinzeit', text: 'Sammle Stein', completeTypes: STONE_OBJECTIVE_TYPES },
+            { label: 'Überleben', text: 'Baue einen Ofen', completeTypes: new Set([BLOCK_TYPES.FURNACE]) }
+        ];
         let controlsHintTimer = null;
         let controlsHintShownForRun = false;
-        let firstObjectiveDoneForRun = false;
+        let miniObjectiveIndex = 0;
 
         function getControlsHintText() {
             if (shouldUseTouchMode() || window.innerWidth <= 760) {
@@ -221,8 +250,17 @@
             }, CONTROLS_HINT_HIDE_MS);
         }
 
-        function playerHasFirstObjectiveItem() {
-            return inventorySlots.some(slot => slot && slot.count > 0 && FIRST_OBJECTIVE_TYPES.has(slot.type));
+        function inventoryHasAny(types) {
+            return inventorySlots.some(slot => slot && slot.count > 0 && types.has(slot.type));
+        }
+
+        function advanceMiniObjective() {
+            while (
+                miniObjectiveIndex < MINI_OBJECTIVES.length &&
+                inventoryHasAny(MINI_OBJECTIVES[miniObjectiveIndex].completeTypes)
+            ) {
+                miniObjectiveIndex++;
+            }
         }
 
         function hideFirstObjective() {
@@ -234,18 +272,19 @@
 
         function showFirstObjective() {
             const el = document.getElementById('first-objective');
-            if (!el) return;
+            const label = document.getElementById('first-objective-label');
+            const text = document.getElementById('first-objective-text');
+            const objective = MINI_OBJECTIVES[miniObjectiveIndex];
+            if (!el || !label || !text || !objective) return;
+            label.textContent = objective.label;
+            text.textContent = objective.text;
             el.classList.add('visible');
             el.setAttribute('aria-hidden', 'false');
         }
 
         function updateFirstObjective() {
-            if (firstObjectiveDoneForRun) {
-                hideFirstObjective();
-                return;
-            }
-            if (playerHasFirstObjectiveItem()) {
-                firstObjectiveDoneForRun = true;
+            advanceMiniObjective();
+            if (miniObjectiveIndex >= MINI_OBJECTIVES.length) {
                 hideFirstObjective();
                 return;
             }
@@ -260,7 +299,8 @@
 
         function resetControlsHintForRun() {
             controlsHintShownForRun = false;
-            firstObjectiveDoneForRun = playerHasFirstObjectiveItem();
+            miniObjectiveIndex = 0;
+            advanceMiniObjective();
             hideControlsHint();
             hideFirstObjective();
         }
@@ -1502,7 +1542,7 @@
                     if (pauseList) pauseList.textContent = '';
 
                     if (!saves || saves.length === 0) {
-                        setStatus(startList, 'Keine Speicherstände gefunden!', '#aaa');
+                        setStatus(startList, 'Noch kein Spielstand. Starte eine neue Welt und sichere später deinen Fortschritt.', '#ddd');
                         setStatus(pauseList, 'Keine Speicherstände gefunden!', '#aaa');
                         return;
                     }

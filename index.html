@@ -169,6 +169,10 @@
     <div id="start-menu">
         <div id="start-menu-content">
             <img src="logo.png" alt="BUTZCRAFT" class="logo-img">
+            <div id="start-promise">
+                <span>Dein erster Tag in Butzcraft</span>
+                Sammle Holz, baue deine erste Werkbank und bereite dich auf die Nacht vor.
+            </div>
             <button
                 id="start-button"
                 class="menu-btn"
@@ -177,6 +181,11 @@
                 onpointerdown="if (event.pointerType !== 'mouse') return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
                 onclick="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
             >Neues Spiel starten</button>
+            <div id="start-goals" aria-label="Erste Ziele">
+                <span>Holz sammeln</span>
+                <span>Werkbank bauen</span>
+                <span>Überleben</span>
+            </div>
             <div id="mobile-start-status" style="display:none; color:#ffd966; font-size:13px; text-align:center; min-height:18px;"></div>
             <div id="save-list">
                 <!-- Gespeicherte Spiele werden hier injected -->
@@ -241,8 +250,8 @@
             <div id="controls-hint-text">WASD bewegen · Maus umsehen · Linksklick abbauen · Rechtsklick bauen · E Inventar</div>
         </div>
         <div id="first-objective" role="status" aria-live="polite" aria-hidden="true">
-            <span>Erstes Ziel</span>
-            Sammle Holz
+            <span id="first-objective-label">Erstes Ziel</span>
+            <strong id="first-objective-text">Sammle Holz</strong>
         </div>
         <div id="instructions">
             <img src="logo.png" alt="BUTZCRAFT" style="width: 200px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">

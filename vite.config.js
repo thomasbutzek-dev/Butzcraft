@@ -35,7 +35,11 @@ export default defineConfig({
         outDir: 'dist',
         emptyOutDir: true,
         rollupOptions: {
-            input: 'index.html'
+            input: {
+                main: 'index.html',
+                characterEditor: 'character-editor.html',
+                preview: 'butzcraft-preview.html'
+            }
         }
     },
     optimizeDeps: {
