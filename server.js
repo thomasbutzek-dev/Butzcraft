@@ -141,8 +141,10 @@ app.post('/api/tester/log', (req, res) => {
 });
 
 const distDir = path.join(__dirname, 'dist');
+const soundsDir = path.join(__dirname, 'sounds');
 const isProduction = process.env.NODE_ENV === 'production';
 const hasDistIndex = fs.existsSync(path.join(distDir, 'index.html'));
+const hasSoundsDir = fs.existsSync(soundsDir);
 const staticRoots = [];
 if (isProduction) {
     if (hasDistIndex) staticRoots.push(distDir);
@@ -169,6 +171,10 @@ const staticOptions = {
 staticRoots.forEach(root => {
     app.use(express.static(root, staticOptions));
 });
+
+if (hasSoundsDir) {
+    app.use('/sounds', express.static(soundsDir, staticOptions));
+}
 
 // Weiterleitung von Root auf index.html falls nicht automatisch gefunden
 app.get('/', (req, res) => {
