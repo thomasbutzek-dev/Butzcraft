@@ -105,6 +105,16 @@ describe('matchRecipe – Smoke-Test mit echten Spiel-Rezepten', () => {
         expect(result).toEqual({ type: 26, count: 4 });
     });
 
+    it('Jungle Wood -> Planks funktioniert im 3x3-Inventar-Grid', () => {
+        const result = matchRecipe([13, 0, 0, 0, 0, 0, 0, 0, 0], 3, craftingRecipes);
+        expect(result).toEqual({ type: 26, count: 4 });
+    });
+
+    it('Palm Wood -> Planks funktioniert im 3x3-Inventar-Grid', () => {
+        const result = matchRecipe([15, 0, 0, 0, 0, 0, 0, 0, 0], 3, craftingRecipes);
+        expect(result).toEqual({ type: 26, count: 4 });
+    });
+
     it('4 Planks → 1 Workbench funktioniert', () => {
         const result = matchRecipe([26, 26, 26, 26], 2, craftingRecipes);
         expect(result).toEqual({ type: 28, count: 1 });

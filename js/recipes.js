@@ -17,6 +17,8 @@
 export const craftingRecipes = [
     // Bestehende Rezepte (Legacy-Form, weiterhin gültig):
     { pattern: [5, 0, 0, 0], result: { type: 26, count: 4 } },       // WOOD -> 4x PLANKS (Pattern-Shifting!)
+    { pattern: [13, 0, 0, 0], result: { type: 26, count: 4 } },      // JUNGLE_WOOD -> 4x PLANKS
+    { pattern: [15, 0, 0, 0], result: { type: 26, count: 4 } },      // PALM_WOOD -> 4x PLANKS
     { pattern: [26, 0, 26, 0], result: { type: 27, count: 4 } },     // 2x PLANKS -> 4x STICK
     { pattern: [26, 26, 26, 26], result: { type: 28, count: 1 } },   // 4x PLANKS -> 1x WORKBENCH
     { pattern: [3, 3, 3, 3], result: { type: 29, count: 4 } },       // 4x STONE -> 4x STONE_BRICK
