@@ -470,18 +470,20 @@ body {
 
         #first-objective {
             position: fixed;
-            top: 124px;
+            top: 64px;
             left: 50%;
             transform: translate(-50%, -6px);
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 12px;
+            display: block;
+            width: min(360px, calc(100vw - 32px));
+            box-sizing: border-box;
+            padding: 12px 14px 11px;
             border-radius: 8px;
-            background: rgba(0, 0, 0, 0.58);
-            border: 1px solid rgba(255, 224, 102, 0.35);
+            background: linear-gradient(120deg, rgba(13, 18, 15, 0.92), rgba(23, 31, 24, 0.84));
+            border: 1px solid rgba(255, 224, 102, 0.38);
+            border-left: 4px solid #ffd84d;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
             color: #fff;
-            font-size: 13px;
+            text-align: left;
             pointer-events: none;
             opacity: 0;
             visibility: hidden;
@@ -495,17 +497,64 @@ body {
             transform: translate(-50%, 0);
         }
 
+        #first-objective.complete {
+            border-color: rgba(113, 214, 121, 0.55);
+            border-left-color: #71d679;
+        }
+
+        .first-objective-kicker {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 5px;
+        }
+
         #first-objective span {
             color: #ffe066;
-            font-size: 11px;
+            font-size: 10px;
             font-weight: 700;
             text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+
+        #first-objective.complete span {
+            color: #9be3a0;
         }
 
         #first-objective strong {
-            font-size: 13px;
+            display: block;
+            font-size: 18px;
             font-weight: 700;
-            line-height: 1.2;
+            line-height: 1.25;
+        }
+
+        #first-objective-hint {
+            margin-top: 3px;
+            color: #d8ddd9;
+            font-size: 12px;
+            line-height: 1.35;
+        }
+
+        #first-objective-progress {
+            display: flex;
+            gap: 4px;
+            margin-top: 9px;
+        }
+
+        #first-objective-progress i {
+            display: block;
+            flex: 1;
+            height: 3px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.17);
+        }
+
+        #first-objective-progress i.active {
+            background: #ffd84d;
+        }
+
+        #first-objective.complete #first-objective-progress i.active {
+            background: #71d679;
         }
 
         .pause-save-list {
@@ -1308,16 +1357,17 @@ html.touch-device body {
     }
 
     #first-objective {
-        top: 138px;
-        max-width: calc(100vw - 24px);
-        box-sizing: border-box;
-        font-size: 12px;
-        flex-wrap: wrap;
-        justify-content: center;
+        top: 72px;
+        width: min(340px, calc(100vw - 24px));
+        padding: 10px 12px 9px;
     }
 
     #first-objective strong {
-        font-size: 12px;
+        font-size: 16px;
+    }
+
+    #first-objective-hint {
+        font-size: 11px;
     }
 
     #save-section {

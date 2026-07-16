@@ -26,7 +26,14 @@ describe('onboarding progress', () => {
     it('starts with the first concrete player objective', () => {
         expect(getOnboardingProgress([], 0)).toEqual({
             index: 0,
-            objective: { label: 'Erstes Ziel', text: 'Sammle Holz' }
+            objective: {
+                label: 'Erster Tag',
+                text: 'Sammle Holz',
+                hint: 'Ziele auf einen Baumstamm und halte Linksklick.',
+                touchHint: 'Ziele auf einen Baumstamm und halte Abbauen.',
+                step: 1,
+                total: 7
+            }
         });
     });
 
@@ -35,20 +42,38 @@ describe('onboarding progress', () => {
 
         expect(getOnboardingProgress(inventory, 0)).toEqual({
             index: 4,
-            objective: { label: 'Steinzeit', text: 'Sammle Stein' }
+            objective: expect.objectContaining({
+                text: 'Baue eine Holzspitzhacke',
+                step: 5,
+                total: 7
+            })
         });
     });
 
     it('never regresses below restored save progress', () => {
-        expect(getOnboardingProgress([], 4)).toEqual({
-            index: 4,
-            objective: { label: 'Steinzeit', text: 'Sammle Stein' }
+        expect(getOnboardingProgress([], 5)).toEqual({
+            index: 5,
+            objective: expect.objectContaining({
+                text: 'Sammle Stein',
+                step: 6,
+                total: 7
+            })
+        });
+    });
+
+    it('guides the player from a wooden pickaxe to stone', () => {
+        expect(getOnboardingProgress([{ type: 63, count: 1 }], 0)).toEqual({
+            index: 5,
+            objective: expect.objectContaining({
+                text: 'Sammle Stein',
+                hint: 'Baue graue Steinblöcke mit der Holzspitzhacke ab.'
+            })
         });
     });
 
     it('finishes the onboarding when a furnace is available', () => {
         expect(getOnboardingProgress([{ type: 59, count: 1 }], 0)).toEqual({
-            index: 6,
+            index: 7,
             objective: null
         });
     });

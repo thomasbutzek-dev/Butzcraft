@@ -14,3 +14,17 @@ describe('start menu loading feedback', () => {
         expect(status.getAttribute('aria-atomic')).toBe('true');
     });
 });
+
+describe('first-day objective HUD', () => {
+    it('exposes one atomic objective with seven visible progress steps', () => {
+        const html = readFileSync('index.html', 'utf8');
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        const objective = document.getElementById('first-objective');
+
+        expect(objective.getAttribute('role')).toBe('status');
+        expect(objective.getAttribute('aria-live')).toBe('polite');
+        expect(objective.getAttribute('aria-atomic')).toBe('true');
+        expect(objective.querySelectorAll('#first-objective-progress i')).toHaveLength(7);
+        expect(document.querySelectorAll('#first-objective')).toHaveLength(1);
+    });
+});

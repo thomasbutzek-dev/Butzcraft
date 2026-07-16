@@ -15,7 +15,7 @@
         import { PlayerInteraction } from './PlayerInteraction.js?v=20260716e';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716e';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716d';
-        import { getOnboardingProgress } from './onboarding.js?v=20260716a';
+        import { getOnboardingProgress } from './onboarding.js?v=20260716b';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716d';
         import { WeatherSystem } from './weather.js?v=20260716b';
@@ -250,7 +250,9 @@
         }
 
         const CONTROLS_HINT_HIDE_MS = 8500;
+        const OBJECTIVE_COMPLETION_MS = 1200;
         let controlsHintTimer = null;
+        let objectiveCompletionTimer = null;
         let controlsHintShownForRun = false;
         let miniObjectiveIndex = 0;
         let currentMiniObjective = null;
@@ -288,39 +290,90 @@
         }
 
         function advanceMiniObjective() {
+            const previousIndex = miniObjectiveIndex;
+            const completedObjective = currentMiniObjective;
             const progress = getOnboardingProgress(inventorySlots, miniObjectiveIndex);
             miniObjectiveIndex = progress.index;
             currentMiniObjective = progress.objective;
+            return {
+                advanced: progress.index > previousIndex,
+                completedObjective
+            };
         }
 
         function hideFirstObjective() {
             const el = document.getElementById('first-objective');
             if (!el) return;
-            el.classList.remove('visible');
-            el.setAttribute('aria-hidden', 'true');
+            if (el.classList.contains('visible')) el.classList.remove('visible');
+            if (el.getAttribute('aria-hidden') !== 'true') el.setAttribute('aria-hidden', 'true');
         }
 
         function showFirstObjective() {
             const el = document.getElementById('first-objective');
             const label = document.getElementById('first-objective-label');
+            const step = document.getElementById('first-objective-step');
             const text = document.getElementById('first-objective-text');
+            const hint = document.getElementById('first-objective-hint');
             const objective = currentMiniObjective;
-            if (!el || !label || !text || !objective) return;
-            label.textContent = objective.label;
+            if (!el || !label || !step || !text || !hint || !objective) return;
+            const needsRender = el.dataset.objectiveStep !== String(objective.step) || el.classList.contains('complete');
+            el.classList.remove('complete');
+            if (needsRender) {
+                label.textContent = objective.label;
+                step.textContent = `Schritt ${objective.step} von ${objective.total}`;
+                text.textContent = objective.text;
+                hint.textContent = shouldUseTouchMode() ? objective.touchHint : objective.hint;
+                updateObjectiveProgress(objective.step);
+                el.dataset.objectiveStep = String(objective.step);
+            }
+            if (!el.classList.contains('visible')) el.classList.add('visible');
+            if (el.getAttribute('aria-hidden') !== 'false') el.setAttribute('aria-hidden', 'false');
+        }
+
+        function updateObjectiveProgress(completedSteps) {
+            const segments = document.querySelectorAll('#first-objective-progress i');
+            segments.forEach((segment, index) => {
+                segment.classList.toggle('active', index < completedSteps);
+            });
+        }
+
+        function showObjectiveCompletion(objective) {
+            const el = document.getElementById('first-objective');
+            const label = document.getElementById('first-objective-label');
+            const step = document.getElementById('first-objective-step');
+            const text = document.getElementById('first-objective-text');
+            const hint = document.getElementById('first-objective-hint');
+            if (!el || !label || !step || !text || !hint) return;
+
+            label.textContent = 'Geschafft';
+            step.textContent = `Schritt ${objective.step} von ${objective.total}`;
             text.textContent = objective.text;
-            el.classList.add('visible');
+            hint.textContent = 'Nächstes Ziel kommt gleich.';
+            updateObjectiveProgress(objective.step);
+            el.classList.add('complete', 'visible');
             el.setAttribute('aria-hidden', 'false');
+
+            objectiveCompletionTimer = setTimeout(() => {
+                objectiveCompletionTimer = null;
+                el.classList.remove('complete');
+                updateFirstObjective();
+            }, OBJECTIVE_COMPLETION_MS);
         }
 
         function updateFirstObjective() {
-            advanceMiniObjective();
-            if (!currentMiniObjective) {
-                hideFirstObjective();
-                return;
-            }
+            const { advanced, completedObjective } = advanceMiniObjective();
             const controlsHint = document.getElementById('controls-hint');
             const controlsHintVisible = controlsHint && controlsHint.classList.contains('visible');
             if (!gameStarted || spawning || manuallyPaused || isBlockingOverlayOpen() || controlsHintVisible) {
+                hideFirstObjective();
+                return;
+            }
+            if (objectiveCompletionTimer) return;
+            if (advanced && completedObjective) {
+                showObjectiveCompletion(completedObjective);
+                return;
+            }
+            if (!currentMiniObjective) {
                 hideFirstObjective();
                 return;
             }
@@ -330,6 +383,11 @@
         function resetControlsHintForRun(restoredObjectiveIndex = 0) {
             controlsHintShownForRun = false;
             miniObjectiveIndex = restoredObjectiveIndex;
+            currentMiniObjective = null;
+            if (objectiveCompletionTimer) {
+                clearTimeout(objectiveCompletionTimer);
+                objectiveCompletionTimer = null;
+            }
             advanceMiniObjective();
             hideControlsHint();
             hideFirstObjective();

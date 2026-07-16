@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260511c">
+    <link rel="stylesheet" href="style.css?v=20260716d">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -250,9 +250,16 @@
             <div class="controls-hint-title">Los geht's</div>
             <div id="controls-hint-text">WASD bewegen · Maus umsehen · Linksklick abbauen · Rechtsklick bauen · E Inventar</div>
         </div>
-        <div id="first-objective" role="status" aria-live="polite" aria-hidden="true">
-            <span id="first-objective-label">Erstes Ziel</span>
+        <div id="first-objective" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+            <div class="first-objective-kicker">
+                <span id="first-objective-label">Erster Tag</span>
+                <span id="first-objective-step">Schritt 1 von 7</span>
+            </div>
             <strong id="first-objective-text">Sammle Holz</strong>
+            <div id="first-objective-hint">Suche einen Baum und halte Linksklick.</div>
+            <div id="first-objective-progress" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
         </div>
         <div id="instructions">
             <img src="logo.png" alt="BUTZCRAFT" style="width: 200px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">
@@ -422,7 +429,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260716q"
+        src="./js/GameMain.js?v=20260716r"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>
