@@ -177,6 +177,7 @@
                 id="start-button"
                 class="menu-btn"
                 type="button"
+                aria-describedby="mobile-start-status"
                 ontouchstart="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
                 onpointerdown="if (event.pointerType !== 'mouse') return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
                 onclick="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
@@ -186,7 +187,7 @@
                 <span>Werkbank bauen</span>
                 <span>Überleben</span>
             </div>
-            <div id="mobile-start-status" style="display:none; color:#ffd966; font-size:13px; text-align:center; min-height:18px;"></div>
+            <div id="mobile-start-status" role="status" aria-live="polite" aria-atomic="true" style="display:none; color:#ffd966; font-size:13px; text-align:center; min-height:18px;"></div>
             <div id="save-list">
                 <!-- Gespeicherte Spiele werden hier injected -->
             </div>

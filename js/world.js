@@ -149,8 +149,12 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     // ==============================
                     if (msg.type === 'terrain') {
                         const { cx, cz, data, epoch } = msg;
-                        if (epoch !== undefined && epoch !== this.meshEpoch) return;
                         this.queuedChunks.delete(this.getChunkKey(cx, cz));
+
+                        if (epoch !== undefined && epoch !== this.meshEpoch) {
+                            if (data) this.chunkPool.push(data.buffer);
+                            return;
+                        }
 
                         if (!this.isChunkInsideActiveView(cx, cz, 1)) {
                             if (data) this.chunkPool.push(data.buffer);

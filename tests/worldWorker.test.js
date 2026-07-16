@@ -60,4 +60,27 @@ describe('World worker buffer recycling', () => {
         expect(generation.message.buffer).toBeInstanceOf(ArrayBuffer);
         expect(generation.transfer).toEqual([generation.message.buffer]);
     }, 15000);
+
+    it('reuses the buffer from a stale terrain epoch', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+        const staleData = new Uint8Array(16 * 64 * 16);
+
+        worker.onmessage({
+            data: {
+                type: 'terrain',
+                cx: 0,
+                cz: 0,
+                epoch: world.meshEpoch - 1,
+                data: staleData
+            }
+        });
+        expect(world.chunkPool).toHaveLength(1);
+        expect(world.chunkPool[0]).toBe(staleData.buffer);
+
+        world.generateChunk(0, 0);
+
+        expect(worker.messages.at(-1).message.buffer === staleData.buffer).toBe(true);
+    }, 15000);
 });
