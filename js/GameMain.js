@@ -3,7 +3,7 @@
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
-        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260716a';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260716a';
         import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260511a';
 
         import { Input } from './Input.js?v=20260507b';
@@ -16,6 +16,7 @@
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716a';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716a';
         import { getOnboardingProgress } from './onboarding.js?v=20260716a';
+        import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716a';
         import { WeatherSystem } from './weather.js?v=20260517a';
         import { NPC } from './npc.js?v=20260507b';
@@ -819,19 +820,9 @@
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 1000);
             
-            // Zufälligen Spawn-Punkt über einem Land-Biom ermitteln (mit Garantie, dass Höhe > WATER_LEVEL ist)
-            let spawnX = 0, spawnZ = 0, spawnH = 0;
-            let foundLand = false;
-            while (!foundLand) {
-                spawnX = Math.floor(Math.random() * 2000 - 1000);
-                spawnZ = Math.floor(Math.random() * 2000 - 1000);
-                const h = getHeightAt(spawnX, spawnZ);
-                if (h > WATER_LEVEL) {
-                    spawnH = h;
-                    foundLand = true;
-                }
-            }
-            camera.position.set(spawnX, spawnH + 5, spawnZ); // Näher am Boden spawnen
+            // Grasland bevorzugen, damit neue Spieler mit freier Sicht und Holz in der Nähe starten.
+            const spawn = findNewGameSpawn();
+            camera.position.set(spawn.x, spawn.height + 5, spawn.z); // Näher am Boden spawnen
 
             const ambient = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambient);
             sunGroup = new THREE.Group(); scene.add(sunGroup);
