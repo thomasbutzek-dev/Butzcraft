@@ -588,7 +588,7 @@ export class PlayerInteraction {
 
                 if (harvestBlock === 38 || harvestBlock === 39) {
                     if (typeof window.trySleepInBed === 'function') {
-                        const result = window.trySleepInBed();
+                        const result = window.trySleepInBed({ x: harvestX, y: harvestY, z: harvestZ });
                         if (result && result.message) {
                             this.showMessage(result.message, result.ok ? '#ffe066' : '#ff9800', 20);
                         }

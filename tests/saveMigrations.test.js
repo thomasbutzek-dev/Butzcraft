@@ -121,6 +121,13 @@ describe('migrateSave – Edge Cases', () => {
         expect(migrated.inventory[2]).toEqual({ type: 63, count: 1, durability: 120 });
     });
 
+    it('ergaenzt ab Version 9 einen leeren Bett-Rueckkehrpunkt', () => {
+        const migrated = migrateSave({ version: 8, inventory: [] });
+
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.respawnBed).toBeNull();
+    });
+
     it('pads short current inventories so loading replaces all 64 slots', () => {
         const data = {
             version: CURRENT_SAVE_VERSION,

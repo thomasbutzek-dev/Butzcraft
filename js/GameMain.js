@@ -8,11 +8,11 @@
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260716d';
-        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716f';
+        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716g';
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260716b';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716m';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716n';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716l';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716j';
         import { getOnboardingProgress } from './onboarding.js?v=20260716c';
@@ -25,6 +25,7 @@
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
         import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
+        import { findSafeBedRespawn, normalizeRespawnBed } from './respawn.js?v=20260716a';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
         window.updateInventoryUI = updateInventoryUI;
@@ -74,6 +75,7 @@
         let inventoryOpened = false;
         let gameActive = true, spawning = true, gameStarted = false, manuallyPaused = false;
         let currentSaveName = null;
+        let respawnBed = null;
         const CHARACTER_PROFILE_STORAGE_KEY = 'butzcraft.characterProfile';
 
         // Schwert & Animation
@@ -593,6 +595,7 @@
             document.getElementById('start-menu').style.display = 'none';
             document.body.classList.add('game-started');
             currentSaveName = null;
+            respawnBed = null;
             SoundManager.init();
             manuallyPaused = false;
             lockControlsForDesktop();
@@ -627,6 +630,7 @@
                     Game.player.health = data.health;
                     Game.player.hunger = data.hunger;
                     time = data.time;
+                    respawnBed = normalizeRespawnBed(data.respawnBed);
                     spawning = false;
 
                     // migrateSave liefert immer exakt 64 Slots und ersetzt damit den vorherigen Inventarstand vollständig.
@@ -756,7 +760,7 @@
             showSaveMessage('Blutmond ueberlebt: +1 Eisenbarren, +4 Kohle, +2 Knochen', '#FFD700');
         }
 
-        window.trySleepInBed = function() {
+        window.trySleepInBed = function(bedPosition) {
             const dayRatio = getDayRatio(time, DAY_DURATION);
             const dayCount = Math.floor(time / DAY_DURATION);
             const isBloodMoonNight = dayCount % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1);
@@ -772,15 +776,43 @@
             if (blockReason === 'bloodMoon') return { ok: false, message: 'Der Blutmond laesst dich nicht schlafen.' };
             if (blockReason === 'hostile') return { ok: false, message: 'Monster sind zu nah.' };
 
+            const safeRespawn = findSafeBedRespawn(world, bedPosition);
+            if (!safeRespawn) return { ok: false, message: 'Raeume neben dem Bett einen sicheren Platz frei.' };
+
             time = getWakeTime(time, DAY_DURATION);
+            respawnBed = normalizeRespawnBed(bedPosition);
             mobs.forEach(m => {
                 if (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'spider' || m.type === 'geist') m.isDead = true;
             });
             Game.player.health = Math.min(MAX_HEALTH, Game.player.health + 10);
             Game.player.hunger = Math.max(0, Game.player.hunger - 5);
             updateUI();
-            return { ok: true, message: 'Gut geschlafen. Es ist Morgen.' };
+            return { ok: true, message: 'Gut geschlafen. Rueckkehrpunkt gesetzt.' };
         };
+
+        function respawnAtBed() {
+            const point = findSafeBedRespawn(world, respawnBed);
+            if (!point) return false;
+
+            controls.getObject().position.set(point.x, point.y, point.z);
+            Game.player.velocity.set(0, 0, 0);
+            velocity.set(0, 0, 0);
+            Game.player.health = MAX_HEALTH;
+            Game.player.hunger = Math.max(50, Game.player.hunger);
+            mobs.forEach(mob => {
+                const hostile = mob.type === 'zombie' || mob.type === 'skeleton' || mob.type === 'spider' || mob.type === 'geist';
+                if (hostile && !mob.isDead && mob.group.position.distanceTo(controls.getObject().position) < 8) mob.isDead = true;
+            });
+            gameActive = true;
+            spawning = false;
+            manuallyPaused = false;
+            DOM.gameOver.style.display = 'none';
+            updateVisibleChunksIfNeeded(controls.getObject().position, true);
+            updateUI(true);
+            lockControlsForDesktop();
+            showSaveMessage('Am Bett wiederbelebt.', '#ffe066');
+            return true;
+        }
 
         // ============================================================
         // Damage-Feedback (Sprint 5)
@@ -1021,7 +1053,9 @@
             // Sprint 6: Game-Over-"Neu starten" → Reload (alter Inline-onclick-Handler ist weg)
             const restartBtn = document.getElementById('game-over-restart');
             if (restartBtn) {
-                restartBtn.addEventListener('click', () => window.location.reload());
+                restartBtn.addEventListener('click', () => {
+                    if (!respawnAtBed()) window.location.reload();
+                });
             }
 
             initStartCharacterEditor();
@@ -1262,6 +1296,10 @@
                 gameActive = false;
                 controls.unlock();
                 hideFirstObjective();
+                const restartBtn = document.getElementById('game-over-restart');
+                if (restartBtn) restartBtn.textContent = findSafeBedRespawn(world, respawnBed)
+                    ? 'Am Bett wiederbeleben'
+                    : 'Neu starten';
                 DOM.gameOver.style.display = 'flex';
                 // Sprint 6: Death-Overlay um "Spielstand laden"-Liste erweitern.
                 // Lädt asynchron — User muss nicht warten, falls die Server-Liste leer ist.
@@ -1740,6 +1778,7 @@
                 pendingBloodMoonRewardDay: pendingBloodMoonRewardDay,
                 onboardingObjectiveIndex: miniObjectiveIndex,
                 storyObjectiveIndex: storyObjectiveIndex,
+                respawnBed: respawnBed,
                 modifiedBlocks: world.modifiedBlocks,
                 blockMeta: world.blockMeta,
                 chestContents: world.chestContents,

@@ -75,6 +75,7 @@ describe('PlayerInteraction through the Game seam', () => {
         Game.reset();
         delete window.npcs;
         delete window.getSelectedSlot;
+        delete window.trySleepInBed;
     });
 
     it('starts an empty-hand animation without showing or sounding like a free sword', async () => {
@@ -237,5 +238,22 @@ describe('PlayerInteraction through the Game seam', () => {
         await interaction.handleInteraction({ button: 2 });
 
         expect(context.openWorkbenchCrafting).toHaveBeenCalledOnce();
+    }, 15000);
+
+    it('passes the used bed position to the sleep system', async () => {
+        const { interaction, world } = await createInteraction({ blockType: 38 });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        world.chunks.set('0,0', { mesh });
+        interaction.raycaster.intersectObjects = vi.fn(objects => objects.length === 0 ? [] : [{
+            distance: 2,
+            object: mesh,
+            point: new THREE.Vector3(0.5, 0.5, 0.5),
+            face: { normal: new THREE.Vector3(0, 1, 0) }
+        }]);
+        window.trySleepInBed = vi.fn(() => ({ ok: true, message: 'Gesetzt' }));
+
+        await interaction.handleInteraction({ button: 2 });
+
+        expect(window.trySleepInBed).toHaveBeenCalledWith({ x: 0, y: 0, z: 0 });
     }, 15000);
 });
