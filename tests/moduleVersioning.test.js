@@ -15,7 +15,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/inventory\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716e']));
+        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716f']));
     });
 
     it('loads the Game singleton through one versioned URL everywhere', () => {

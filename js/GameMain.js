@@ -13,7 +13,7 @@
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
         import { PlayerInteraction } from './PlayerInteraction.js?v=20260716e';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716e';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716f';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716d';
         import { getOnboardingProgress } from './onboarding.js?v=20260716b';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';

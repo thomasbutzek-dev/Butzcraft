@@ -325,22 +325,55 @@ body {
         }
 
         #inventory-close-btn {
-            display: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             position: absolute;
             top: 10px;
             right: 10px;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
+            min-width: 86px;
+            height: 36px;
+            padding: 0 12px;
+            border-radius: 6px;
             border: 1px solid rgba(255, 255, 255, 0.32);
             background: rgba(0, 0, 0, 0.45);
             color: #fff;
-            font-size: 22px;
+            font-size: 12px;
             font-weight: bold;
             line-height: 1;
             cursor: pointer;
             z-index: 3;
             touch-action: manipulation;
+        }
+
+        #inventory-close-btn:hover {
+            border-color: rgba(255, 224, 102, 0.65);
+            background: rgba(255, 224, 102, 0.12);
+        }
+
+        #crafting-label {
+            color: #aaa;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 4px 0 8px;
+        }
+
+        #crafting-status {
+            min-height: 16px;
+            margin: -10px 0 10px;
+            color: #aaa;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        #crafting-status.success {
+            color: #9be3a0;
+        }
+
+        #crafting-status.error {
+            color: #ffad9f;
         }
 
         .slot-name {
@@ -1501,7 +1534,7 @@ html.touch-device body {
     }
 
     #inventory-close-btn {
-        display: block;
+        display: flex;
     }
 
     #crafting-area {

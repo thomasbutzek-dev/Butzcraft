@@ -501,31 +501,92 @@ export function initInventoryGrid() {
     }
 }
 
+function getRecipeGrid(recipe) {
+    const grid = Array(9).fill(0);
+    if (recipe.kind === 'shapeless') {
+        recipe.ingredients.slice(0, 9).forEach((type, index) => grid[index] = type);
+    } else if (recipe.gridSize === 3) {
+        recipe.pattern.slice(0, 9).forEach((type, index) => grid[index] = type);
+    } else {
+        const slots = [0, 1, 3, 4];
+        recipe.pattern.slice(0, 4).forEach((type, index) => grid[slots[index]] = type);
+    }
+    return grid;
+}
+
+function removeInventoryItems(type, count) {
+    let remaining = count;
+    for (let i = 0; i < inventorySlots.length && remaining > 0; i++) {
+        if (i >= 8 && i <= 15) continue;
+        const slot = inventorySlots[i];
+        if (slot.type !== type || slot.count <= 0) continue;
+        const removed = Math.min(slot.count, remaining);
+        slot.count -= removed;
+        remaining -= removed;
+        if (slot.count <= 0) inventorySlots[i] = { type: 0, count: 0 };
+    }
+    return remaining === 0;
+}
+
+function tryFillRecipeFromInventory(recipe) {
+    const inventorySnapshot = inventorySlots.map(slot => ({ ...slot }));
+    const craftingSnapshot = craftingGridData.map(slot => ({ ...slot }));
+    const recipeGrid = getRecipeGrid(recipe);
+    const required = new Map();
+
+    recipeGrid.forEach(type => {
+        if (type !== 0) required.set(type, (required.get(type) || 0) + 1);
+    });
+
+    let canFill = true;
+    for (const item of craftingGridData) {
+        if (!item || item.type === 0 || item.count <= 0) continue;
+        const used = Math.min(item.count, required.get(item.type) || 0);
+        if (used > 0) required.set(item.type, required.get(item.type) - used);
+        const leftover = item.count - used;
+        if (leftover > 0 && addItemToInventory(item.type, leftover).remaining > 0) {
+            canFill = false;
+            break;
+        }
+    }
+
+    if (canFill) {
+        canFill = [...required].every(([type, count]) => count === 0 || removeInventoryItems(type, count));
+    }
+
+    if (!canFill) {
+        for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = inventorySnapshot[i];
+        for (let i = 0; i < craftingGridData.length; i++) craftingGridData[i] = craftingSnapshot[i];
+        updateInventoryUI();
+        return false;
+    }
+
+    recipeGrid.forEach((type, index) => {
+        craftingGridData[index] = type === 0 ? { type: 0, count: 0 } : { type, count: 1 };
+    });
+    checkCrafting();
+    updateInventoryUI();
+    return true;
+}
+
 export function toggleInventory(gameStarted, spawning, controls) {
     if (!gameStarted || spawning) return false;
     inventoryOpened = !inventoryOpened;
     
     // Rezeptbuch initialisieren/umbauen
     if (inventoryOpened) {
+        const craftingStatus = document.getElementById('crafting-status');
+        if (craftingStatus) {
+            craftingStatus.textContent = 'Rezept anklicken, um Zutaten einzusetzen.';
+            craftingStatus.classList.remove('success', 'error');
+        }
         const onRecipeClick = (recipe) => {
-            for (let i = 0; i < 9; i++) craftingGridData[i] = { type: 0, count: 0 };
-            if (recipe.kind === 'shapeless') {
-                recipe.ingredients.forEach((type, i) => {
-                    if (i < 9 && type !== 0) craftingGridData[i] = { type, count: 1 };
-                });
-            } else if (recipe.gridSize === 3) {
-                recipe.pattern.forEach((type, i) => {
-                    if (type !== 0) craftingGridData[i] = { type, count: 1 };
-                });
-            } else {
-                // 2×2-Legacy → oben-links im 3×3-Grid (Slots 0,1,3,4)
-                const slots = [0, 1, 3, 4];
-                recipe.pattern.forEach((type, i) => {
-                    if (type !== 0) craftingGridData[slots[i]] = { type, count: 1 };
-                });
+            const filled = tryFillRecipeFromInventory(recipe);
+            if (craftingStatus) {
+                craftingStatus.textContent = filled ? 'Rezept eingesetzt.' : 'Zutaten fehlen – Bastelfeld bleibt unverändert.';
+                craftingStatus.classList.toggle('success', filled);
+                craftingStatus.classList.toggle('error', !filled);
             }
-            checkCrafting();
-            updateInventoryUI();
         };
         initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick);
     }

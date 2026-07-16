@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260716d">
+    <link rel="stylesheet" href="style.css?v=20260716e">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -341,12 +341,13 @@
         <button
             id="inventory-close-btn"
             type="button"
-            aria-label="Inventar schliessen"
+            aria-label="Inventar schließen"
             onclick="window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', bubbles: true }));"
-        >x</button>
+        >Schließen</button>
         <div id="inventory-title">Inventar</div>
-        
+
         <!-- NEUES CRAFTING AREA (3×3) -->
+        <div id="crafting-label">Bastelfeld</div>
         <div id="crafting-area" style="display: flex; gap: 20px; align-items: center; justify-content: center; margin-bottom: 20px;">
             <div id="crafting-grid" style="display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px); gap: 5px;">
                 <!-- Wird dynamisch mit 9 inv-slot für Crafting gefüllt -->
@@ -356,6 +357,7 @@
                 <!-- Result Slot -->
             </div>
         </div>
+        <div id="crafting-status" role="status" aria-live="polite">Rezept anklicken, um Zutaten einzusetzen.</div>
 
         <div id="inventory-grid">
             <!-- Wird dynamisch gefüllt -->
@@ -429,7 +431,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260716r"
+        src="./js/GameMain.js?v=20260716s"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

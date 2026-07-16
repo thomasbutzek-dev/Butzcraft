@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
 import { openFurnace } from './furnace.js?v=20260716d';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716e';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716f';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 
