@@ -8,13 +8,14 @@
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
-        import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260507b';
+        import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260716b';
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
         import { PlayerInteraction } from './PlayerInteraction.js?v=20260716a';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716a';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716a';
+        import { getOnboardingProgress } from './onboarding.js?v=20260716a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716a';
         import { WeatherSystem } from './weather.js?v=20260517a';
         import { NPC } from './npc.js?v=20260507b';
@@ -253,45 +254,10 @@
         }
 
         const CONTROLS_HINT_HIDE_MS = 8500;
-        const WOOD_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.WOOD, BLOCK_TYPES.JUNGLE_WOOD, BLOCK_TYPES.PALM_WOOD,
-            BLOCK_TYPES.PLANKS, BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
-            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
-        ]);
-        const PLANK_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.PLANKS, BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
-            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
-        ]);
-        const STICK_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
-            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
-            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
-        ]);
-        const WORKBENCH_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.WORKBENCH,
-            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
-            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
-        ]);
-        const STONE_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK,
-            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
-            BLOCK_TYPES.FURNACE
-        ]);
-        const MINI_OBJECTIVES = [
-            { label: 'Erstes Ziel', text: 'Sammle Holz', completeTypes: WOOD_OBJECTIVE_TYPES },
-            { label: 'Weiter', text: 'Stelle Holzbretter her', completeTypes: PLANK_OBJECTIVE_TYPES },
-            { label: 'Werkzeugbasis', text: 'Mache Stöcke', completeTypes: STICK_OBJECTIVE_TYPES },
-            { label: 'Arbeitsplatz', text: 'Baue eine Werkbank', completeTypes: WORKBENCH_OBJECTIVE_TYPES },
-            { label: 'Steinzeit', text: 'Sammle Stein', completeTypes: STONE_OBJECTIVE_TYPES },
-            { label: 'Überleben', text: 'Baue einen Ofen', completeTypes: new Set([BLOCK_TYPES.FURNACE]) }
-        ];
         let controlsHintTimer = null;
         let controlsHintShownForRun = false;
         let miniObjectiveIndex = 0;
+        let currentMiniObjective = null;
 
         function getControlsHintText() {
             if (shouldUseTouchMode() || window.innerWidth <= 760) {
@@ -325,17 +291,10 @@
             }, CONTROLS_HINT_HIDE_MS);
         }
 
-        function inventoryHasAny(types) {
-            return inventorySlots.some(slot => slot && slot.count > 0 && types.has(slot.type));
-        }
-
         function advanceMiniObjective() {
-            while (
-                miniObjectiveIndex < MINI_OBJECTIVES.length &&
-                inventoryHasAny(MINI_OBJECTIVES[miniObjectiveIndex].completeTypes)
-            ) {
-                miniObjectiveIndex++;
-            }
+            const progress = getOnboardingProgress(inventorySlots, miniObjectiveIndex);
+            miniObjectiveIndex = progress.index;
+            currentMiniObjective = progress.objective;
         }
 
         function hideFirstObjective() {
@@ -349,7 +308,7 @@
             const el = document.getElementById('first-objective');
             const label = document.getElementById('first-objective-label');
             const text = document.getElementById('first-objective-text');
-            const objective = MINI_OBJECTIVES[miniObjectiveIndex];
+            const objective = currentMiniObjective;
             if (!el || !label || !text || !objective) return;
             label.textContent = objective.label;
             text.textContent = objective.text;
@@ -359,7 +318,7 @@
 
         function updateFirstObjective() {
             advanceMiniObjective();
-            if (miniObjectiveIndex >= MINI_OBJECTIVES.length) {
+            if (!currentMiniObjective) {
                 hideFirstObjective();
                 return;
             }
@@ -372,9 +331,9 @@
             showFirstObjective();
         }
 
-        function resetControlsHintForRun() {
+        function resetControlsHintForRun(restoredObjectiveIndex = 0) {
             controlsHintShownForRun = false;
-            miniObjectiveIndex = 0;
+            miniObjectiveIndex = restoredObjectiveIndex;
             advanceMiniObjective();
             hideControlsHint();
             hideFirstObjective();
@@ -569,7 +528,6 @@
                     document.body.classList.add('game-started');
                     lockControlsForDesktop();
                     gameStarted = true;
-                    resetControlsHintForRun();
                     currentSaveName = name;
                     document.getElementById('save-input').value = name;
 
@@ -590,6 +548,7 @@
                     if (Array.isArray(data.inventory)) {
                         data.inventory.forEach((item, i) => inventorySlots[i] = item);
                     }
+                    resetControlsHintForRun(data.onboardingObjectiveIndex);
                     
                     collectedWool = data.collectedWool || 0;
                     lastBloodMoonRewardDay = typeof data.lastBloodMoonRewardDay === 'number' ? data.lastBloodMoonRewardDay : -1;
@@ -1701,6 +1660,7 @@
                 collectedWool: collectedWool,
                 lastBloodMoonRewardDay: lastBloodMoonRewardDay,
                 pendingBloodMoonRewardDay: pendingBloodMoonRewardDay,
+                onboardingObjectiveIndex: miniObjectiveIndex,
                 modifiedBlocks: world.modifiedBlocks,
                 blockMeta: world.blockMeta,
                 chestContents: world.chestContents,
