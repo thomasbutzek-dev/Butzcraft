@@ -15,7 +15,7 @@
         import { PlayerInteraction } from './PlayerInteraction.js?v=20260716n';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716l';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716j';
-        import { getOnboardingProgress } from './onboarding.js?v=20260716c';
+        import { getOnboardingProgress } from './onboarding.js?v=20260716d';
         import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260716a';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716b';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716j';
@@ -299,7 +299,7 @@
         function advanceMiniObjective() {
             const previousIndex = miniObjectiveIndex;
             const completedObjective = currentMiniObjective;
-            const progress = getOnboardingProgress(inventorySlots, miniObjectiveIndex);
+            const progress = getOnboardingProgress(inventorySlots, miniObjectiveIndex, { respawnSet: Boolean(respawnBed) });
             miniObjectiveIndex = progress.index;
             currentMiniObjective = progress.objective;
             return {

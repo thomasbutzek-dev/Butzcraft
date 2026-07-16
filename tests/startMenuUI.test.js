@@ -16,7 +16,7 @@ describe('start menu loading feedback', () => {
 });
 
 describe('first-day objective HUD', () => {
-    it('exposes one atomic objective with seven visible progress steps', () => {
+    it('exposes one atomic objective with eleven visible progress steps', () => {
         const html = readFileSync('index.html', 'utf8');
         const document = new DOMParser().parseFromString(html, 'text/html');
         const objective = document.getElementById('first-objective');
@@ -24,7 +24,7 @@ describe('first-day objective HUD', () => {
         expect(objective.getAttribute('role')).toBe('status');
         expect(objective.getAttribute('aria-live')).toBe('polite');
         expect(objective.getAttribute('aria-atomic')).toBe('true');
-        expect(objective.querySelectorAll('#first-objective-progress i')).toHaveLength(7);
+        expect(objective.querySelectorAll('#first-objective-progress i')).toHaveLength(11);
         expect(document.querySelectorAll('#first-objective')).toHaveLength(1);
     });
 });
