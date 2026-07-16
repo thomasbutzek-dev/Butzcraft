@@ -7,21 +7,21 @@
         import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716c';
 
         import { Input } from './Input.js?v=20260507b';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260716c';
-        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716e';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260716d';
+        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716f';
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716f';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716f';
-        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716d';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716h';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716g';
+        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716e';
         import { getOnboardingProgress } from './onboarding.js?v=20260716b';
         import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260716a';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716d';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716e';
         import { WeatherSystem } from './weather.js?v=20260716b';
         import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716e';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716f';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
         import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
@@ -434,6 +434,7 @@
 
         window.pauseGame = function() {
             if (!gameStarted || spawning || isBlockingOverlayOpen()) return;
+            if (window.playerInteraction) window.playerInteraction.cancelMining();
             manuallyPaused = true;
             if (controls?.isLocked) controls.unlock();
             hideControlsHint();
@@ -1196,6 +1197,7 @@
                     if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
                     if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
                     if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
+                    if (window.playerInteraction) window.playerInteraction.cancelMining();
                     toggleInventory(gameStarted, spawning, controls); return;
                 }
                 if (isInventoryOpened()) return;
@@ -1630,6 +1632,7 @@
 
                 // Druckplatten-Schaden
                 if (window.playerInteraction) window.playerInteraction.checkPressurePlates(playerPos.x, playerPos.y, playerPos.z);
+                if (window.playerInteraction) window.playerInteraction.updateMining(delta);
             }
 
             // Ofen-Tick (auch wenn pausiert, solange UI offen)

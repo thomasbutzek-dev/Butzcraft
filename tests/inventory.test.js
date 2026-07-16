@@ -22,7 +22,14 @@ vi.mock('../js/recipe_book.js', () => ({ initRecipeBook: () => {} }));
 vi.mock('../js/sound.js', () => ({ SoundManager: { playSound: () => {} } }));
 
 // Nach den Mocks importieren — top-level await funktioniert in Vitest.
-const { inventorySlots, addItemToInventory, canAddItemToInventory, tryAddItemsToInventory } = await import('../js/inventory.js');
+const {
+    inventorySlots,
+    cursorItem,
+    addItemToInventory,
+    canAddItemToInventory,
+    createSlotElement,
+    tryAddItemsToInventory
+} = await import('../js/inventory.js');
 
 // updateInventoryUI hängt am DOM; wir machen sie zum No-Op via document.querySelectorAll-stub.
 beforeEach(() => {
@@ -30,7 +37,11 @@ beforeEach(() => {
     for (let i = 0; i < inventorySlots.length; i++) {
         inventorySlots[i].type = 0;
         inventorySlots[i].count = 0;
+        delete inventorySlots[i].durability;
     }
+    cursorItem.type = 0;
+    cursorItem.count = 0;
+    delete cursorItem.durability;
     // Stub für DOM-Lookups in updateInventoryUI
     document.querySelectorAll = () => [];
 });
@@ -59,6 +70,26 @@ describe('addItemToInventory – Basis', () => {
         expect(inventorySlots[0].count).toBe(64);
         expect(inventorySlots[1]).toEqual({ type: 3, count: 6 });
     });
+
+    it('stores durable tools separately with full durability', () => {
+        addItemToInventory(63, 2);
+
+        expect(inventorySlots[0]).toEqual({ type: 63, count: 1, durability: 120 });
+        expect(inventorySlots[1]).toEqual({ type: 63, count: 1, durability: 120 });
+    });
+
+    it('preserves tool durability when moving it between slots', () => {
+        inventorySlots[0] = { type: 63, count: 1, durability: 37 };
+        const source = createSlotElement(0, 'inventory');
+        const target = createSlotElement(1, 'inventory');
+
+        source.dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+        target.dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+
+        expect(inventorySlots[0]).toEqual({ type: 0, count: 0 });
+        expect(inventorySlots[1]).toEqual({ type: 63, count: 1, durability: 37 });
+        expect(cursorItem).toEqual({ type: 0, count: 0 });
+    });
 });
 
 describe('addItemToInventory full inventory', () => {
@@ -81,6 +112,16 @@ describe('addItemToInventory full inventory', () => {
         }
 
         expect(canAddItemToInventory(3, 1)).toBe(false);
+    });
+
+    it('requires one free slot per durable tool', () => {
+        for (let i = 0; i < inventorySlots.length; i++) {
+            if (i < 8 || i >= 16) inventorySlots[i] = { type: 1, count: 64 };
+        }
+        inventorySlots[0] = { type: 0, count: 0 };
+
+        expect(canAddItemToInventory(63, 1)).toBe(true);
+        expect(canAddItemToInventory(63, 2)).toBe(false);
     });
 
     it('rolls back a multi-item reward when only part of it fits', () => {

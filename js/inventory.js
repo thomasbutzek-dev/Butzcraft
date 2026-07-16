@@ -5,6 +5,7 @@ import { initRecipeBook } from './recipe_book.js?v=20260716a';
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
+import { getToolInfo, isToolType } from './miningRules.js?v=20260716a';
 
 // Sprint 6: Tooltip-Hint für essbare Items.
 // Quelle der Wahrheit für Hunger-Werte ist PlayerInteraction.handleInteraction (Type-Match-Switch).
@@ -35,6 +36,32 @@ export const inventorySlots = Array.from({ length: 64 }, () => ({ type: 0, count
 export let cursorItem = { type: 0, count: 0 };
 export let selectedSlot = 0;
 export let inventoryOpened = false;
+
+function clearItem(item) {
+    item.type = 0;
+    item.count = 0;
+    delete item.durability;
+}
+
+function moveItem(target, source) {
+    target.type = source.type;
+    target.count = source.count;
+    if (Number.isFinite(source.durability)) target.durability = source.durability;
+    else delete target.durability;
+    clearItem(source);
+}
+
+function swapItems(first, second) {
+    const snapshot = { ...first };
+    first.type = second.type;
+    first.count = second.count;
+    if (Number.isFinite(second.durability)) first.durability = second.durability;
+    else delete first.durability;
+    second.type = snapshot.type;
+    second.count = snapshot.count;
+    if (Number.isFinite(snapshot.durability)) second.durability = snapshot.durability;
+    else delete second.durability;
+}
 
 // Temporäre Migrations-Map für altes Speichersystem
 export const oldInventoryMap = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
@@ -78,6 +105,15 @@ const TOUCH_MOVE_CANCEL_PX = 10;
 
 export function canAddItemToInventory(type, count) {
     if (type === 0 || count <= 0) return false;
+    if (isToolType(type)) {
+        let freeSlots = 0;
+        for (let i = 0; i < inventorySlots.length; i++) {
+            if (i >= 8 && i <= 15) continue;
+            const slot = inventorySlots[i];
+            if (slot.type === 0 || slot.count <= 0) freeSlots++;
+        }
+        return freeSlots >= count;
+    }
     let remaining = count;
     for (let i = 0; i < inventorySlots.length; i++) {
         if (i >= 8 && i <= 15) continue;
@@ -91,7 +127,7 @@ export function canAddItemToInventory(type, count) {
 
 export function tryAddItemsToInventory(items) {
     if (!Array.isArray(items) || items.length === 0) return { added: false, reason: 'invalid-items' };
-    const snapshot = inventorySlots.map(slot => ({ type: slot.type, count: slot.count }));
+    const snapshot = inventorySlots.map(slot => ({ ...slot }));
 
     for (const item of items) {
         if (!item || item.type === 0 || item.count <= 0) {
@@ -122,7 +158,7 @@ export function tryExchangeInventory(give, receive) {
     }
     if (available < give.count) return { exchanged: false, reason: 'insufficient-items' };
 
-    const snapshot = inventorySlots.map(slot => ({ type: slot.type, count: slot.count }));
+    const snapshot = inventorySlots.map(slot => ({ ...slot }));
     let toRemove = give.count;
     for (let i = 0; i < inventorySlots.length && toRemove > 0; i++) {
         if (i >= 8 && i <= 15) continue;
@@ -147,6 +183,17 @@ export function tryExchangeInventory(give, receive) {
 export function addItemToInventory(type, count) {
     if (type === 0) return { added: 0, remaining: count };
     const requestedCount = count;
+    const toolInfo = getToolInfo(type);
+    if (toolInfo) {
+        for (let i = 0; i < inventorySlots.length && count > 0; i++) {
+            if (i >= 8 && i <= 15) continue;
+            if (inventorySlots[i].type !== 0 && inventorySlots[i].count > 0) continue;
+            inventorySlots[i] = { type, count: 1, durability: toolInfo.maxDurability };
+            count--;
+        }
+        updateInventoryUI();
+        return { added: requestedCount - count, remaining: count };
+    }
     for (let i = 0; i < 64; i++) {
         if (i >= 8 && i <= 15) continue; 
         if (inventorySlots[i].type === type && inventorySlots[i].count < 64) {
@@ -205,6 +252,30 @@ function buildSlotLabel(kind, index, item) {
     return `${prefix} ${getItemName(item.type)} x${item.count}`;
 }
 
+function updateDurabilityBar(slot, item) {
+    let track = slot.querySelector('.durability-track');
+    const toolInfo = item && item.count > 0 ? getToolInfo(item.type) : null;
+    if (!toolInfo) {
+        if (track) track.remove();
+        return false;
+    }
+
+    if (!track) {
+        track = document.createElement('span');
+        track.className = 'durability-track';
+        const fill = document.createElement('span');
+        fill.className = 'durability-fill';
+        track.appendChild(fill);
+        slot.appendChild(track);
+    }
+    const durability = Number.isFinite(item.durability) ? item.durability : toolInfo.maxDurability;
+    const ratio = Math.max(0, Math.min(1, durability / toolInfo.maxDurability));
+    track.querySelector('.durability-fill').style.width = `${Math.round(ratio * 100)}%`;
+    track.classList.toggle('low', ratio <= 0.15);
+    track.title = `Haltbarkeit ${durability}/${toolInfo.maxDurability}`;
+    return true;
+}
+
 export function updateInventoryUI() {
 
     const hotbarSlots = document.querySelectorAll('#inventory .slot');
@@ -224,7 +295,8 @@ export function updateInventoryUI() {
             slot.dataset.initialized = 'true';
         }
         if (item && item.count > 0) {
-            icon.style.display = 'flex'; count.style.display = 'block'; name.style.display = 'block';
+            const durable = updateDurabilityBar(slot, item);
+            icon.style.display = 'flex'; count.style.display = durable ? 'none' : 'block'; name.style.display = 'block';
             icon.innerHTML = createBlockHTML(item.type); icon.style.background = 'none'; icon.style.backgroundColor = 'transparent';
             if (count.textContent !== String(item.count)) count.textContent = item.count;
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
@@ -232,6 +304,7 @@ export function updateInventoryUI() {
             if (name.textContent !== translatedName) name.textContent = translatedName;
             slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
+            updateDurabilityBar(slot, null);
             icon.style.display = 'none'; count.style.display = 'none'; name.style.display = 'none'; slot.title = buildSlotLabel('Hotbar', i, item);
         }
         slot.setAttribute('aria-label', buildSlotLabel('Hotbar', i, item));
@@ -268,12 +341,14 @@ export function updateInventoryUI() {
         const count = slot.querySelector('.slot-count');
 
         if (item && item.count > 0) {
-            icon.style.display = 'flex'; count.style.display = 'block';
+            const durable = updateDurabilityBar(slot, item);
+            icon.style.display = 'flex'; count.style.display = durable ? 'none' : 'block';
             icon.innerHTML = createBlockHTML(item.type);
             if (count.textContent !== String(item.count)) count.textContent = item.count;
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
             slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
+            updateDurabilityBar(slot, null);
             icon.style.display = 'none'; count.style.display = 'none';
             icon.innerHTML = ''; slot.title = buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item);
         }
@@ -292,12 +367,22 @@ function handleSlotClick(e, sType, index) {
     if (!itemObj) return;
 
     if (sType === 'result') {
-        if (itemObj.count > 0 && (cursorItem.count === 0 || (cursorItem.type === itemObj.type && cursorItem.count + itemObj.count <= 64))) {
+        const durableResult = isToolType(itemObj.type);
+        const canTakeResult = itemObj.count > 0 && (
+            cursorItem.count === 0 ||
+            (!durableResult && cursorItem.type === itemObj.type && cursorItem.count + itemObj.count <= 64)
+        );
+        if (canTakeResult) {
             if (e.button === 0 || e.button === 2) {
-                if (cursorItem.count === 0) cursorItem.type = itemObj.type;
-                cursorItem.count += itemObj.count;
-                itemObj.count = 0;
-                itemObj.type = 0;
+                if (cursorItem.count === 0) {
+                    cursorItem.type = itemObj.type;
+                    cursorItem.count = itemObj.count;
+                    const toolInfo = getToolInfo(itemObj.type);
+                    if (toolInfo) cursorItem.durability = toolInfo.maxDurability;
+                } else {
+                    cursorItem.count += itemObj.count;
+                }
+                clearItem(itemObj);
 
                 for (let i = 0; i < 9; i++) {
                     if (craftingGridData[i] && craftingGridData[i].count > 0) {
@@ -318,44 +403,50 @@ function handleSlotClick(e, sType, index) {
     if (e.button === 0) { 
         if (cursorItem.count === 0) {
             if (itemObj.count > 0) {
-                cursorItem.type = itemObj.type; cursorItem.count = itemObj.count;
-                itemObj.type = 0; itemObj.count = 0;
+                moveItem(cursorItem, itemObj);
             }
         } else {
             if (itemObj.count === 0) {
-                itemObj.type = cursorItem.type; itemObj.count = cursorItem.count;
-                cursorItem.type = 0; cursorItem.count = 0;
-            } else if (itemObj.type === cursorItem.type) {
+                moveItem(itemObj, cursorItem);
+            } else if (itemObj.type === cursorItem.type && !isToolType(itemObj.type)) {
                 const space = 64 - itemObj.count;
                 if (space > 0) {
                     const add = Math.min(space, cursorItem.count);
                     itemObj.count += add;
                     cursorItem.count -= add;
-                    if (cursorItem.count <= 0) cursorItem.type = 0;
+                    if (cursorItem.count <= 0) clearItem(cursorItem);
                 }
             } else {
-                const tempType = itemObj.type, tempCount = itemObj.count;
-                itemObj.type = cursorItem.type; itemObj.count = cursorItem.count;
-                cursorItem.type = tempType; cursorItem.count = tempCount;
+                swapItems(itemObj, cursorItem);
             }
         }
     } else if (e.button === 2) { 
         if (cursorItem.count === 0) {
             if (itemObj.count > 0) {
-                const half = Math.ceil(itemObj.count / 2);
-                cursorItem.type = itemObj.type; cursorItem.count = half;
-                itemObj.count -= half;
-                if (itemObj.count <= 0) itemObj.type = 0;
+                if (isToolType(itemObj.type)) {
+                    moveItem(cursorItem, itemObj);
+                } else {
+                    const half = Math.ceil(itemObj.count / 2);
+                    cursorItem.type = itemObj.type;
+                    cursorItem.count = half;
+                    itemObj.count -= half;
+                    if (itemObj.count <= 0) clearItem(itemObj);
+                }
             }
         } else {
             if (itemObj.count === 0) {
-                itemObj.type = cursorItem.type; itemObj.count = 1;
-                cursorItem.count--;
-                if (cursorItem.count <= 0) cursorItem.type = 0;
-            } else if (itemObj.type === cursorItem.type && itemObj.count < 64) {
+                if (isToolType(cursorItem.type)) {
+                    moveItem(itemObj, cursorItem);
+                } else {
+                    itemObj.type = cursorItem.type;
+                    itemObj.count = 1;
+                    cursorItem.count--;
+                    if (cursorItem.count <= 0) clearItem(cursorItem);
+                }
+            } else if (itemObj.type === cursorItem.type && !isToolType(itemObj.type) && itemObj.count < 64) {
                 itemObj.count++;
                 cursorItem.count--;
-                if (cursorItem.count <= 0) cursorItem.type = 0;
+                if (cursorItem.count <= 0) clearItem(cursorItem);
             }
         }
     }

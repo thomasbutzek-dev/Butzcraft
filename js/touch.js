@@ -23,6 +23,7 @@ const JOYSTICK_RADIUS_PX = 60;
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const TAP_MAX_MOVE_PX = 10;
 const TAP_MAX_MS = 260;
+const MINE_HOLD_DELAY_MS = 180;
 
 export function isTouchDevice() {
     return ('ontouchstart' in window) ||
@@ -224,8 +225,8 @@ function _injectTouchStyles() {
     document.head.appendChild(style);
 }
 
-function _dispatchInteraction(button) {
-    const evt = new MouseEvent('mousedown', {
+function _dispatchInteraction(button, type = 'mousedown') {
+    const evt = new MouseEvent(type, {
         button,
         buttons: button === 2 ? 2 : 1,
         bubbles: true,
@@ -293,6 +294,8 @@ function _bindLookArea(ctx) {
     let lastX = 0, lastY = 0;
     let startX = 0, startY = 0, startTime = 0;
     let moved = false;
+    let miningStarted = false;
+    let miningTimer = null;
 
     area.addEventListener('touchstart', (e) => {
         // Ignorieren, wenn Inventar offen
@@ -304,6 +307,14 @@ function _bindLookArea(ctx) {
         lastY = startY = t.clientY;
         startTime = performance.now();
         moved = false;
+        miningStarted = false;
+        if (miningTimer) clearTimeout(miningTimer);
+        miningTimer = setTimeout(() => {
+            miningTimer = null;
+            if (activeId === null || moved) return;
+            miningStarted = true;
+            _dispatchInteraction(0, 'mousedown');
+        }, MINE_HOLD_DELAY_MS);
     }, { passive: true });
 
     area.addEventListener('touchmove', (e) => {
@@ -314,7 +325,17 @@ function _bindLookArea(ctx) {
             const dx = t.clientX - lastX;
             const dy = t.clientY - lastY;
             lastX = t.clientX; lastY = t.clientY;
-            if (Math.hypot(t.clientX - startX, t.clientY - startY) > TAP_MAX_MOVE_PX) moved = true;
+            if (Math.hypot(t.clientX - startX, t.clientY - startY) > TAP_MAX_MOVE_PX) {
+                moved = true;
+                if (miningTimer) {
+                    clearTimeout(miningTimer);
+                    miningTimer = null;
+                }
+                if (miningStarted) {
+                    _dispatchInteraction(0, 'mouseup');
+                    miningStarted = false;
+                }
+            }
             applyTouchLookDelta(ctx, dx, dy);
         }
     }, { passive: false });
@@ -323,16 +344,39 @@ function _bindLookArea(ctx) {
         for (const t of e.changedTouches) {
             if (t.identifier === activeId) {
                 const elapsed = performance.now() - startTime;
-                if (!moved && elapsed <= TAP_MAX_MS && !(ctx.isInventoryOpenedProvider && ctx.isInventoryOpenedProvider())) {
-                    _dispatchInteraction(0);
+                if (miningTimer) {
+                    clearTimeout(miningTimer);
+                    miningTimer = null;
+                }
+                if (miningStarted) {
+                    _dispatchInteraction(0, 'mouseup');
+                    miningStarted = false;
+                } else if (!moved && elapsed <= TAP_MAX_MS && !(ctx.isInventoryOpenedProvider && ctx.isInventoryOpenedProvider())) {
+                    _dispatchInteraction(0, 'mousedown');
+                    _dispatchInteraction(0, 'mouseup');
                 }
                 activeId = null;
                 break;
             }
         }
     };
+    const cancelHandler = (e) => {
+        for (const t of e.changedTouches) {
+            if (t.identifier !== activeId) continue;
+            if (miningTimer) {
+                clearTimeout(miningTimer);
+                miningTimer = null;
+            }
+            if (miningStarted) {
+                _dispatchInteraction(0, 'mouseup');
+                miningStarted = false;
+            }
+            activeId = null;
+            break;
+        }
+    };
     area.addEventListener('touchend', endHandler);
-    area.addEventListener('touchcancel', endHandler);
+    area.addEventListener('touchcancel', cancelHandler);
 }
 
 function _bindActionButtons(ctx) {

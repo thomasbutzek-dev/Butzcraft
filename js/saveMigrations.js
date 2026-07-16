@@ -14,8 +14,10 @@
  * Vorteil ggü. der vorigen Inline-Migration: Eine Stelle, eine Versions-Reihe, testbar.
  */
 
+import { getToolInfo } from './miningRules.js?v=20260716a';
+
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 7;
+export const CURRENT_SAVE_VERSION = 8;
 
 // Migration v0 → v1: Inventory-Format vom Objekt {type: count} auf Array<{type, count}>
 const OLD_INVENTORY_MAP = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
@@ -86,6 +88,37 @@ function migrateV6toV7(data) {
     return data;
 }
 
+function migrateV7toV8(data) {
+    if (!Array.isArray(data.inventory)) return data;
+    const extraTools = [];
+    for (const slot of data.inventory) {
+        if (!slot || typeof slot !== 'object') continue;
+        const toolInfo = getToolInfo(slot.type);
+        if (!toolInfo || slot.count <= 0) continue;
+        const extraCount = Math.max(0, Math.floor(slot.count) - 1);
+        for (let i = 0; i < extraCount; i++) extraTools.push(slot.type);
+        slot.count = 1;
+        slot.durability = Number.isFinite(slot.durability)
+            ? Math.max(1, Math.min(toolInfo.maxDurability, Math.floor(slot.durability)))
+            : toolInfo.maxDurability;
+    }
+
+    for (const type of extraTools) {
+        let freeIndex = -1;
+        for (let index = 0; index < 64; index++) {
+            if (index >= 8 && index < 16) continue;
+            const slot = data.inventory[index];
+            if (!slot || slot.type === 0 || slot.count <= 0) {
+                freeIndex = index;
+                break;
+            }
+        }
+        if (freeIndex === -1) break;
+        data.inventory[freeIndex] = { type, count: 1, durability: getToolInfo(type).maxDurability };
+    }
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
@@ -94,7 +127,8 @@ const MIGRATIONS = {
     4: migrateV3toV4,
     5: migrateV4toV5,
     6: migrateV5toV6,
-    7: migrateV6toV7
+    7: migrateV6toV7,
+    8: migrateV7toV8
 };
 
 function normalizeInventory(data) {

@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260716g">
+    <link rel="stylesheet" href="style.css?v=20260716h">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -245,7 +245,9 @@
             </div>
             <div id="time-info">Tag 1 | 08:00</div>
         </div>
-        <div id="crosshair"></div>
+        <div id="crosshair">
+            <div id="mining-progress" role="progressbar" aria-label="Abbaufortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+        </div>
         <div id="controls-hint" role="status" aria-live="polite" aria-hidden="true">
             <div class="controls-hint-title">Los geht's</div>
             <div id="controls-hint-text">WASD bewegen · Maus umsehen · Linksklick abbauen · Rechtsklick bauen · E Inventar</div>
@@ -431,7 +433,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260716u"
+        src="./js/GameMain.js?v=20260716w"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

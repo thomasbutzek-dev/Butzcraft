@@ -1,35 +1,16 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
-import { openFurnace } from './furnace.js?v=20260716d';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716f';
+import { openFurnace } from './furnace.js?v=20260716e';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716g';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
+import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260716a';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
-// Werkzeug-Kategorien und Materialien
-const TOOL_TYPES = {
-    pickaxe: { materials: [63, 64, 65, 66], goodBlocks: new Set([3, 29, 56, 57, 58, 59, 30, 20, 78, 83, 84, 85]) },
-    axe:     { materials: [67, 68, 69, 70], goodBlocks: new Set([5, 13, 15, 26, 28, 36, 75, 81]) },
-    shovel:  { materials: [71, 72, 73, 74], goodBlocks: new Set([2, 1, 7, 11, 77]) },
-};
-const TOOL_DURABILITY = { wood: 60, stone: 131, iron: 250, gold: 32 };
-const MATERIAL_IDX = [0, 1, 2, 3]; // wood/stone/iron/gold = offset 0-3 in each category
-
 const WOOD_BLOCKS = new Set([5, 13, 15]);
 const MINING_HINT_COOLDOWN_MS = 1800;
-
-function getToolInfo(toolType) {
-    for (const [cat, info] of Object.entries(TOOL_TYPES)) {
-        const idx = info.materials.indexOf(toolType);
-        if (idx !== -1) {
-            const matNames = ['wood', 'stone', 'iron', 'gold'];
-            return { cat, matName: matNames[idx], goodBlocks: info.goodBlocks, maxDurability: TOOL_DURABILITY[matNames[idx]] };
-        }
-    }
-    return null;
-}
 
 export class PlayerInteraction {
     constructor(camera, scene, world, mobs, SoundManager, context) {
@@ -42,6 +23,10 @@ export class PlayerInteraction {
         
         this.raycaster = new THREE.Raycaster();
         this.lastMiningHintAt = 0;
+        this.miningHeld = false;
+        this.miningTarget = null;
+        this.miningProgress = 0;
+        this.miningToolType = 0;
     }
 
     spawnBlockBreakParticles(x, y, z, blockType, normal) {
@@ -115,7 +100,13 @@ export class PlayerInteraction {
             if (!lockOk || !getGameActive() || getSpawning()) return;
             this.handleInteraction(e);
         };
+        this._onMouseUp = (e) => {
+            if (e.button === 0) this.cancelMining();
+        };
+        this._onWindowBlur = () => this.cancelMining();
         document.addEventListener('mousedown', this._onMouseDown);
+        document.addEventListener('mouseup', this._onMouseUp);
+        window.addEventListener('blur', this._onWindowBlur);
     }
 
     destroy() {
@@ -123,6 +114,235 @@ export class PlayerInteraction {
             document.removeEventListener('mousedown', this._onMouseDown);
             this._onMouseDown = null;
         }
+        if (this._onMouseUp) {
+            document.removeEventListener('mouseup', this._onMouseUp);
+            this._onMouseUp = null;
+        }
+        if (this._onWindowBlur) {
+            window.removeEventListener('blur', this._onWindowBlur);
+            this._onWindowBlur = null;
+        }
+        this.cancelMining();
+    }
+
+    _getCurrentItem() {
+        const slotIndex = typeof window.getSelectedSlot === 'function'
+            ? window.getSelectedSlot()
+            : this.context.getSelectedSlot();
+        return this.context.getInventorySlots()[slotIndex];
+    }
+
+    _getBlockHit() {
+        this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+        const chunkMeshes = [];
+        this.world.chunks.forEach(chunk => {
+            if (chunk.mesh) chunkMeshes.push(chunk.mesh);
+            if (chunk.waterMesh) chunkMeshes.push(chunk.waterMesh);
+        });
+        const hit = this.raycaster.intersectObjects(chunkMeshes)[0];
+        if (!hit || hit.distance > 3 || !(hit.object instanceof THREE.Mesh) || !hit.object.geometry) return null;
+
+        const point = hit.point.clone().add(hit.face.normal.clone().multiplyScalar(-0.5));
+        return {
+            x: Math.floor(point.x),
+            y: Math.floor(point.y),
+            z: Math.floor(point.z),
+            normal: hit.face.normal.clone()
+        };
+    }
+
+    _setMiningProgress(progress) {
+        const indicator = document.getElementById('mining-progress');
+        if (!indicator) return;
+        const clamped = Math.max(0, Math.min(1, progress));
+        indicator.style.setProperty('--mining-progress', String(clamped));
+        indicator.classList.toggle('visible', clamped > 0);
+        indicator.setAttribute('aria-valuenow', String(Math.round(clamped * 100)));
+    }
+
+    cancelMining() {
+        this.miningHeld = false;
+        this.miningTarget = null;
+        this.miningProgress = 0;
+        this.miningToolType = 0;
+        this._setMiningProgress(0);
+    }
+
+    _startMining(target, plan, toolType) {
+        this.miningHeld = true;
+        this.miningTarget = target;
+        this.miningProgress = 0;
+        this.miningToolType = toolType;
+        this._setMiningProgress(0.001);
+        if (!plan.canBreak) {
+            this.showMiningHint(plan.hint);
+            this.cancelMining();
+        }
+    }
+
+    updateMining(delta) {
+        if (!this.miningHeld) return;
+        const hit = this._getBlockHit();
+        if (!hit) {
+            this.cancelMining();
+            return;
+        }
+
+        const targetChanged = !this.miningTarget ||
+            hit.x !== this.miningTarget.x || hit.y !== this.miningTarget.y || hit.z !== this.miningTarget.z;
+        if (targetChanged) {
+            this.miningTarget = hit;
+            this.miningProgress = 0;
+        }
+
+        const currentItem = this._getCurrentItem();
+        const toolType = currentItem && currentItem.count > 0 ? currentItem.type : 0;
+        const plan = getMiningPlan(this.world.getBlock(hit.x, hit.y, hit.z), toolType);
+        if (!plan.canBreak) {
+            this.showMiningHint(plan.hint);
+            this.cancelMining();
+            return;
+        }
+        if (toolType !== this.miningToolType) {
+            this.miningToolType = toolType;
+            this.miningProgress = 0;
+        }
+
+        this.miningProgress += delta / plan.duration;
+        this._setMiningProgress(this.miningProgress);
+        if (this.miningProgress < 1) return;
+
+        this._breakMinedBlock(hit, currentItem, plan);
+        this.miningTarget = null;
+        this.miningProgress = 0;
+        this._setMiningProgress(0);
+    }
+
+    _breakMinedBlock(target, currentItem, plan) {
+        const bx = target.x, by = target.y, bz = target.z;
+        const brokenType = this.world.getBlock(bx, by, bz);
+        if (!plan.canBreak || brokenType === 0) return;
+
+        const isNextToWater = (
+            this.world.getBlock(bx, by + 1, bz) === 4 ||
+            this.world.getBlock(bx - 1, by, bz) === 4 ||
+            this.world.getBlock(bx + 1, by, bz) === 4 ||
+            this.world.getBlock(bx, by, bz - 1) === 4 ||
+            this.world.getBlock(bx, by, bz + 1) === 4
+        );
+
+        this.world.setBlock(bx, by, bz, isNextToWater ? 4 : 0);
+        this.SoundManager.playDig(brokenType);
+        this.spawnBlockBreakParticles(bx, by, bz, brokenType, target.normal);
+
+        if (plan.usesDurability && currentItem) {
+            const toolInfo = getToolInfo(currentItem.type);
+            if (toolInfo) {
+                if (!Number.isFinite(currentItem.durability) || currentItem.durability <= 0) {
+                    currentItem.durability = toolInfo.maxDurability;
+                }
+                const previousDurability = currentItem.durability;
+                currentItem.durability--;
+                if (currentItem.durability <= 0) {
+                    currentItem.type = 0;
+                    currentItem.count = 0;
+                    currentItem.durability = 0;
+                    this.showMessage('Werkzeug kaputt!', '#ff4444', 20);
+                } else if (previousDurability / toolInfo.maxDurability > 0.15 && currentItem.durability / toolInfo.maxDurability <= 0.15) {
+                    this.showMessage('Werkzeug fast kaputt!', '#ff9800', 18);
+                }
+            }
+        }
+
+        if (brokenType === 28 || brokenType === 36) {
+            for (let x = bx - 1; x <= bx + 1; x++) {
+                for (let z = bz - 1; z <= bz + 1; z++) {
+                    const neighbor = this.world.getBlock(x, by, z);
+                    if ((brokenType === 28 && neighbor === 36) || (brokenType === 36 && neighbor === 28)) {
+                        this.world.setBlock(x, by, z, 0);
+                    }
+                }
+            }
+            this.context.addItemToInventory(28, 1);
+        } else if (brokenType === 33 || brokenType === 34) {
+            const partnerY = brokenType === 33 ? by + 1 : by - 1;
+            const partnerType = this.world.getBlock(bx, partnerY, bz);
+            if (brokenType === 33 && partnerType === 34) {
+                this.world.setBlock(bx, by + 1, bz, 0);
+                this.world.deleteBlockMeta(bx, by + 1, bz);
+            } else if (brokenType === 34 && partnerType === 33) {
+                this.world.setBlock(bx, by - 1, bz, 0);
+                this.world.deleteBlockMeta(bx, by - 1, bz);
+            }
+            this.world.deleteBlockMeta(bx, by, bz);
+            this.context.addItemToInventory(33, 1);
+        } else if (brokenType === 38 || brokenType === 39) {
+            for (let x = bx - 1; x <= bx + 1; x++) {
+                for (let z = bz - 1; z <= bz + 1; z++) {
+                    const neighbor = this.world.getBlock(x, by, z);
+                    if ((brokenType === 38 && neighbor === 39) || (brokenType === 39 && neighbor === 38)) {
+                        this.world.setBlock(x, by, z, 0);
+                    }
+                }
+            }
+            this.context.addItemToInventory(38, 1);
+        } else if (brokenType === 56) {
+            const dropCount = 1 + Math.floor(Math.random() * 2);
+            this.context.addItemToInventory(60, dropCount);
+            this.showMessage(`+ ${dropCount}x Kohle`, '#333333', 20);
+        } else if (brokenType === 57) {
+            this.context.addItemToInventory(57, 1);
+            this.showMessage('+ Eisen-Erz', '#C0C0C0', 20);
+        } else if (brokenType === 58) {
+            this.context.addItemToInventory(58, 1);
+            this.showMessage('+ Gold-Erz', '#FFD700', 20);
+        } else if (brokenType === 75) {
+            const chestKey = `chest,${bx},${by},${bz}`;
+            const contents = this.world.chestContents[chestKey] || [];
+            for (const item of contents) {
+                if (item && item.count > 0) this.context.addItemToInventory(item.type, item.count);
+            }
+            delete this.world.chestContents[chestKey];
+            this.world.lootedChests.delete(chestKey);
+            this.context.addItemToInventory(75, 1);
+        } else if (brokenType === 46) {
+            const stickCount = 1 + Math.floor(Math.random() * 2);
+            this.context.addItemToInventory(27, stickCount);
+            this.showMessage(`+ ${stickCount}x Stock`, '#8B4513', 20);
+        } else if (brokenType === 6 || brokenType === 14) {
+            if (Math.random() < 0.2) {
+                this.context.addItemToInventory(27, 1);
+                this.showMessage('+ Stock', '#8B4513', 20);
+            }
+        } else if (brokenType === 52) {
+            this.context.addItemToInventory(27, 1);
+        } else if (brokenType === 43) {
+            const berryCount = 1 + Math.floor(Math.random() * 3);
+            this.context.addItemToInventory(51, berryCount);
+            this.context.addItemToInventory(27, 1);
+            this.showMessage(`+ ${berryCount}x Beeren`, '#E53935', 20);
+        } else if (brokenType === 79) {
+            this.context.addItemToInventory(79, 1);
+        } else if (brokenType === 83) {
+            const spawnerKey = `${bx},${by},${bz}`;
+            delete this.world.spawnerMeta[spawnerKey];
+            if (Array.isArray(this.mobs)) {
+                for (const mob of this.mobs) {
+                    if (mob && mob._spawnerKey === spawnerKey) mob.isDead = true;
+                }
+            }
+            this.context.addItemToInventory(85, 2);
+            this.showMessage('Spawner zerstört! 💀', '#8B0000', 20);
+        } else if (brokenType === 86) {
+            const fireKey = `${bx},${by},${bz}`;
+            this.world.fireBlocks.delete(fireKey);
+            this.showMessage('Feuer gelöscht! 🔥', '#FF6600', 18);
+        } else {
+            this.context.addItemToInventory(brokenType, 1);
+            if (WOOD_BLOCKS.has(brokenType)) this.showMessage('+ Holz', '#d9a45f', 20);
+        }
+
+        this.context.updateInventoryUI();
     }
 
     async handleInteraction(e) {
@@ -149,7 +369,7 @@ export class PlayerInteraction {
                 if (hitNpc) {
                     if (e.button === 2) {
                         // Rechtsklick: Handels-UI öffnen
-                        const { openTradeUI } = await import('./tradeUI.js?v=20260716e');
+                        const { openTradeUI } = await import('./tradeUI.js?v=20260716f');
                         openTradeUI(hitNpc, this._controls);
                         return;
                     } else if (e.button === 0) {
@@ -261,139 +481,10 @@ export class PlayerInteraction {
                 const bx = Math.floor(p.x), by = Math.floor(p.y), bz = Math.floor(p.z);
                 const brokenType = this.world.getBlock(bx, by, bz);
                 
-                // Wasser und Bedrock können nicht abgebaut werden
-                if (brokenType === 4 || brokenType === 0 || brokenType === 20) {
-                    this.showMiningHint('Diesen Block kannst du nicht abbauen');
-                    return;
-                }
-
-                // Wasser-Einströmen prüfen
-                const isNextToWater = (
-                    this.world.getBlock(bx, by + 1, bz) === 4 ||
-                    this.world.getBlock(bx - 1, by, bz) === 4 ||
-                    this.world.getBlock(bx + 1, by, bz) === 4 ||
-                    this.world.getBlock(bx, by, bz - 1) === 4 ||
-                    this.world.getBlock(bx, by, bz + 1) === 4
-                );
-
-                this.world.setBlock(bx, by, bz, isNextToWater ? 4 : 0);
-                this.SoundManager.playDig(brokenType);
-                this.spawnBlockBreakParticles(bx, by, bz, brokenType, h.face.normal);
-
-                // Werkzeug-Haltbarkeit reduzieren
-                const toolInfo = getToolInfo(currentItem ? currentItem.type : 0);
-                if (toolInfo) {
-                    if (!currentItem.durability) currentItem.durability = toolInfo.maxDurability;
-                    currentItem.durability--;
-                    if (currentItem.durability <= 0) {
-                        currentItem.type = 0; currentItem.count = 0; currentItem.durability = 0;
-                        this.showMessage('Werkzeug kaputt!', '#ff4444', 20);
-                    }
-                }
-
-                // Doppel-Werkbank Logik
-                if (brokenType === 28 || brokenType === 36) {
-                    for (let x = bx - 1; x <= bx + 1; x++) {
-                        for (let z = bz - 1; z <= bz + 1; z++) {
-                            const neighbor = this.world.getBlock(x, by, z);
-                            if ((brokenType === 28 && neighbor === 36) || (brokenType === 36 && neighbor === 28)) {
-                                this.world.setBlock(x, by, z, 0);
-                            }
-                        }
-                    }
-                    this.context.addItemToInventory(28, 1);
-                // TÜR abbauen
-                } else if (brokenType === 33 || brokenType === 34) {
-                    const partnerY = brokenType === 33 ? by + 1 : by - 1;
-                    const partnerType = this.world.getBlock(bx, partnerY, bz);
-                    if (brokenType === 33 && partnerType === 34) {
-                        this.world.setBlock(bx, by + 1, bz, 0);
-                        this.world.deleteBlockMeta(bx, by + 1, bz);
-                    } else if (brokenType === 34 && partnerType === 33) {
-                        this.world.setBlock(bx, by - 1, bz, 0);
-                        this.world.deleteBlockMeta(bx, by - 1, bz);
-                    }
-                    this.world.deleteBlockMeta(bx, by, bz);
-                    this.context.addItemToInventory(33, 1);
-                // BETT abbauen
-                } else if (brokenType === 38 || brokenType === 39) {
-                    for (let x = bx - 1; x <= bx + 1; x++) {
-                        for (let z = bz - 1; z <= bz + 1; z++) {
-                            const neighbor = this.world.getBlock(x, by, z);
-                            if ((brokenType === 38 && neighbor === 39) || (brokenType === 39 && neighbor === 38)) {
-                                this.world.setBlock(x, by, z, 0);
-                            }
-                        }
-                    }
-                    this.context.addItemToInventory(38, 1);
-                // ERZ-Drops: Kohle-Erz → Kohle; Eisen/Gold-Erz → Erz selbst (zum Schmelzen)
-                } else if (brokenType === 56) {
-                    const dropCount = 1 + Math.floor(Math.random() * 2);
-                    this.context.addItemToInventory(60, dropCount); // COAL
-                    this.showMessage(`+ ${dropCount}x Kohle`, '#333333', 20);
-                } else if (brokenType === 57) {
-                    this.context.addItemToInventory(57, 1); // IRON_ORE (zum Schmelzen)
-                    this.showMessage('+ Eisen-Erz', '#C0C0C0', 20);
-                } else if (brokenType === 58) {
-                    this.context.addItemToInventory(58, 1); // GOLD_ORE (zum Schmelzen)
-                    this.showMessage('+ Gold-Erz', '#FFD700', 20);
-                // TRUHE: Inhalt und Block droppen
-                } else if (brokenType === 75) {
-                    const chestKey = `chest,${bx},${by},${bz}`;
-                    const contents = this.world.chestContents[chestKey] || [];
-                    for (const item of contents) {
-                        if (item && item.count > 0) this.context.addItemToInventory(item.type, item.count);
-                    }
-                    delete this.world.chestContents[chestKey];
-                    this.world.lootedChests.delete(chestKey); // Abgebaute Kiste zurücksetzen
-                    this.context.addItemToInventory(75, 1);
-                // TOTER STRAUCH
-                } else if (brokenType === 46) {
-                    const stickCount = 1 + Math.floor(Math.random() * 2);
-                    this.context.addItemToInventory(27, stickCount);
-                    this.showMessage(`+ ${stickCount}x Stock`, "#8B4513", 20);
-                // BLÄTTER
-                } else if (brokenType === 6 || brokenType === 14) {
-                    if (Math.random() < 0.2) {
-                        this.context.addItemToInventory(27, 1);
-                        this.showMessage("+ Stock", "#8B4513", 20);
-                    }
-                // LEERER BEERENBUSCH
-                } else if (brokenType === 52) {
-                    this.context.addItemToInventory(27, 1);
-                // VOLLER BEERENBUSCH
-                } else if (brokenType === 43) {
-                    const berryCount = 1 + Math.floor(Math.random() * 3);
-                    this.context.addItemToInventory(51, berryCount);
-                    this.context.addItemToInventory(27, 1);
-                    this.showMessage(`+ ${berryCount}x Beeren`, "#E53935", 20);
-                // DRUCKPLATTE: fallen lassen
-                } else if (brokenType === 79) {
-                    this.context.addItemToInventory(79, 1);
-                // SPAWNER: Abbau zerstört den Spawner, droppt nur Cobblestone
-                } else if (brokenType === 83) {
-                    const spawnerKey = `${bx},${by},${bz}`;
-                    delete this.world.spawnerMeta[spawnerKey];
-                    if (Array.isArray(this.mobs)) {
-                        for (const mob of this.mobs) {
-                            if (mob && mob._spawnerKey === spawnerKey) mob.isDead = true;
-                        }
-                    }
-                    this.context.addItemToInventory(85, 2); // 2x Cobblestone
-                    this.showMessage('Spawner zerstört! 💀', '#8B0000', 20);
-                // FEUER: Feuer löschen, kein Drop
-                } else if (brokenType === 86) {
-                    const fireKey = `${bx},${by},${bz}`;
-                    this.world.fireBlocks.delete(fireKey);
-                    this.showMessage('Feuer gelöscht! 🔥', '#FF6600', 18);
-                } else if (brokenType !== 0) {
-                    this.context.addItemToInventory(brokenType, 1);
-                    if (WOOD_BLOCKS.has(brokenType)) this.showMessage('+ Holz', '#d9a45f', 20);
-                }
-
-                this.context.updateInventoryUI();
-
-                
+                const toolType = currentItem && currentItem.count > 0 ? currentItem.type : 0;
+                const plan = getMiningPlan(brokenType, toolType);
+                this._startMining({ x: bx, y: by, z: bz, normal: h.face.normal.clone() }, plan, toolType);
+                return;
             } else if (e.button === 2) {
                 // Block platzieren / Interagieren
                 // === BEERENBUSCH, OFEN, TRUHE RECHTSKLICK ===

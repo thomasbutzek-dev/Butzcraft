@@ -10,7 +10,7 @@
  */
 
 import * as THREE from 'three';
-import { isTouchDevice } from './touch.js?v=20260716c';
+import { isTouchDevice } from './touch.js?v=20260716d';
 
 const _dummy = new THREE.Object3D();
 const _color = new THREE.Color();

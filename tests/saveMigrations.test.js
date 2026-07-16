@@ -100,8 +100,25 @@ describe('migrateSave – Edge Cases', () => {
 
         const migrated = migrateSave(data);
 
-        expect(migrated.version).toBe(7);
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
         expect(migrated.storyObjectiveIndex).toBe(0);
+    });
+
+    it('macht alte Werkzeuge einzeln haltbar und behaelt vorhandenen Verschleiss', () => {
+        const data = {
+            version: 7,
+            inventory: [
+                { type: 63, count: 2 },
+                { type: 65, count: 1, durability: 73 }
+            ]
+        };
+
+        const migrated = migrateSave(data);
+
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.inventory[0]).toEqual({ type: 63, count: 1, durability: 120 });
+        expect(migrated.inventory[1]).toEqual({ type: 65, count: 1, durability: 73 });
+        expect(migrated.inventory[2]).toEqual({ type: 63, count: 1, durability: 120 });
     });
 
     it('pads short current inventories so loading replaces all 64 slots', () => {

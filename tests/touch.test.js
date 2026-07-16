@@ -2,7 +2,7 @@
  *
  * Tests fuer die Touch-Detection-Heuristik in touch.js.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { applyTouchLookDelta, initTouchControls, isTouchDevice } from '../js/touch.js';
 import { Game } from '../js/Game.js';
 
@@ -121,6 +121,56 @@ describe('isTouchDevice', () => {
 
         document.removeEventListener('mousedown', onMouseDown);
         expect(buttons).toEqual([0]);
+    });
+
+    it('haelt den Abbau bis zum Loslassen aktiv', () => {
+        vi.useFakeTimers();
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const events = [];
+        const onMouseDown = (e) => events.push(`down:${e.button}`);
+        const onMouseUp = (e) => events.push(`up:${e.button}`);
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mouseup', onMouseUp);
+
+        try {
+            initTouchControls({
+                camera: { rotation: { x: 0 } },
+                controls: { getObject: () => ({ rotation: { y: 0 } }) },
+                isInventoryOpenedProvider: () => false
+            });
+
+            const area = document.getElementById('touch-look-area');
+            dispatchTouchEvent(area, 'touchstart', { identifier: 8, clientX: 100, clientY: 100 });
+            vi.advanceTimersByTime(181);
+            expect(events).toEqual(['down:0']);
+
+            dispatchTouchEvent(area, 'touchend', { identifier: 8, clientX: 100, clientY: 100 });
+            expect(events).toEqual(['down:0', 'up:0']);
+        } finally {
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('mouseup', onMouseUp);
+            vi.useRealTimers();
+        }
+    });
+
+    it('loest bei einem abgebrochenen Touch keinen Schlag aus', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const buttons = [];
+        const onMouseDown = (e) => buttons.push(e.button);
+        document.addEventListener('mousedown', onMouseDown);
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const area = document.getElementById('touch-look-area');
+        dispatchTouchEvent(area, 'touchstart', { identifier: 9, clientX: 100, clientY: 100 });
+        dispatchTouchEvent(area, 'touchcancel', { identifier: 9, clientX: 100, clientY: 100 });
+
+        document.removeEventListener('mousedown', onMouseDown);
+        expect(buttons).toEqual([]);
     });
 
     it('Touch-Look erzeugt keinen Roll/Seitwaerts-Kippwinkel', () => {

@@ -59,6 +59,22 @@ body {
             transform: translateX(-50%);
         }
 
+        #mining-progress {
+            --mining-progress: 0;
+            position: absolute;
+            inset: -8px;
+            border-radius: 50%;
+            background: conic-gradient(#ffe066 calc(var(--mining-progress) * 1turn), rgba(255, 255, 255, 0.14) 0);
+            -webkit-mask: radial-gradient(circle, transparent 58%, #000 61%);
+            mask: radial-gradient(circle, transparent 58%, #000 61%);
+            opacity: 0;
+            transition: opacity 0.1s ease;
+        }
+
+        #mining-progress.visible {
+            opacity: 1;
+        }
+
         #top-ui {
             width: 100%;
             display: flex;
@@ -401,6 +417,30 @@ body {
 
         .slot-count.empty {
             color: rgba(150, 150, 150, 0.6);
+        }
+
+        .durability-track {
+            position: absolute;
+            left: 5px;
+            right: 5px;
+            bottom: 3px;
+            height: 4px;
+            overflow: hidden;
+            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.72);
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        .durability-fill {
+            display: block;
+            height: 100%;
+            border-radius: inherit;
+            background: #71d679;
+        }
+
+        .durability-track.low .durability-fill {
+            background: #ff6b6b;
         }
 
         .key-hint {

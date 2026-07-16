@@ -17,22 +17,32 @@ beforeAll(() => {
     HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,';
 });
 
-async function createInteraction({ blockType = 0 } = {}) {
+async function createInteraction({ blockType = 0, inventoryItem = null } = {}) {
     const { PlayerInteraction } = await import('../js/PlayerInteraction.js');
     const sound = {
+        playDig: vi.fn(),
         playSound: vi.fn(),
         playSword: vi.fn()
     };
+    const inventorySlots = Array.from({ length: 64 }, () => ({ type: 0, count: 0 }));
+    if (inventoryItem) inventorySlots[0] = { ...inventoryItem };
     const context = {
         getSelectedSlot: () => 0,
-        getInventorySlots: () => Array.from({ length: 64 }, () => ({ type: 0, count: 0 })),
+        getInventorySlots: () => inventorySlots,
         addItemToInventory: vi.fn(),
         updateInventoryUI: vi.fn(),
         updateUI: vi.fn()
     };
+    let currentBlockType = blockType;
     const world = {
         chunks: new Map(),
-        getBlock: () => blockType
+        getBlock: () => currentBlockType,
+        setBlock: vi.fn((x, y, z, type) => { currentBlockType = type; }),
+        deleteBlockMeta: vi.fn(),
+        chestContents: {},
+        lootedChests: new Set(),
+        spawnerMeta: {},
+        fireBlocks: new Set()
     };
     const interaction = new PlayerInteraction(
         new THREE.PerspectiveCamera(),
@@ -43,7 +53,7 @@ async function createInteraction({ blockType = 0 } = {}) {
         context
     );
     interaction.showMessage = vi.fn();
-    return { interaction, sound };
+    return { interaction, sound, context, inventorySlots, world };
 }
 
 describe('PlayerInteraction through the Game seam', () => {
@@ -76,5 +86,36 @@ describe('PlayerInteraction through the Game seam', () => {
 
         expect(Game.player.health).toBe(8);
         expect(sound.playSound).toHaveBeenCalledWith('damage', 0.8, 1.0);
+    }, 15000);
+
+    it('breaks a held target only after enough progress and wears the correct tool', async () => {
+        const { interaction, inventorySlots, world } = await createInteraction({
+            blockType: 5,
+            inventoryItem: { type: 67, count: 1, durability: 37 }
+        });
+        const target = { x: 1, y: 2, z: 3, normal: new THREE.Vector3(0, 1, 0) };
+        interaction._getBlockHit = () => target;
+        interaction.spawnBlockBreakParticles = vi.fn();
+        interaction._startMining(target, { canBreak: true }, 67);
+
+        interaction.updateMining(0.1);
+        expect(world.setBlock).not.toHaveBeenCalled();
+
+        interaction.updateMining(0.5);
+        expect(world.setBlock).toHaveBeenCalledWith(1, 2, 3, 0);
+        expect(inventorySlots[0].durability).toBe(36);
+    }, 15000);
+
+    it('keeps valuable stone intact and shows the required tool hint', async () => {
+        const { interaction, world } = await createInteraction({ blockType: 3 });
+        const target = { x: 1, y: 2, z: 3, normal: new THREE.Vector3(0, 1, 0) };
+        interaction._getBlockHit = () => target;
+        interaction._startMining(target, { canBreak: true }, 0);
+
+        interaction.updateMining(1);
+
+        expect(world.setBlock).not.toHaveBeenCalled();
+        expect(interaction.showMessage).toHaveBeenCalledWith('Du brauchst eine Holz-Spitzhacke.', '#ffe066', 18);
+        expect(interaction.miningHeld).toBe(false);
     }, 15000);
 });
