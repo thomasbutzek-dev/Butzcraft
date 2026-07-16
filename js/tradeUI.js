@@ -5,7 +5,7 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName, tryExchangeInventory } from './inventory.js?v=20260716a';
+import { createBlockHTML, getItemName, tryExchangeInventory } from './inventory.js?v=20260716b';
 import { getQuestProgress } from './quests.js?v=20260515b';
 
 let currentNPC = null;

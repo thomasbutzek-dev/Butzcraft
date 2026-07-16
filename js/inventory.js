@@ -1,7 +1,7 @@
 /* js/inventory.js - Butzcraft Inventory Module */
 import { craftingGridData, craftingResultData, checkCrafting } from './crafting.js?v=20260507b';
 import { craftingRecipes } from './recipes.js?v=20260507b';
-import { initRecipeBook } from './recipe_book.js?v=20260507b';
+import { initRecipeBook } from './recipe_book.js?v=20260716a';
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
 import { SoundManager } from './sound.js?v=20260507b';
 
@@ -527,7 +527,6 @@ export function toggleInventory(gameStarted, spawning, controls) {
             updateInventoryUI();
         };
         initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick);
-        if(window.updateRecipeList) window.updateRecipeList();
     }
     
     document.getElementById('inventory-overlay').style.display = inventoryOpened ? 'flex' : 'none';

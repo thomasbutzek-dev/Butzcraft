@@ -191,5 +191,5 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
         }, 10);
     };
 
-    window.updateRecipeList = updateRecipeList;
+    updateRecipeList();
 }

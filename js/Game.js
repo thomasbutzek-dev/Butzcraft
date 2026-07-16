@@ -5,8 +5,8 @@
  *  Phase 1 (HIER): Game proxy-zu-window. Existierender Code unverändert. Neuer Code soll
  *                  `import { Game } from './Game.js'` benutzen anstatt window.player etc.
  *
- *  Phase 2 (später): Bestehende Module schrittweise migrieren — pro PR ein Modul:
- *                  - inventory.js: window.* Recipe-Hooks → Game-Methoden
+ *  Phase 2 (complete): PlayerInteraction and mob state use Game; the obsolete
+ *                      global recipe refresh hook was removed from inventory.
  *
  *  Phase 3 (final): window.* Assignments aus GameMain.js entfernen, Game.set*() aufrufen.
  *                  Tests können Game.reset() aufrufen statt window-Properties zu löschen.
