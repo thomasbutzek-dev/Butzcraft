@@ -1,6 +1,6 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
-import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260716i';
+import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260716j';
 import { Game } from './Game.js?v=20260716b';
 
 // Schmelz-Rezepte: Input-Block → Output-Item

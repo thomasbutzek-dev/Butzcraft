@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260716j">
+    <link rel="stylesheet" href="style.css?v=20260716k">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -325,6 +325,10 @@
                     </div>
                 </div>
             </div>
+            <div id="attack-cooldown" role="progressbar" aria-label="Angriff bereit" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                <span>Angriff</span>
+                <div class="attack-cooldown-track"><div id="attack-cooldown-fill"></div></div>
+            </div>
             <div id="inventory">
                 <div class="slot active" data-slot="0"><span class="key-hint">1</span></div>
                 <div class="slot" data-slot="1"><span class="key-hint">2</span></div>
@@ -436,7 +440,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260716y"
+        src="./js/GameMain.js?v=20260716z"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

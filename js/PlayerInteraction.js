@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
-import { openFurnace } from './furnace.js?v=20260716g';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716i';
+import { openFurnace } from './furnace.js?v=20260716h';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716j';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260716a';
+import { getAttackProfile, getSwordInfo } from './combatRules.js?v=20260716a';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
@@ -27,6 +28,8 @@ export class PlayerInteraction {
         this.miningTarget = null;
         this.miningProgress = 0;
         this.miningToolType = 0;
+        this.attackReadyAt = 0;
+        this.lastAttackCooldown = 0.8;
     }
 
     spawnBlockBreakParticles(x, y, z, blockType, normal) {
@@ -166,6 +169,43 @@ export class PlayerInteraction {
         this.miningProgress = 0;
         this.miningToolType = 0;
         this._setMiningProgress(0);
+    }
+
+    _setAttackCooldown(progress, visible) {
+        const indicator = document.getElementById('attack-cooldown');
+        const fill = document.getElementById('attack-cooldown-fill');
+        if (!indicator || !fill) return;
+        const clamped = Math.max(0, Math.min(1, progress));
+        fill.style.transform = `scaleX(${clamped})`;
+        indicator.classList.toggle('visible', visible);
+        indicator.setAttribute('aria-valuenow', String(Math.round(clamped * 100)));
+    }
+
+    updateCombat(now = performance.now()) {
+        const currentItem = this._getCurrentItem();
+        const swordSelected = Boolean(currentItem && currentItem.count > 0 && getSwordInfo(currentItem.type));
+        const remaining = Math.max(0, this.attackReadyAt - now);
+        const coolingDown = remaining > 0;
+        const duration = Math.max(1, this.lastAttackCooldown * 1000);
+        this._setAttackCooldown(coolingDown ? 1 - remaining / duration : 1, swordSelected || coolingDown);
+    }
+
+    _wearSword(item, swordInfo) {
+        if (!item || !swordInfo) return;
+        if (!Number.isFinite(item.durability) || item.durability <= 0) {
+            item.durability = swordInfo.maxDurability;
+        }
+        const previousDurability = item.durability;
+        item.durability--;
+        if (item.durability <= 0) {
+            item.type = 0;
+            item.count = 0;
+            item.durability = 0;
+            this.showMessage('Schwert kaputt!', '#ff4444', 20);
+        } else if (previousDurability / swordInfo.maxDurability > 0.15 && item.durability / swordInfo.maxDurability <= 0.15) {
+            this.showMessage('Schwert fast kaputt!', '#ff9800', 18);
+        }
+        this.context.updateInventoryUI();
     }
 
     _startMining(target, plan, toolType) {
@@ -346,11 +386,18 @@ export class PlayerInteraction {
     }
 
     async handleInteraction(e) {
-        // Schlag-Animation triggern
-        if (e.button === 0) { 
-            Game.player.isSwinging = true;
-            Game.player.swingProgress = 0;
-            this.SoundManager.playSword();
+        const currentItem = this._getCurrentItem();
+        const heldType = currentItem && currentItem.count > 0 ? currentItem.type : 0;
+        const swordInfo = getSwordInfo(heldType);
+
+        if (e.button === 0) {
+            if (typeof Game.player.startAttackAnimation === 'function') {
+                Game.player.startAttackAnimation(swordInfo);
+            } else {
+                Game.player.isSwinging = true;
+                Game.player.swingProgress = 0;
+            }
+            if (swordInfo) this.SoundManager.playSword();
         }
 
         this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
@@ -369,12 +416,11 @@ export class PlayerInteraction {
                 if (hitNpc) {
                     if (e.button === 2) {
                         // Rechtsklick: Handels-UI öffnen
-                        const { openTradeUI } = await import('./tradeUI.js?v=20260716h');
+                        const { openTradeUI } = await import('./tradeUI.js?v=20260716i');
                         openTradeUI(hitNpc, this._controls);
                         return;
                     } else if (e.button === 0) {
-                        // Linksklick: NPC angreifen
-                        hitNpc.takeDamage(10);
+                        this.showMessage('Dorfbewohner sind Freunde – sprich mit Rechtsklick.', '#ffe066', 18);
                         return;
                     }
                 }
@@ -393,11 +439,18 @@ export class PlayerInteraction {
 
             if (hitMob) {
                 if (e.button === 0) { // Angreifen
-                    hitMob.takeDamage(10, (amount) => {
+                    const now = performance.now();
+                    if (now < this.attackReadyAt) return;
+                    const attack = getAttackProfile(heldType);
+                    this.attackReadyAt = now + attack.cooldown * 1000;
+                    this.lastAttackCooldown = attack.cooldown;
+                    this._setAttackCooldown(0, true);
+                    hitMob.takeDamage(attack.damage, (amount) => {
                         if (hitMob.type === 'pig') {
                             Game.player.hunger = Math.min(MAX_HUNGER, Game.player.hunger + HUNGER_GAIN_PIG);
                         }
                     });
+                    if (attack.usesDurability) this._wearSword(currentItem, swordInfo);
                 } else if (e.button === 2 && hitMob.type === 'cow') { // Melken
                     const now = Date.now();
                     if (now - hitMob.lastMilkTime > CONFIG.MOBS.COW_MILK_TIME_MIN) {
@@ -424,10 +477,6 @@ export class PlayerInteraction {
         }
 
         // 2. Konsumierbare Items prüfen (Live-Abfrage der Slot-Daten)
-        const currentSlotIdx = (typeof window.getSelectedSlot === 'function') ? window.getSelectedSlot() : this.context.getSelectedSlot();
-        const inventorySlots = this.context.getInventorySlots();
-        const currentItem = inventorySlots[currentSlotIdx];
-        
         if (e.button === 2 && currentItem && (currentItem.type === 17 || currentItem.type === 18 || (currentItem.type >= 21 && currentItem.type <= 25) || currentItem.type === 51 || currentItem.type === 55)) {
             if (currentItem.count > 0) {
                 currentItem.count--;
@@ -535,7 +584,8 @@ export class PlayerInteraction {
 
                 // Werkzeuge, Barren, Items können nicht platziert werden
                 const unplaceable = [17, 18, 21, 22, 23, 24, 25, 31, 34, 39, 51,
-                    60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74];
+                    60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
+                    89, 90, 91, 92];
                 
                 if (currentItem.count <= 0 || currentItem.type === 0 || unplaceable.includes(currentItem.type)) {
                     return; 

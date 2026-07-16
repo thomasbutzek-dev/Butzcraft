@@ -128,4 +128,12 @@ describe('matchRecipe – Smoke-Test mit echten Spiel-Rezepten', () => {
     it('leeres Grid liefert null (kein Phantom-Recipe)', () => {
         expect(matchRecipe([0, 0, 0, 0], 2, craftingRecipes)).toBeNull();
     });
+
+    it('Schwerter benoetigen die 3x3-Werkbank und passende Materialien', () => {
+        expect(matchRecipe([0,26,0, 0,26,0, 0,27,0], 3, craftingRecipes)).toEqual({ type: 89, count: 1 });
+        expect(matchRecipe([0,3,0, 0,3,0, 0,27,0], 3, craftingRecipes)).toEqual({ type: 90, count: 1 });
+        expect(matchRecipe([0,61,0, 0,61,0, 0,27,0], 3, craftingRecipes)).toEqual({ type: 91, count: 1 });
+        expect(matchRecipe([0,62,0, 0,62,0, 0,27,0], 3, craftingRecipes)).toEqual({ type: 92, count: 1 });
+        expect(matchRecipe([26,26,27,0], 2, craftingRecipes)).toBeNull();
+    });
 });

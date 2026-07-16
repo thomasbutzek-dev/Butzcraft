@@ -1,11 +1,20 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260716a';
-import { craftingRecipes } from './recipes.js?v=20260507b';
-import { initRecipeBook } from './recipe_book.js?v=20260716c';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
+import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260716b';
+import { craftingRecipes } from './recipes.js?v=20260716c';
+import { initRecipeBook } from './recipe_book.js?v=20260716d';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260716c';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
-import { getToolInfo, isToolType } from './miningRules.js?v=20260716a';
+import { getToolInfo } from './miningRules.js?v=20260716a';
+import { getSwordInfo } from './combatRules.js?v=20260716a';
+
+function getDurableItemInfo(type) {
+    return getToolInfo(type) || getSwordInfo(type);
+}
+
+function isDurableItemType(type) {
+    return getDurableItemInfo(type) !== null;
+}
 
 // Sprint 6: Tooltip-Hint für essbare Items.
 // Quelle der Wahrheit für Hunger-Werte ist PlayerInteraction.handleInteraction (Type-Match-Switch).
@@ -89,7 +98,8 @@ const TRANSLATIONS = {
     'WOOD_AXE': 'Holz-Axt', 'STONE_AXE': 'Stein-Axt', 'IRON_AXE': 'Eisen-Axt', 'GOLD_AXE': 'Gold-Axt',
     'WOOD_SHOVEL': 'Holz-Schaufel', 'STONE_SHOVEL': 'Stein-Schaufel', 'IRON_SHOVEL': 'Eisen-Schaufel', 'GOLD_SHOVEL': 'Gold-Schaufel',
     'CHEST': 'Truhe', 'SNOW_BLOCK': 'Schneeblock', 'ICE_BLOCK': 'Eisblock', 'PRESSURE_PLATE': 'Druckplatte', 'MINE_RAIL': 'Minengleis', 'MINE_SUPPORT': 'Minenbalken', 'SANDSTONE_CARVED': 'Gravierter Sandstein',
-    'SPAWNER': 'Mob-Spawner', 'MOSSY_STONE': 'Moosiger Stein', 'COBBLESTONE': 'Bruchstein', 'FIRE': 'Feuer', 'VILLAGE_PATH': 'Dorfweg', 'HAY_BALE': 'Strohballen'
+    'SPAWNER': 'Mob-Spawner', 'MOSSY_STONE': 'Moosiger Stein', 'COBBLESTONE': 'Bruchstein', 'FIRE': 'Feuer', 'VILLAGE_PATH': 'Dorfweg', 'HAY_BALE': 'Strohballen',
+    'WOOD_SWORD': 'Holzschwert', 'STONE_SWORD': 'Steinschwert', 'IRON_SWORD': 'Eisenschwert', 'GOLD_SWORD': 'Goldschwert'
 };
 
 
@@ -110,7 +120,7 @@ const TOUCH_MOVE_CANCEL_PX = 10;
 
 export function canAddItemToInventory(type, count) {
     if (type === 0 || count <= 0) return false;
-    if (isToolType(type)) {
+    if (isDurableItemType(type)) {
         let freeSlots = 0;
         for (let i = 0; i < inventorySlots.length; i++) {
             if (i >= 8 && i <= 15) continue;
@@ -188,12 +198,12 @@ export function tryExchangeInventory(give, receive) {
 export function addItemToInventory(type, count) {
     if (type === 0) return { added: 0, remaining: count };
     const requestedCount = count;
-    const toolInfo = getToolInfo(type);
-    if (toolInfo) {
+    const durableInfo = getDurableItemInfo(type);
+    if (durableInfo) {
         for (let i = 0; i < inventorySlots.length && count > 0; i++) {
             if (i >= 8 && i <= 15) continue;
             if (inventorySlots[i].type !== 0 && inventorySlots[i].count > 0) continue;
-            inventorySlots[i] = { type, count: 1, durability: toolInfo.maxDurability };
+            inventorySlots[i] = { type, count: 1, durability: durableInfo.maxDurability };
             count--;
         }
         updateInventoryUI();
@@ -236,7 +246,7 @@ export function createBlockHTML(type) {
     if (type === 25) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍖</div>`;
 
     const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
-        || (type >= 60 && type <= 74)); // Kohle, Barren, Werkzeuge als 2D-Icons
+        || (type >= 60 && type <= 74) || (type >= 89 && type <= 92)); // Kohle, Barren, Werkzeuge und Waffen als 2D-Icons
     let texIdx = 0;
     if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
     const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
@@ -259,8 +269,8 @@ function buildSlotLabel(kind, index, item) {
 
 function updateDurabilityBar(slot, item) {
     let track = slot.querySelector('.durability-track');
-    const toolInfo = item && item.count > 0 ? getToolInfo(item.type) : null;
-    if (!toolInfo) {
+    const durableInfo = item && item.count > 0 ? getDurableItemInfo(item.type) : null;
+    if (!durableInfo) {
         if (track) track.remove();
         return false;
     }
@@ -273,11 +283,11 @@ function updateDurabilityBar(slot, item) {
         track.appendChild(fill);
         slot.appendChild(track);
     }
-    const durability = Number.isFinite(item.durability) ? item.durability : toolInfo.maxDurability;
-    const ratio = Math.max(0, Math.min(1, durability / toolInfo.maxDurability));
+    const durability = Number.isFinite(item.durability) ? item.durability : durableInfo.maxDurability;
+    const ratio = Math.max(0, Math.min(1, durability / durableInfo.maxDurability));
     track.querySelector('.durability-fill').style.width = `${Math.round(ratio * 100)}%`;
     track.classList.toggle('low', ratio <= 0.15);
-    track.title = `Haltbarkeit ${durability}/${toolInfo.maxDurability}`;
+    track.title = `Haltbarkeit ${durability}/${durableInfo.maxDurability}`;
     return true;
 }
 
@@ -375,8 +385,8 @@ function handleSlotClick(e, sType, index) {
     if (!itemObj) return;
 
     if (sType === 'result') return;
-    if (sType === 'crafting' && cursorItem.count > 0 && isToolType(cursorItem.type)) {
-        setCraftingStatus('Werkzeuge sind keine Bastelzutaten.', 'error');
+    if (sType === 'crafting' && cursorItem.count > 0 && isDurableItemType(cursorItem.type)) {
+        setCraftingStatus('Werkzeuge und Waffen sind keine Bastelzutaten.', 'error');
         return;
     }
 
@@ -388,7 +398,7 @@ function handleSlotClick(e, sType, index) {
         } else {
             if (itemObj.count === 0) {
                 moveItem(itemObj, cursorItem);
-            } else if (itemObj.type === cursorItem.type && !isToolType(itemObj.type)) {
+            } else if (itemObj.type === cursorItem.type && !isDurableItemType(itemObj.type)) {
                 const space = 64 - itemObj.count;
                 if (space > 0) {
                     const add = Math.min(space, cursorItem.count);
@@ -403,7 +413,7 @@ function handleSlotClick(e, sType, index) {
     } else if (e.button === 2) { 
         if (cursorItem.count === 0) {
             if (itemObj.count > 0) {
-                if (isToolType(itemObj.type)) {
+                if (isDurableItemType(itemObj.type)) {
                     moveItem(cursorItem, itemObj);
                 } else {
                     const half = Math.ceil(itemObj.count / 2);
@@ -415,7 +425,7 @@ function handleSlotClick(e, sType, index) {
             }
         } else {
             if (itemObj.count === 0) {
-                if (isToolType(cursorItem.type)) {
+                if (isDurableItemType(cursorItem.type)) {
                     moveItem(itemObj, cursorItem);
                 } else {
                     itemObj.type = cursorItem.type;
@@ -423,7 +433,7 @@ function handleSlotClick(e, sType, index) {
                     cursorItem.count--;
                     if (cursorItem.count <= 0) clearItem(cursorItem);
                 }
-            } else if (itemObj.type === cursorItem.type && !isToolType(itemObj.type) && itemObj.count < 64) {
+            } else if (itemObj.type === cursorItem.type && !isDurableItemType(itemObj.type) && itemObj.count < 64) {
                 itemObj.count++;
                 cursorItem.count--;
                 if (cursorItem.count <= 0) clearItem(cursorItem);

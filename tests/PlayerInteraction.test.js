@@ -17,7 +17,7 @@ beforeAll(() => {
     HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,';
 });
 
-async function createInteraction({ blockType = 0, inventoryItem = null } = {}) {
+async function createInteraction({ blockType = 0, inventoryItem = null, mobs = [] } = {}) {
     const { PlayerInteraction } = await import('../js/PlayerInteraction.js');
     const sound = {
         playDig: vi.fn(),
@@ -49,7 +49,7 @@ async function createInteraction({ blockType = 0, inventoryItem = null } = {}) {
         new THREE.PerspectiveCamera(),
         new THREE.Scene(),
         world,
-        [],
+        mobs,
         sound,
         context
     );
@@ -59,7 +59,13 @@ async function createInteraction({ blockType = 0, inventoryItem = null } = {}) {
 
 describe('PlayerInteraction through the Game seam', () => {
     beforeEach(() => {
-        Game.player = { health: 10, hunger: 10, isSwinging: false, swingProgress: 1 };
+        Game.player = {
+            health: 10,
+            hunger: 10,
+            isSwinging: false,
+            swingProgress: 1,
+            startAttackAnimation: vi.fn()
+        };
         window.npcs = [];
         window.getSelectedSlot = undefined;
     });
@@ -70,14 +76,56 @@ describe('PlayerInteraction through the Game seam', () => {
         delete window.getSelectedSlot;
     });
 
-    it('updates the player swing state on a primary interaction', async () => {
+    it('starts an empty-hand animation without showing or sounding like a free sword', async () => {
         const { interaction, sound } = await createInteraction();
 
         await interaction.handleInteraction({ button: 0 });
 
-        expect(Game.player.isSwinging).toBe(true);
-        expect(Game.player.swingProgress).toBe(0);
-        expect(sound.playSword).toHaveBeenCalledOnce();
+        expect(Game.player.startAttackAnimation).toHaveBeenCalledWith(null);
+        expect(sound.playSword).not.toHaveBeenCalled();
+    }, 15000);
+
+    it('applies sword damage once per cooldown and wears the sword on a hit', async () => {
+        const mobMesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        const mob = { mesh: mobMesh, isDead: false, type: 'zombie', takeDamage: vi.fn() };
+        const { interaction, context, inventorySlots } = await createInteraction({
+            inventoryItem: { type: 89, count: 1, durability: 5 },
+            mobs: [mob]
+        });
+        interaction.raycaster.intersectObjects = vi.fn(objects => objects.includes(mobMesh) ? [{
+            distance: 2,
+            object: mobMesh
+        }] : []);
+        const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+
+        await interaction.handleInteraction({ button: 0 });
+        await interaction.handleInteraction({ button: 0 });
+
+        expect(mob.takeDamage).toHaveBeenCalledTimes(1);
+        expect(mob.takeDamage).toHaveBeenCalledWith(5, expect.any(Function));
+        expect(inventorySlots[0].durability).toBe(4);
+        expect(context.updateInventoryUI).toHaveBeenCalled();
+        now.mockRestore();
+    }, 15000);
+
+    it('protects villagers from player attacks', async () => {
+        const group = new THREE.Group();
+        const npc = { group, isDead: false, takeDamage: vi.fn() };
+        window.npcs = [npc];
+        const { interaction } = await createInteraction({ inventoryItem: { type: 91, count: 1, durability: 450 } });
+        interaction.raycaster.intersectObjects = vi.fn(objects => objects.includes(group) ? [{
+            distance: 2,
+            object: group
+        }] : []);
+
+        await interaction.handleInteraction({ button: 0 });
+
+        expect(npc.takeDamage).not.toHaveBeenCalled();
+        expect(interaction.showMessage).toHaveBeenCalledWith(
+            'Dorfbewohner sind Freunde – sprich mit Rechtsklick.',
+            '#ffe066',
+            18
+        );
     }, 15000);
 
     it('applies pressure-plate damage to the central player state', async () => {

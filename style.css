@@ -147,6 +147,41 @@ body {
             margin-bottom: 10px;
         }
 
+        #attack-cooldown {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 7px;
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            opacity: 0;
+            transition: opacity 0.12s ease;
+        }
+
+        #attack-cooldown.visible {
+            opacity: 1;
+        }
+
+        .attack-cooldown-track {
+            width: 96px;
+            height: 5px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 4px;
+            background: rgba(0, 0, 0, 0.55);
+        }
+
+        #attack-cooldown-fill {
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #d99016, #ffe066);
+            transform: scaleX(1);
+            transform-origin: left center;
+        }
+
         .bar-container {
             display: flex;
             flex-direction: column;

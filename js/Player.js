@@ -35,6 +35,8 @@ export class Player {
         // Sword Animation State
         this.isSwinging = false;
         this.swingProgress = 0;
+        this.showSwordDuringSwing = false;
+        this.swordSwingSpeed = 12;
         this.swordGroup = this.createSword();
         this.camera.add(this.swordGroup);
 
@@ -214,6 +216,7 @@ export class Player {
             new THREE.BoxGeometry(0.12, 0.6, 0.05),
             new THREE.MeshPhongMaterial({ color: 0xbdc3c7 })
         );
+        this.swordBlade = blade;
         blade.position.y = 0.45;
         swordGroup.add(blade);
 
@@ -249,21 +252,25 @@ export class Player {
     }
 
     swingSword() {
-        if (!this.isSwinging) {
-            this.isSwinging = true;
-            this.swingProgress = 0;
+        this.startAttackAnimation(null);
+    }
+
+    startAttackAnimation(swordInfo = null) {
+        this.isSwinging = true;
+        this.swingProgress = 0;
+        this.showSwordDuringSwing = Boolean(swordInfo);
+        this.swordSwingSpeed = swordInfo
+            ? Math.max(10, Math.PI / Math.max(0.25, swordInfo.cooldown * 0.75))
+            : 12;
+        if (swordInfo && this.swordBlade?.material?.color) {
+            this.swordBlade.material.color.setHex(swordInfo.color);
         }
     }
 
     updateSword(delta) {
-        if (this.cameraMode !== 'first') {
-            this.swordGroup.visible = false;
-            return;
-        }
-
         if (this.isSwinging) {
-            this.swordGroup.visible = true; 
-            this.swingProgress += delta * 12; 
+            this.swordGroup.visible = this.cameraMode === 'first' && this.showSwordDuringSwing;
+            this.swingProgress += delta * this.swordSwingSpeed;
             if (this.swingProgress > Math.PI) { 
                 this.swingProgress = 0; 
                 this.isSwinging = false; 
