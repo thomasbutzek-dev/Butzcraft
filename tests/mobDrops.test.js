@@ -43,4 +43,15 @@ describe('Mob drops through the Game seam', () => {
         expect(Game.droppedItems).toHaveLength(1);
         expect(Game.droppedItems[0].blockType).toBe(22);
     }, 15000);
+
+    it('drops string when a spider is defeated', async () => {
+        const { Mob } = await import('../js/mobs.js');
+        Game.droppedItems = [];
+        const spider = new Mob(new THREE.Scene(), 'spider', 0, 0, 0);
+
+        spider.takeDamage(100);
+
+        expect(Game.droppedItems).toHaveLength(1);
+        expect(Game.droppedItems[0].blockType).toBe(93);
+    }, 15000);
 });

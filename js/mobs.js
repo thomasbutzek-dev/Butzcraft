@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260511a';
 import { SoundManager } from './sound.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260507b';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260716d';
 import { Physics } from './Physics.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 
@@ -1104,6 +1104,7 @@ export class Mob {
                     else if (this.type === 'chicken') { blockType = 23; dropColor = 0xFFEEBB; }
                     else if (this.type === 'zombie') { blockType = 24; dropColor = 0x3a5f0b; }
                     else if (this.type === 'skeleton') { blockType = 31; dropColor = 0xebebeb; }
+                    else if (this.type === 'spider') { blockType = BLOCK_TYPES.STRING; dropColor = 0xF2F2F2; }
                     else if (this.type === 'sheep') { blockType = 25; dropColor = 0xFFB6C1; }
                     else if (this.type === 'turtle') { blockType = 55; dropColor = 0x4A7A3D; }
 

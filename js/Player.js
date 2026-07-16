@@ -36,9 +36,12 @@ export class Player {
         this.isSwinging = false;
         this.swingProgress = 0;
         this.showSwordDuringSwing = false;
+        this.showBowDuringSwing = false;
         this.swordSwingSpeed = 12;
         this.swordGroup = this.createSword();
         this.camera.add(this.swordGroup);
+        this.bowGroup = this.createBow();
+        this.camera.add(this.bowGroup);
 
         this.cameraMode = 'first';
         this.characterGroup = characterProfile ? createCharacterModel(characterProfile, { positionY: 0 }) : null;
@@ -85,7 +88,10 @@ export class Player {
     setCameraMode(mode) {
         this.cameraMode = mode === 'third' ? 'third' : 'first';
         if (this.characterGroup) this.characterGroup.visible = this.cameraMode === 'third';
-        if (this.cameraMode === 'third') this.swordGroup.visible = false;
+        if (this.cameraMode === 'third') {
+            this.swordGroup.visible = false;
+            this.bowGroup.visible = false;
+        }
     }
 
     prepareCameraForRender(world) {
@@ -251,6 +257,31 @@ export class Player {
         return swordGroup;
     }
 
+    createBow() {
+        const bowGroup = new THREE.Group();
+        const wood = new THREE.MeshPhongMaterial({ color: 0x8B5A2B });
+        const upper = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.42, 0.07), wood);
+        const lower = upper.clone();
+        upper.position.set(0.08, 0.2, 0); upper.rotation.z = -0.28;
+        lower.position.set(0.08, -0.2, 0); lower.rotation.z = 0.28;
+        bowGroup.add(upper, lower);
+
+        const stringPoints = [
+            new THREE.Vector3(0.19, 0.4, 0),
+            new THREE.Vector3(-0.06, 0, 0),
+            new THREE.Vector3(0.19, -0.4, 0)
+        ];
+        const string = new THREE.Line(
+            new THREE.BufferGeometry().setFromPoints(stringPoints),
+            new THREE.LineBasicMaterial({ color: 0xEEEEEE })
+        );
+        bowGroup.add(string);
+        bowGroup.position.set(0.42, -0.25, -0.55);
+        bowGroup.rotation.set(-0.15, -0.35, -0.15);
+        bowGroup.visible = false;
+        return bowGroup;
+    }
+
     swingSword() {
         this.startAttackAnimation(null);
     }
@@ -259,6 +290,7 @@ export class Player {
         this.isSwinging = true;
         this.swingProgress = 0;
         this.showSwordDuringSwing = Boolean(swordInfo);
+        this.showBowDuringSwing = false;
         this.swordSwingSpeed = swordInfo
             ? Math.max(10, Math.PI / Math.max(0.25, swordInfo.cooldown * 0.75))
             : 12;
@@ -267,22 +299,35 @@ export class Player {
         }
     }
 
+    startBowAnimation(bowInfo) {
+        this.isSwinging = true;
+        this.swingProgress = 0;
+        this.showSwordDuringSwing = false;
+        this.showBowDuringSwing = true;
+        this.swordSwingSpeed = Math.max(8, Math.PI / Math.max(0.3, bowInfo.cooldown * 0.85));
+    }
+
     updateSword(delta) {
         if (this.isSwinging) {
             this.swordGroup.visible = this.cameraMode === 'first' && this.showSwordDuringSwing;
+            this.bowGroup.visible = this.cameraMode === 'first' && this.showBowDuringSwing;
             this.swingProgress += delta * this.swordSwingSpeed;
             if (this.swingProgress > Math.PI) { 
                 this.swingProgress = 0; 
                 this.isSwinging = false; 
                 this.swordGroup.visible = false; 
+                this.bowGroup.visible = false;
             }
             const v = Math.sin(this.swingProgress); 
             this.swordGroup.rotation.x = -0.2 - v * 1.5; 
             this.swordGroup.rotation.z = v * 0.5; 
             this.swordGroup.position.z = -0.5 + v * 0.2; 
             this.swordGroup.rotation.y = -0.35 - v * 0.15;
+            this.bowGroup.position.z = -0.55 + v * 0.12;
+            this.bowGroup.rotation.y = -0.35 - v * 0.12;
         } else {
             this.swordGroup.visible = false;
+            this.bowGroup.visible = false;
         }
     }
 

@@ -85,6 +85,13 @@ describe('addItemToInventory – Basis', () => {
         expect(inventorySlots[1]).toEqual({ type: 89, count: 1, durability: 100 });
     });
 
+    it('stores bows separately with full durability', () => {
+        addItemToInventory(94, 2);
+
+        expect(inventorySlots[0]).toEqual({ type: 94, count: 1, durability: 180 });
+        expect(inventorySlots[1]).toEqual({ type: 94, count: 1, durability: 180 });
+    });
+
     it('preserves tool durability when moving it between slots', () => {
         inventorySlots[0] = { type: 63, count: 1, durability: 37 };
         const source = createSlotElement(0, 'inventory');

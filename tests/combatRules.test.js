@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getAttackProfile, getSwordInfo, isSwordType } from '../js/combatRules.js';
+import { getAttackProfile, getBowInfo, getSwordInfo, isBowType, isSwordType } from '../js/combatRules.js';
 
 describe('combat quality rules', () => {
     it('keeps bare hands weak but viable and tools only slightly stronger', () => {
@@ -25,5 +25,11 @@ describe('combat quality rules', () => {
         expect([89, 90, 91, 92].every(isSwordType)).toBe(true);
         expect(isSwordType(63)).toBe(false);
         expect(isSwordType(0)).toBe(false);
+    });
+
+    it('defines one durable bow as the ranged weapon', () => {
+        expect(getBowInfo(94)).toMatchObject({ damage: 6, cooldown: 0.75, maxDurability: 180 });
+        expect(isBowType(94)).toBe(true);
+        expect(isBowType(95)).toBe(false);
     });
 });

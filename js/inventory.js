@@ -1,15 +1,15 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260716b';
-import { craftingRecipes } from './recipes.js?v=20260716c';
-import { initRecipeBook } from './recipe_book.js?v=20260716d';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260716c';
+import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260716c';
+import { craftingRecipes } from './recipes.js?v=20260716d';
+import { initRecipeBook } from './recipe_book.js?v=20260716e';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260716d';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getToolInfo } from './miningRules.js?v=20260716a';
-import { getSwordInfo } from './combatRules.js?v=20260716a';
+import { getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
 
 function getDurableItemInfo(type) {
-    return getToolInfo(type) || getSwordInfo(type);
+    return getToolInfo(type) || getSwordInfo(type) || getBowInfo(type);
 }
 
 function isDurableItemType(type) {
@@ -99,7 +99,8 @@ const TRANSLATIONS = {
     'WOOD_SHOVEL': 'Holz-Schaufel', 'STONE_SHOVEL': 'Stein-Schaufel', 'IRON_SHOVEL': 'Eisen-Schaufel', 'GOLD_SHOVEL': 'Gold-Schaufel',
     'CHEST': 'Truhe', 'SNOW_BLOCK': 'Schneeblock', 'ICE_BLOCK': 'Eisblock', 'PRESSURE_PLATE': 'Druckplatte', 'MINE_RAIL': 'Minengleis', 'MINE_SUPPORT': 'Minenbalken', 'SANDSTONE_CARVED': 'Gravierter Sandstein',
     'SPAWNER': 'Mob-Spawner', 'MOSSY_STONE': 'Moosiger Stein', 'COBBLESTONE': 'Bruchstein', 'FIRE': 'Feuer', 'VILLAGE_PATH': 'Dorfweg', 'HAY_BALE': 'Strohballen',
-    'WOOD_SWORD': 'Holzschwert', 'STONE_SWORD': 'Steinschwert', 'IRON_SWORD': 'Eisenschwert', 'GOLD_SWORD': 'Goldschwert'
+    'WOOD_SWORD': 'Holzschwert', 'STONE_SWORD': 'Steinschwert', 'IRON_SWORD': 'Eisenschwert', 'GOLD_SWORD': 'Goldschwert',
+    'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil'
 };
 
 
@@ -246,7 +247,7 @@ export function createBlockHTML(type) {
     if (type === 25) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍖</div>`;
 
     const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
-        || (type >= 60 && type <= 74) || (type >= 89 && type <= 92)); // Kohle, Barren, Werkzeuge und Waffen als 2D-Icons
+        || (type >= 60 && type <= 74) || (type >= 89 && type <= 95)); // Kohle, Barren, Werkzeuge und Waffen als 2D-Icons
     let texIdx = 0;
     if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
     const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;

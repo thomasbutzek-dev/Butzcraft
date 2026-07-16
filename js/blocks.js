@@ -11,7 +11,8 @@ export const BLOCK_TYPES = {
         CHEST: 75,
         SNOW_BLOCK: 77, ICE_BLOCK: 78, PRESSURE_PLATE: 79, MINE_RAIL: 80, MINE_SUPPORT: 81, SANDSTONE_CARVED: 82,
         SPAWNER: 83, MOSSY_STONE: 84, COBBLESTONE: 85, FIRE: 86, VILLAGE_PATH: 87, HAY_BALE: 88,
-        WOOD_SWORD: 89, STONE_SWORD: 90, IRON_SWORD: 91, GOLD_SWORD: 92
+        WOOD_SWORD: 89, STONE_SWORD: 90, IRON_SWORD: 91, GOLD_SWORD: 92,
+        STRING: 93, BOW: 94, ARROW: 95
         };
 
         export const BLOCK_COLORS = {
@@ -32,7 +33,8 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.CHEST]: 0xA0724A,
             [BLOCK_TYPES.SNOW_BLOCK]: 0xF0F0F0, [BLOCK_TYPES.ICE_BLOCK]: 0x99DDEE, [BLOCK_TYPES.PRESSURE_PLATE]: 0x999999, [BLOCK_TYPES.MINE_RAIL]: 0x888888, [BLOCK_TYPES.MINE_SUPPORT]: 0x6B4226, [BLOCK_TYPES.SANDSTONE_CARVED]: 0xD2A85A,
             [BLOCK_TYPES.SPAWNER]: 0x1A1A2E, [BLOCK_TYPES.MOSSY_STONE]: 0x5A7A5A, [BLOCK_TYPES.COBBLESTONE]: 0x7A7A7A, [BLOCK_TYPES.FIRE]: 0xFF6600, [BLOCK_TYPES.VILLAGE_PATH]: 0x8B6B3D, [BLOCK_TYPES.HAY_BALE]: 0xD4A820,
-            [BLOCK_TYPES.WOOD_SWORD]: 0xCD853F, [BLOCK_TYPES.STONE_SWORD]: 0x888888, [BLOCK_TYPES.IRON_SWORD]: 0xC0C0C0, [BLOCK_TYPES.GOLD_SWORD]: 0xFFD700
+            [BLOCK_TYPES.WOOD_SWORD]: 0xCD853F, [BLOCK_TYPES.STONE_SWORD]: 0x888888, [BLOCK_TYPES.IRON_SWORD]: 0xC0C0C0, [BLOCK_TYPES.GOLD_SWORD]: 0xFFD700,
+            [BLOCK_TYPES.STRING]: 0xF2F2F2, [BLOCK_TYPES.BOW]: 0x8B6B3D, [BLOCK_TYPES.ARROW]: 0xA0A0A0
         };
 
         export const BLOCK_TEX = {
@@ -52,7 +54,8 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.CHEST]: 75,
             [BLOCK_TYPES.SNOW_BLOCK]: 8, [BLOCK_TYPES.ICE_BLOCK]: 9, [BLOCK_TYPES.PRESSURE_PLATE]: 79, [BLOCK_TYPES.MINE_RAIL]: 80, [BLOCK_TYPES.MINE_SUPPORT]: 81, [BLOCK_TYPES.SANDSTONE_CARVED]: 82,
             [BLOCK_TYPES.SPAWNER]: 83, [BLOCK_TYPES.MOSSY_STONE]: 84, [BLOCK_TYPES.COBBLESTONE]: 85, [BLOCK_TYPES.FIRE]: 86, [BLOCK_TYPES.VILLAGE_PATH]: 87, [BLOCK_TYPES.HAY_BALE]: 88,
-            [BLOCK_TYPES.WOOD_SWORD]: 89, [BLOCK_TYPES.STONE_SWORD]: 90, [BLOCK_TYPES.IRON_SWORD]: 91, [BLOCK_TYPES.GOLD_SWORD]: 92
+            [BLOCK_TYPES.WOOD_SWORD]: 89, [BLOCK_TYPES.STONE_SWORD]: 90, [BLOCK_TYPES.IRON_SWORD]: 91, [BLOCK_TYPES.GOLD_SWORD]: 92,
+            [BLOCK_TYPES.STRING]: 93, [BLOCK_TYPES.BOW]: 94, [BLOCK_TYPES.ARROW]: 95
         };
 
 // --- TEXTURE GENERATOR ---
@@ -1345,6 +1348,31 @@ export const BLOCK_TYPES = {
             drawSwordTile(90, '#777777', '#B0B0B0');
             drawSwordTile(91, '#BFC7CF', '#F1F5F8');
             drawSwordTile(92, '#E2B814', '#FFF176');
+
+            drawTile(93, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.strokeStyle = '#F2F2F2';
+                c.lineWidth = 5;
+                c.beginPath();
+                c.moveTo(12, 18); c.bezierCurveTo(46, 4, 15, 58, 52, 44);
+                c.stroke();
+            });
+            drawTile(94, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.strokeStyle = '#8B5A2B'; c.lineWidth = 7;
+                c.beginPath(); c.arc(23, 32, 23, -Math.PI / 2, Math.PI / 2); c.stroke();
+                c.strokeStyle = '#EEEEEE'; c.lineWidth = 3;
+                c.beginPath(); c.moveTo(23, 9); c.lineTo(23, 55); c.stroke();
+            });
+            drawTile(95, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.strokeStyle = '#8B6B3D'; c.lineWidth = 5;
+                c.beginPath(); c.moveTo(12, 52); c.lineTo(48, 16); c.stroke();
+                c.fillStyle = '#B0B0B0';
+                c.beginPath(); c.moveTo(45, 10); c.lineTo(58, 7); c.lineTo(54, 20); c.closePath(); c.fill();
+                c.fillStyle = '#EEEEEE';
+                c.beginPath(); c.moveTo(10, 45); c.lineTo(5, 58); c.lineTo(18, 53); c.closePath(); c.fill();
+            });
 
             atlasDataURL = canvas.toDataURL("image/png");
 

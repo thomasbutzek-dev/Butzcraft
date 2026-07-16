@@ -2,26 +2,26 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260716c';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260716d';
         import { World, getBiomeAt, BIOMES } from './world.js?v=20260716b';
-        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716c';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716d';
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260716d';
         import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716f';
         import { Game } from './Game.js?v=20260716b'; // Central state container
-        import { Player } from './Player.js?v=20260716a';
+        import { Player } from './Player.js?v=20260716b';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716k';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716j';
-        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716h';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716l';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716k';
+        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716i';
         import { getOnboardingProgress } from './onboarding.js?v=20260716b';
         import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260716a';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716h';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716i';
         import { WeatherSystem } from './weather.js?v=20260716b';
         import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716i';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716j';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
         import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
@@ -1131,6 +1131,9 @@
                 rsSelect.addEventListener('change', (e) => applyRenderScale(e.target.value));
             }
 
+            if (window.playerInteraction && typeof window.playerInteraction.destroy === 'function') {
+                window.playerInteraction.destroy();
+            }
             window.playerInteraction = new PlayerInteraction(camera, scene, world, mobs, SoundManager, {
                 getSelectedSlot: getSelectedSlot,
                 getInventorySlots: () => inventorySlots,
@@ -1635,6 +1638,7 @@
                 if (window.playerInteraction) window.playerInteraction.checkPressurePlates(playerPos.x, playerPos.y, playerPos.z);
                 if (window.playerInteraction) window.playerInteraction.updateMining(delta);
                 if (window.playerInteraction) window.playerInteraction.updateCombat();
+                if (window.playerInteraction) window.playerInteraction.updateRanged(delta);
             }
 
             // Ofen-Tick (auch wenn pausiert, solange UI offen)

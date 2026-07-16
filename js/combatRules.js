@@ -7,12 +7,22 @@ const SWORDS = Object.freeze({
     92: Object.freeze({ material: 'Gold', damage: 11, cooldown: 0.38, maxDurability: 180, color: 0xFFD700 })
 });
 
+const BOW = Object.freeze({ damage: 6, cooldown: 0.75, maxDurability: 180, color: 0x8B6B3D });
+
 export function getSwordInfo(type) {
     return SWORDS[type] || null;
 }
 
 export function isSwordType(type) {
     return getSwordInfo(type) !== null;
+}
+
+export function getBowInfo(type) {
+    return type === 94 ? BOW : null;
+}
+
+export function isBowType(type) {
+    return getBowInfo(type) !== null;
 }
 
 export function getAttackProfile(type) {

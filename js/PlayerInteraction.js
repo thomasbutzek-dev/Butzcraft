@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
-import { openFurnace } from './furnace.js?v=20260716h';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716j';
+import { openFurnace } from './furnace.js?v=20260716i';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716k';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260716a';
-import { getAttackProfile, getSwordInfo } from './combatRules.js?v=20260716a';
+import { getAttackProfile, getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
+import { PlayerArrowProjectile } from './playerArrow.js?v=20260716a';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
@@ -30,6 +31,7 @@ export class PlayerInteraction {
         this.miningToolType = 0;
         this.attackReadyAt = 0;
         this.lastAttackCooldown = 0.8;
+        this.rangedProjectiles = [];
     }
 
     spawnBlockBreakParticles(x, y, z, blockType, normal) {
@@ -125,6 +127,10 @@ export class PlayerInteraction {
             window.removeEventListener('blur', this._onWindowBlur);
             this._onWindowBlur = null;
         }
+        if (this.rangedProjectiles) {
+            for (const projectile of this.rangedProjectiles) projectile.dispose();
+            this.rangedProjectiles.length = 0;
+        }
         this.cancelMining();
     }
 
@@ -183,17 +189,17 @@ export class PlayerInteraction {
 
     updateCombat(now = performance.now()) {
         const currentItem = this._getCurrentItem();
-        const swordSelected = Boolean(currentItem && currentItem.count > 0 && getSwordInfo(currentItem.type));
+        const weaponSelected = Boolean(currentItem && currentItem.count > 0 && (getSwordInfo(currentItem.type) || getBowInfo(currentItem.type)));
         const remaining = Math.max(0, this.attackReadyAt - now);
         const coolingDown = remaining > 0;
         const duration = Math.max(1, this.lastAttackCooldown * 1000);
-        this._setAttackCooldown(coolingDown ? 1 - remaining / duration : 1, swordSelected || coolingDown);
+        this._setAttackCooldown(coolingDown ? 1 - remaining / duration : 1, weaponSelected || coolingDown);
     }
 
-    _wearSword(item, swordInfo) {
-        if (!item || !swordInfo) return;
+    _wearWeapon(item, weaponInfo, label) {
+        if (!item || !weaponInfo) return;
         if (!Number.isFinite(item.durability) || item.durability <= 0) {
-            item.durability = swordInfo.maxDurability;
+            item.durability = weaponInfo.maxDurability;
         }
         const previousDurability = item.durability;
         item.durability--;
@@ -201,11 +207,45 @@ export class PlayerInteraction {
             item.type = 0;
             item.count = 0;
             item.durability = 0;
-            this.showMessage('Schwert kaputt!', '#ff4444', 20);
-        } else if (previousDurability / swordInfo.maxDurability > 0.15 && item.durability / swordInfo.maxDurability <= 0.15) {
-            this.showMessage('Schwert fast kaputt!', '#ff9800', 18);
+            this.showMessage(`${label} kaputt!`, '#ff4444', 20);
+        } else if (previousDurability / weaponInfo.maxDurability > 0.15 && item.durability / weaponInfo.maxDurability <= 0.15) {
+            this.showMessage(`${label} fast kaputt!`, '#ff9800', 18);
         }
         this.context.updateInventoryUI();
+    }
+
+    _fireBow(currentItem, bowInfo) {
+        const now = performance.now();
+        if (now < this.attackReadyAt) return false;
+        const arrowSlot = this.context.getInventorySlots().find(slot => slot.type === 95 && slot.count > 0);
+        if (!arrowSlot) {
+            this.showMessage('Keine Pfeile – aus Stein und Stock herstellen.', '#ff9800', 18);
+            return false;
+        }
+
+        arrowSlot.count--;
+        if (arrowSlot.count <= 0) {
+            arrowSlot.type = 0;
+            arrowSlot.count = 0;
+        }
+        const direction = new THREE.Vector3();
+        this.camera.getWorldDirection(direction).normalize();
+        const start = this.camera.position.clone().addScaledVector(direction, 0.6);
+        if (this.rangedProjectiles.length >= 64) this.rangedProjectiles.shift().dispose();
+        this.rangedProjectiles.push(new PlayerArrowProjectile(this.scene, start, direction, bowInfo.damage));
+        this.attackReadyAt = now + bowInfo.cooldown * 1000;
+        this.lastAttackCooldown = bowInfo.cooldown;
+        this._setAttackCooldown(0, true);
+        this._wearWeapon(currentItem, bowInfo, 'Bogen');
+        return true;
+    }
+
+    updateRanged(delta) {
+        for (let i = this.rangedProjectiles.length - 1; i >= 0; i--) {
+            const projectile = this.rangedProjectiles[i];
+            projectile.update(delta, this.world, this.mobs);
+            if (projectile.isDead) this.rangedProjectiles.splice(i, 1);
+        }
     }
 
     _startMining(target, plan, toolType) {
@@ -389,8 +429,15 @@ export class PlayerInteraction {
         const currentItem = this._getCurrentItem();
         const heldType = currentItem && currentItem.count > 0 ? currentItem.type : 0;
         const swordInfo = getSwordInfo(heldType);
+        const bowInfo = getBowInfo(heldType);
 
         if (e.button === 0) {
+            if (bowInfo) {
+                if (this._fireBow(currentItem, bowInfo) && typeof Game.player.startBowAnimation === 'function') {
+                    Game.player.startBowAnimation(bowInfo);
+                }
+                return;
+            }
             if (typeof Game.player.startAttackAnimation === 'function') {
                 Game.player.startAttackAnimation(swordInfo);
             } else {
@@ -416,7 +463,7 @@ export class PlayerInteraction {
                 if (hitNpc) {
                     if (e.button === 2) {
                         // Rechtsklick: Handels-UI öffnen
-                        const { openTradeUI } = await import('./tradeUI.js?v=20260716i');
+                        const { openTradeUI } = await import('./tradeUI.js?v=20260716j');
                         openTradeUI(hitNpc, this._controls);
                         return;
                     } else if (e.button === 0) {
@@ -450,7 +497,7 @@ export class PlayerInteraction {
                             Game.player.hunger = Math.min(MAX_HUNGER, Game.player.hunger + HUNGER_GAIN_PIG);
                         }
                     });
-                    if (attack.usesDurability) this._wearSword(currentItem, swordInfo);
+                    if (attack.usesDurability) this._wearWeapon(currentItem, swordInfo, 'Schwert');
                 } else if (e.button === 2 && hitMob.type === 'cow') { // Melken
                     const now = Date.now();
                     if (now - hitMob.lastMilkTime > CONFIG.MOBS.COW_MILK_TIME_MIN) {
@@ -585,7 +632,7 @@ export class PlayerInteraction {
                 // Werkzeuge, Barren, Items können nicht platziert werden
                 const unplaceable = [17, 18, 21, 22, 23, 24, 25, 31, 34, 39, 51,
                     60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
-                    89, 90, 91, 92];
+                    89, 90, 91, 92, 93, 94, 95];
                 
                 if (currentItem.count <= 0 || currentItem.type === 0 || unplaceable.includes(currentItem.type)) {
                     return; 

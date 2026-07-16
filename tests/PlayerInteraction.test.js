@@ -64,7 +64,8 @@ describe('PlayerInteraction through the Game seam', () => {
             hunger: 10,
             isSwinging: false,
             swingProgress: 1,
-            startAttackAnimation: vi.fn()
+            startAttackAnimation: vi.fn(),
+            startBowAnimation: vi.fn()
         };
         window.npcs = [];
         window.getSelectedSlot = undefined;
@@ -124,6 +125,47 @@ describe('PlayerInteraction through the Game seam', () => {
         expect(interaction.showMessage).toHaveBeenCalledWith(
             'Dorfbewohner sind Freunde – sprich mit Rechtsklick.',
             '#ffe066',
+            18
+        );
+    }, 15000);
+
+    it('fires one inventory arrow, damages a mob and wears the bow', async () => {
+        const mobMesh = new THREE.Group();
+        mobMesh.position.set(0, 0, -2);
+        const mob = { mesh: mobMesh, isDead: false, type: 'zombie', takeDamage: vi.fn() };
+        const { interaction, context, inventorySlots } = await createInteraction({
+            inventoryItem: { type: 94, count: 1, durability: 5 },
+            mobs: [mob]
+        });
+        inventorySlots[1] = { type: 95, count: 2 };
+        const now = vi.spyOn(performance, 'now').mockReturnValue(1000);
+
+        try {
+            await interaction.handleInteraction({ button: 0 });
+            interaction.updateRanged(0.05);
+
+            expect(inventorySlots[1]).toEqual({ type: 95, count: 1 });
+            expect(inventorySlots[0].durability).toBe(4);
+            expect(mob.takeDamage).toHaveBeenCalledWith(6);
+            expect(context.updateInventoryUI).toHaveBeenCalled();
+            expect(Game.player.startBowAnimation).toHaveBeenCalledWith(expect.objectContaining({ damage: 6 }));
+        } finally {
+            now.mockRestore();
+        }
+    }, 15000);
+
+    it('does not wear or fire a bow without arrows', async () => {
+        const { interaction, inventorySlots } = await createInteraction({
+            inventoryItem: { type: 94, count: 1, durability: 5 }
+        });
+
+        await interaction.handleInteraction({ button: 0 });
+
+        expect(interaction.rangedProjectiles).toHaveLength(0);
+        expect(inventorySlots[0].durability).toBe(5);
+        expect(interaction.showMessage).toHaveBeenCalledWith(
+            'Keine Pfeile – aus Stein und Stock herstellen.',
+            '#ff9800',
             18
         );
     }, 15000);
