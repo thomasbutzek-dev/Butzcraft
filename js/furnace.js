@@ -1,6 +1,7 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716b';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716c';
+import { Game } from './Game.js?v=20260507b';
 
 // Schmelz-Rezepte: Input-Block → Output-Item
 const SMELT_RECIPES = {
@@ -39,7 +40,7 @@ export function closeFurnace(controls) {
     furnaceOpen = false;
     const overlay = document.getElementById('furnace-overlay');
     if (overlay) overlay.style.display = 'none';
-    if (controls && !window.touchActive) {
+    if (controls && !Game.touchActive) {
         if (typeof window.resumeGame === 'function') window.resumeGame();
         else controls.lock();
     }

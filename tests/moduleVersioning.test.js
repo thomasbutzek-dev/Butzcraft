@@ -15,6 +15,6 @@ describe('browser module identity', () => {
             return source.match(/\.\/inventory\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716b']));
+        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716c']));
     });
 });

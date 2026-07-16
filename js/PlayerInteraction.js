@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
-import { openFurnace } from './furnace.js?v=20260507b';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716b';
+import { openFurnace } from './furnace.js?v=20260716b';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716c';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
 import { Game } from './Game.js?v=20260507b';
 
@@ -111,7 +111,7 @@ export class PlayerInteraction {
             // wird die isLocked-Check übersprungen (Touch-Buttons feuern synthetische mousedowns).
             const lockOk = typeof window.butzcraftCanInteract === 'function'
                 ? window.butzcraftCanInteract()
-                : (controls.isLocked || window.touchActive);
+                : (controls.isLocked || Game.touchActive);
             if (!lockOk || !getGameActive() || getSpawning()) return;
             this.handleInteraction(e);
         };
@@ -605,7 +605,7 @@ export class PlayerInteraction {
 
         window.closeChest = () => {
             if (overlay) overlay.style.display = 'none';
-            if (this._controls && !window.touchActive) {
+            if (this._controls && !Game.touchActive) {
                 if (typeof window.resumeGame === 'function') window.resumeGame();
                 else this._controls.lock();
             }

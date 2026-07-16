@@ -5,8 +5,9 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName, tryExchangeInventory } from './inventory.js?v=20260716b';
+import { createBlockHTML, getItemName, tryExchangeInventory } from './inventory.js?v=20260716c';
 import { getQuestProgress } from './quests.js?v=20260515b';
+import { Game } from './Game.js?v=20260507b';
 
 let currentNPC = null;
 
@@ -178,7 +179,7 @@ export function closeTradeUI(controls) {
     const overlay = document.getElementById('trade-overlay');
     if (overlay) overlay.style.display = 'none';
     currentNPC = null;
-    if (controls && !window.touchActive) {
+    if (controls && !Game.touchActive) {
         if (typeof window.resumeGame === 'function') window.resumeGame();
         else controls.lock();
     }
