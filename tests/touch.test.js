@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { applyTouchLookDelta, initTouchControls, isTouchDevice } from '../js/touch.js';
+import { Game } from '../js/Game.js';
 
 const origMaxTouchPoints = navigator.maxTouchPoints;
 const origMatchMedia = window.matchMedia;
@@ -30,6 +31,7 @@ afterEach(() => {
     document.getElementById('touch-controls-styles')?.remove();
     document.documentElement.classList.remove('touch-device');
     document.body.classList.remove('touch-device');
+    Game.touchActive = false;
 });
 
 describe('isTouchDevice', () => {
@@ -69,6 +71,7 @@ describe('isTouchDevice', () => {
         expect(document.getElementById('touch-overlay')).not.toBeNull();
         expect(document.documentElement.classList.contains('touch-device')).toBe(true);
         expect(document.body.classList.contains('touch-device')).toBe(true);
+        expect(Game.touchActive).toBe(true);
         expect(document.getElementById('touch-btn-jump')).not.toBeNull();
         expect(document.getElementById('touch-btn-place')).not.toBeNull();
         expect(document.getElementById('touch-btn-inv')).not.toBeNull();

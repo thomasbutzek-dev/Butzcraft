@@ -8,13 +8,14 @@
  *  - Kurzer Tap in den Look-Bereich: ABBAUEN/Angreifen (mousedown button=0)
  *
  *  PointerLock funktioniert auf iOS/Android nicht (kein API-Support) → wir setzen
- *  window.touchActive=true, und PlayerInteraction sowie der Pause-Check ignorieren
+ *  Game.touchActive=true, und PlayerInteraction sowie der Pause-Check ignorieren
  *  controls.isLocked, wenn touchActive gesetzt ist.
  *
  *  Look-Empfindlichkeit: 0.005 rad pro Pixel — Daumen-tauglich, nicht wackelig.
  */
 
 import { Input } from './Input.js?v=20260507b';
+import { Game } from './Game.js?v=20260507b';
 
 const LOOK_SENSITIVITY = 0.005;
 const JOYSTICK_DEADZONE = 0.18;
@@ -73,7 +74,7 @@ export function initTouchControls(ctx) {
     if (!isTouchDevice()) return;
     if (document.getElementById('touch-overlay')) return; // schon initialisiert
 
-    window.touchActive = true;
+    Game.touchActive = true;
     document.documentElement.classList.add('touch-device');
     document.body.classList.add('touch-device');
 
@@ -344,7 +345,7 @@ function _bindActionButtons(ctx) {
     if (pauseOverlay) {
         pauseOverlay.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
-            if (!btn || !window.touchActive) return;
+            if (!btn || !Game.touchActive) return;
             if (btn.textContent && btn.textContent.includes('Weiter')) {
                 e.stopPropagation();
                 pauseOverlay.style.display = 'none';

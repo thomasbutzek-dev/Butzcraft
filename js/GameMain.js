@@ -7,7 +7,7 @@
         import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716a';
 
         import { Input } from './Input.js?v=20260507b';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260716a';
         import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716d';
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js?v=20260602a';
@@ -91,7 +91,7 @@
         }
 
         function shouldUseTouchMode() {
-            return Boolean(window.touchActive) || isTouchDevice();
+            return Boolean(Game.touchActive) || isTouchDevice();
         }
 
         function loadLocalCharacterProfile() {
@@ -207,7 +207,7 @@
         function relockControlsFromInput(e) {
             if (!isGameplayKey(e)) return;
             if (!gameStarted || manuallyPaused || isBlockingOverlayOpen()) return;
-            if (!controls?.isLocked && !window.touchActive) lockControlsForDesktop();
+            if (!controls?.isLocked && !Game.touchActive) lockControlsForDesktop();
         }
 
         function relockControlsFromPointer(e) {
@@ -219,7 +219,7 @@
                 manuallyPaused = false;
                 hidePauseMenu();
             }
-            if (!controls?.isLocked && !window.touchActive) lockControlsForDesktop();
+            if (!controls?.isLocked && !Game.touchActive) lockControlsForDesktop();
         }
 
         function handleCameraModeToggle(e) {
@@ -239,7 +239,7 @@
                 !spawning &&
                 !manuallyPaused &&
                 !isBlockingOverlayOpen() &&
-                (controls?.isLocked || window.touchActive || window.butzcraftPointerLockUnavailable)
+                (controls?.isLocked || Game.touchActive || window.butzcraftPointerLockUnavailable)
             );
         };
 
@@ -1051,7 +1051,7 @@
             window.playerInteractions = window.playerInteraction; // Alias für Backwards-Compat
             window.playerInteraction.init(controls, () => gameActive, () => spawning);
 
-            // Touch-Controls: nur auf Touch-Devices aktiv. Setzt window.touchActive=true,
+            // Touch-Controls: nur auf Touch-Devices aktiv. Setzt Game.touchActive=true,
             // damit der PointerLock-Pause-Mechanismus übersprungen wird.
             initTouchControls({
                 camera,
@@ -1326,7 +1326,7 @@
                         const bt = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z));
                         if (bt !== 0 && bt !== 8 && bt !== 9 && bt !== 10) {
                             spawning = false;
-                            if (!controls.isLocked && !window.touchActive) lockControlsForDesktop();
+                            if (!controls.isLocked && !Game.touchActive) lockControlsForDesktop();
                         }
                     }
                 }
