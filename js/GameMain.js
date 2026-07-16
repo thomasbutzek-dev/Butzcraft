@@ -824,20 +824,20 @@
             sunGroup = new THREE.Group(); scene.add(sunGroup);
             sun = new THREE.DirectionalLight(0xffffff, 1.0); sun.position.set(0, 50, 0); sunGroup.add(sun);
 
-            window.celestialGroup = new THREE.Group();
-            scene.add(window.celestialGroup);
+            const celestialGroup = new THREE.Group();
+            scene.add(celestialGroup);
             
             const sunGeo = new THREE.CircleGeometry(30, 32);
             const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffcc, fog: false, transparent: true, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-            window.sunMesh = new THREE.Mesh(sunGeo, sunMat);
-            window.sunMesh.position.set(0, 400, 0);
-            window.celestialGroup.add(window.sunMesh);
+            const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+            sunMesh.position.set(0, 400, 0);
+            celestialGroup.add(sunMesh);
 
             const moonGeo = new THREE.CircleGeometry(25, 32);
             const moonMat = new THREE.MeshBasicMaterial({ color: 0xdddddf, fog: false, transparent: true, side: THREE.DoubleSide });
-            window.moonMesh = new THREE.Mesh(moonGeo, moonMat);
-            window.moonMesh.position.set(0, -400, 0);
-            window.celestialGroup.add(window.moonMesh);
+            const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+            moonMesh.position.set(0, -400, 0);
+            celestialGroup.add(moonMesh);
 
             const starsGeo = new THREE.BufferGeometry();
             const starsPos = [];
@@ -846,9 +846,9 @@
                 starsPos.push(vec.x, vec.y, vec.z);
             }
             starsGeo.setAttribute('position', new THREE.Float32BufferAttribute(starsPos, 3));
-            window.starsMat = new THREE.PointsMaterial({color: 0xffffff, size: 2.0, transparent: true, opacity: 0, fog: false});
-            window.starsMesh = new THREE.Points(starsGeo, window.starsMat);
-            scene.add(window.starsMesh);
+            const starsMat = new THREE.PointsMaterial({color: 0xffffff, size: 2.0, transparent: true, opacity: 0, fog: false});
+            const starsMesh = new THREE.Points(starsGeo, starsMat);
+            scene.add(starsMesh);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
             renderer.domElement.id = 'game-canvas';

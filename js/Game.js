@@ -23,7 +23,6 @@
 const PROXIED_SLOTS = [
     'player', 'world', 'scene', 'camera', 'renderer', 'controls',
     'mobs', 'droppedItems', 'projectiles',
-    'sunMesh', 'moonMesh', 'starsMesh', 'starsMat', 'celestialGroup',
     'BLOCK_TYPES', 'BLOCK_TEX', 'SoundManager',
     'inventorySlots',
     'webglContextLost', 'touchActive'
