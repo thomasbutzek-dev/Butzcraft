@@ -15,7 +15,7 @@
  */
 
 import { Input } from './Input.js?v=20260507b';
-import { Game } from './Game.js?v=20260507b';
+import { Game } from './Game.js?v=20260716a';
 
 const LOOK_SENSITIVITY = 0.005;
 const JOYSTICK_DEADZONE = 0.18;

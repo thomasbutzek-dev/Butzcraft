@@ -16,16 +16,13 @@
  *  - Game-Singleton dient als ausgezeichneter Insertion-Point für Tests/Mocks
  */
 
-// Liste der Slots, die Game verwaltet. Jeder bekommt eine Property mit get/set,
-// die transparent durch zu window.* leitet — solange GameMain noch dort schreibt.
-//
-// Sprint 6: `touchActive` ergänzt (war fehlende Lücke aus dem Sprint-5-Review).
+// Legacy-Slots, die Game weiterhin transparent zu window.* leitet.
 const PROXIED_SLOTS = [
     'player', 'world', 'scene', 'camera', 'renderer', 'controls',
     'mobs', 'droppedItems', 'projectiles',
     'BLOCK_TYPES', 'BLOCK_TEX', 'SoundManager',
     'inventorySlots',
-    'webglContextLost', 'touchActive'
+    'webglContextLost'
 ];
 
 class GameClass {
@@ -39,6 +36,7 @@ class GameClass {
                 configurable: true
             });
         }
+        this.touchActive = false;
     }
 
     // Convenience: Player-Position. null wenn Spiel nicht aktiv.
@@ -63,6 +61,7 @@ class GameClass {
         for (const slot of PROXIED_SLOTS) {
             this[slot] = undefined;
         }
+        this.touchActive = false;
     }
 }
 

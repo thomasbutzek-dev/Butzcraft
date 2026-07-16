@@ -74,10 +74,11 @@ describe('Game-Singleton (Phase-1-Proxy)', () => {
         expect(window.player).toBeUndefined();
     });
 
-    it('touchActive (Sprint 6) ist proxied — read/write konsistent mit window', () => {
+    it('owns and resets touchActive without leaking it to window', () => {
+        delete window.touchActive;
         Game.touchActive = true;
-        expect(window.touchActive).toBe(true);
-        window.touchActive = false;
+        expect(window.touchActive).toBeUndefined();
+        Game.reset();
         expect(Game.touchActive).toBe(false);
     });
 });

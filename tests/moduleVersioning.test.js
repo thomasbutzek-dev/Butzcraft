@@ -15,6 +15,24 @@ describe('browser module identity', () => {
             return source.match(/\.\/inventory\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716c']));
+        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716d']));
+    });
+
+    it('loads the Game singleton through one versioned URL everywhere', () => {
+        const consumers = [
+            'js/GameMain.js',
+            'js/PlayerInteraction.js',
+            'js/furnace.js',
+            'js/inventory.js',
+            'js/mobs.js',
+            'js/touch.js',
+            'js/tradeUI.js'
+        ];
+        const specifiers = consumers.map(file => {
+            const source = readFileSync(file, 'utf8');
+            return source.match(/\.\/Game\.js\?v=[^'\"]+/)?.[0];
+        });
+
+        expect(new Set(specifiers)).toEqual(new Set(['./Game.js?v=20260716a']));
     });
 });
