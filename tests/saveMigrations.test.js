@@ -7,7 +7,7 @@
  *  - stampSaveVersion setzt korrekt die Version
  */
 import { describe, it, expect } from 'vitest';
-import { migrateSave, stampSaveVersion, CURRENT_SAVE_VERSION } from '../js/saveMigrations.js';
+import { migrateSave, prepareSaveForLoad, stampSaveVersion, CURRENT_SAVE_VERSION } from '../js/saveMigrations.js';
 
 describe('migrateSave – v0 → v1 (Inventory-Format)', () => {
     it('konvertiert Legacy-Inventory-Objekt zu Array', () => {
@@ -125,5 +125,53 @@ describe('stampSaveVersion', () => {
 
     it('null wird unverändert zurückgegeben', () => {
         expect(stampSaveVersion(null)).toBeNull();
+    });
+});
+
+describe('prepareSaveForLoad', () => {
+    it('migrates and returns a playable save', () => {
+        const prepared = prepareSaveForLoad({
+            version: CURRENT_SAVE_VERSION,
+            pos: { x: 10, y: 42, z: -5 },
+            health: 80,
+            hunger: 70,
+            time: 123,
+            inventory: []
+        });
+
+        expect(prepared.inventory).toHaveLength(64);
+        expect(prepared.pos).toEqual({ x: 10, y: 42, z: -5 });
+    });
+
+    it('rejects a save without a valid player position', () => {
+        expect(() => prepareSaveForLoad({
+            version: CURRENT_SAVE_VERSION,
+            health: 100,
+            hunger: 100,
+            time: 0,
+            inventory: []
+        })).toThrow('Spielstand enthält keine gültige Position');
+    });
+
+    it('rejects save versions newer than the game supports', () => {
+        expect(() => prepareSaveForLoad({
+            version: CURRENT_SAVE_VERSION + 1,
+            pos: { x: 0, y: 42, z: 0 },
+            health: 100,
+            hunger: 100,
+            time: 0,
+            inventory: []
+        })).toThrow('Spielstandversion wird nicht unterstützt');
+    });
+
+    it('rejects non-finite player values', () => {
+        expect(() => prepareSaveForLoad({
+            version: CURRENT_SAVE_VERSION,
+            pos: { x: 0, y: 42, z: 0 },
+            health: Number.NaN,
+            hunger: 100,
+            time: 0,
+            inventory: []
+        })).toThrow('Spielstand enthält ungültige Spielerwerte');
     });
 });

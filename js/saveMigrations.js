@@ -125,6 +125,28 @@ export function migrateSave(data) {
     return normalizeInventory(data);
 }
 
+export function prepareSaveForLoad(rawData) {
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
+        throw new Error('Ungültiger Spielstand');
+    }
+    if (typeof rawData.version === 'number' && rawData.version > CURRENT_SAVE_VERSION) {
+        throw new Error('Spielstandversion wird nicht unterstützt');
+    }
+
+    const data = migrateSave(rawData);
+    const pos = data.pos;
+    if (
+        !pos || typeof pos !== 'object' ||
+        !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(pos.z)
+    ) {
+        throw new Error('Spielstand enthält keine gültige Position');
+    }
+    if (!Number.isFinite(data.health) || !Number.isFinite(data.hunger) || !Number.isFinite(data.time)) {
+        throw new Error('Spielstand enthält ungültige Spielerwerte');
+    }
+    return data;
+}
+
 /**
  * Stempelt ein neues Save-Object mit der aktuellen Version, vor dem Schreiben.
  */

@@ -8,7 +8,7 @@
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
-        import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260716c';
+        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716d';
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
@@ -524,7 +524,8 @@
             console.log("DEBUG: loadGame starting for", name);
             SoundManager.init();
             loadSaveData(name)
-                .then(data => {
+                .then(rawData => {
+                    const data = prepareSaveForLoad(rawData);
                     document.getElementById('start-menu').style.display = 'none';
                     document.body.classList.add('game-started');
                     lockControlsForDesktop();
@@ -532,10 +533,6 @@
                     currentSaveName = name;
                     document.getElementById('save-input').value = name;
 
-                    // Sprint 6: Migration zentralisiert via saveMigrations.js
-                    // Vorher war die Inventory-Migration hier inline + oldInventoryMap aus inventory.js.
-                    // Jetzt: ein Aufruf, alle nötigen Versions-Schritte werden angewendet.
-                    data = migrateSave(data);
                     resetRuntimeForLoadedGame();
 
                     const playerPos = camera.position;
