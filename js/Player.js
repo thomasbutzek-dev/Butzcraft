@@ -1,9 +1,15 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { Physics } from './Physics.js?v=20260507b';
+import { createCharacterModel } from './characterModel.js?v=20260602a';
+
+const CAMERA_EXTRA_BLOCKING_BLOCKS = new Set([5, 6, 13, 14, 15, 16]);
+const THIRD_PERSON_CAMERA_DISTANCES = [4.2, 3.4, 2.6, 1.8];
+const THIRD_PERSON_CAMERA_HEIGHTS = [1.05, 1.35, 1.65];
+const THIRD_PERSON_CAMERA_CLEARANCE = 0.28;
 
 export class Player {
-    constructor(scene, camera, domElement, CONFIG) {
+    constructor(scene, camera, domElement, CONFIG, characterProfile = null) {
         this.camera = camera;
         this.scene = scene;
         this.controls = new PointerLockControls(camera, domElement);
@@ -32,11 +38,172 @@ export class Player {
         this.swordGroup = this.createSword();
         this.camera.add(this.swordGroup);
 
+        this.cameraMode = 'first';
+        this.characterGroup = characterProfile ? createCharacterModel(characterProfile, { positionY: 0 }) : null;
+        if (this.characterGroup) {
+            this.characterGroup.visible = false;
+            this.scene.add(this.characterGroup);
+        }
+
         // Wiederverwendbare Vector3-Instanzen für updatePhysics (vermeidet GC-Druck bei 60fps).
         // Pattern wie in mobs.js (`_tempDir` etc.). Pro Frame wurden vorher 3 neue Vec3 alloziert.
         this._fwd = new THREE.Vector3();
         this._fwdH = new THREE.Vector3();
         this._rgt = new THREE.Vector3();
+        this._thirdPersonForward = new THREE.Vector3();
+        this._thirdPersonFlatForward = new THREE.Vector3();
+        this._thirdPersonEye = new THREE.Vector3();
+        this._thirdPersonDesired = new THREE.Vector3();
+        this._thirdPersonCandidate = new THREE.Vector3();
+        this._thirdPersonSafe = new THREE.Vector3();
+        this._thirdPersonStep = new THREE.Vector3();
+        this._savedCameraPosition = new THREE.Vector3();
+        this._savedCameraQuaternion = new THREE.Quaternion();
+    }
+
+    setCharacterProfile(characterProfile) {
+        if (this.characterGroup) {
+            this.scene.remove(this.characterGroup);
+            disposeObject(this.characterGroup);
+        }
+
+        this.characterGroup = characterProfile ? createCharacterModel(characterProfile, { positionY: 0 }) : null;
+        if (this.characterGroup) {
+            this.characterGroup.visible = this.cameraMode === 'third';
+            this.scene.add(this.characterGroup);
+            this.updateCharacterModel();
+        }
+    }
+
+    toggleCameraMode() {
+        this.setCameraMode(this.cameraMode === 'first' ? 'third' : 'first');
+        return this.cameraMode;
+    }
+
+    setCameraMode(mode) {
+        this.cameraMode = mode === 'third' ? 'third' : 'first';
+        if (this.characterGroup) this.characterGroup.visible = this.cameraMode === 'third';
+        if (this.cameraMode === 'third') this.swordGroup.visible = false;
+    }
+
+    prepareCameraForRender(world) {
+        this.updateCharacterModel();
+        if (this.cameraMode !== 'third') return null;
+
+        this._savedCameraPosition.copy(this.camera.position);
+        this._savedCameraQuaternion.copy(this.camera.quaternion);
+
+        const eye = this._thirdPersonEye.copy(this.camera.position);
+        const forward = this._thirdPersonForward.set(0, 0, -1).applyQuaternion(this.camera.quaternion).normalize();
+        const flatForward = this._thirdPersonFlatForward.set(forward.x, 0, forward.z);
+        if (flatForward.lengthSq() < 0.0001) flatForward.set(0, 0, -1);
+        flatForward.normalize();
+
+        this.camera.position.copy(this.getThirdPersonCameraPosition(world, eye, flatForward));
+        this.camera.lookAt(eye.x, eye.y - 0.35, eye.z);
+
+        return {
+            position: this._savedCameraPosition,
+            quaternion: this._savedCameraQuaternion
+        };
+    }
+
+    restoreCameraAfterRender(state) {
+        if (!state) return;
+        this.camera.position.copy(state.position);
+        this.camera.quaternion.copy(state.quaternion);
+    }
+
+    updateCharacterModel() {
+        if (!this.characterGroup) return;
+
+        const playerPos = this.controls.getObject().position;
+        const yMin = this.CONFIG.PHYSICS.PLAYER_HITBOX_Y_MIN;
+        this.characterGroup.position.set(playerPos.x, playerPos.y + yMin, playerPos.z);
+
+        const forward = this._thirdPersonForward.set(0, 0, -1).applyQuaternion(this.camera.quaternion);
+        const flatForward = this._thirdPersonFlatForward.set(forward.x, 0, forward.z);
+        if (flatForward.lengthSq() > 0.0001) {
+            flatForward.normalize();
+            this.characterGroup.rotation.y = Math.atan2(flatForward.x, flatForward.z);
+        }
+    }
+
+    getUnblockedCameraPosition(world, eye, desired) {
+        if (!world?.getBlock) return desired;
+
+        const step = this._thirdPersonStep.subVectors(desired, eye);
+        const distance = step.length();
+        const steps = Math.max(1, Math.ceil(distance * 6));
+        let lastClearT = 0;
+        for (let i = 2; i <= steps; i++) {
+            const t = i / steps;
+            const x = eye.x + step.x * t;
+            const y = eye.y + step.y * t;
+            const z = eye.z + step.z * t;
+            if (this.isCameraSpaceBlocked(world, x, y, z)) {
+                const safeT = Math.max(0, lastClearT - THIRD_PERSON_CAMERA_CLEARANCE / distance);
+                return this._thirdPersonDesired.set(
+                    eye.x + step.x * safeT,
+                    eye.y + step.y * safeT,
+                    eye.z + step.z * safeT
+                );
+            }
+            lastClearT = t;
+        }
+        return desired;
+    }
+
+    getThirdPersonCameraPosition(world, eye, flatForward) {
+        if (!world?.getBlock) {
+            return this._thirdPersonDesired
+                .copy(eye)
+                .addScaledVector(flatForward, -THIRD_PERSON_CAMERA_DISTANCES[0])
+                .setY(eye.y + THIRD_PERSON_CAMERA_HEIGHTS[0]);
+        }
+
+        let bestDistanceSq = 0;
+        this._thirdPersonSafe.copy(eye);
+
+        for (const distance of THIRD_PERSON_CAMERA_DISTANCES) {
+            for (const height of THIRD_PERSON_CAMERA_HEIGHTS) {
+                this._thirdPersonCandidate
+                    .copy(eye)
+                    .addScaledVector(flatForward, -distance);
+                this._thirdPersonCandidate.y += height;
+
+                const safe = this.getUnblockedCameraPosition(world, eye, this._thirdPersonCandidate);
+                const distanceSq = safe.distanceToSquared(eye);
+                if (distanceSq > bestDistanceSq) {
+                    bestDistanceSq = distanceSq;
+                    this._thirdPersonSafe.copy(safe);
+                }
+
+                if (safe.distanceToSquared(this._thirdPersonCandidate) < 0.0001) {
+                    return this._thirdPersonSafe.copy(safe);
+                }
+            }
+        }
+
+        return this._thirdPersonSafe;
+    }
+
+    isCameraSpaceBlocked(world, x, y, z) {
+        const radius = THIRD_PERSON_CAMERA_CLEARANCE;
+        return this.isCameraPointBlocked(world, x, y, z)
+            || this.isCameraPointBlocked(world, x + radius, y, z)
+            || this.isCameraPointBlocked(world, x - radius, y, z)
+            || this.isCameraPointBlocked(world, x, y + radius, z)
+            || this.isCameraPointBlocked(world, x, y - radius, z)
+            || this.isCameraPointBlocked(world, x, y, z + radius)
+            || this.isCameraPointBlocked(world, x, y, z - radius);
+    }
+
+    isCameraPointBlocked(world, x, y, z) {
+        const block = world.getBlock(Math.floor(x), Math.floor(y), Math.floor(z));
+        if (block === -1) return true;
+        if (CAMERA_EXTRA_BLOCKING_BLOCKS.has(block)) return true;
+        return Physics.isSolid(world, x, y, z, false);
     }
 
     createSword() {
@@ -89,6 +256,11 @@ export class Player {
     }
 
     updateSword(delta) {
+        if (this.cameraMode !== 'first') {
+            this.swordGroup.visible = false;
+            return;
+        }
+
         if (this.isSwinging) {
             this.swordGroup.visible = true; 
             this.swingProgress += delta * 12; 
@@ -288,4 +460,16 @@ export class Player {
             stepHoriz('z', (fwdH.z * -this.velocity.z + rgt.z * this.velocity.x) * delta);
         }
     }
+}
+
+function disposeObject(object) {
+    object.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (!child.material) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        for (const material of materials) {
+            if (material.map) material.map.dispose();
+            material.dispose();
+        }
+    });
 }

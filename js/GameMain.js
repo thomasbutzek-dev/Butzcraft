@@ -10,7 +10,8 @@
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
         import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260507b';
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
-        import { Player } from './Player.js?v=20260511a';
+        import { Player } from './Player.js?v=20260602a';
+        import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
         import { PlayerInteraction } from './PlayerInteraction.js?v=20260507c';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260511a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260507c';
@@ -71,6 +72,7 @@
         window.BLOCK_TEX = BLOCK_TEX;
         let gameActive = true, spawning = true, gameStarted = false, manuallyPaused = false;
         let currentSaveName = null;
+        const CHARACTER_PROFILE_STORAGE_KEY = 'butzcraft.characterProfile';
 
         // Schwert & Animation
 
@@ -84,6 +86,66 @@
 
         function shouldUseTouchMode() {
             return Boolean(window.touchActive) || isTouchDevice();
+        }
+
+        function loadLocalCharacterProfile() {
+            try {
+                const saved = localStorage.getItem(CHARACTER_PROFILE_STORAGE_KEY);
+                return saved ? parseCharacterProfile(saved) : createCharacterProfile();
+            } catch {
+                return createCharacterProfile();
+            }
+        }
+
+        function showCameraModeMessage(mode) {
+            const msg = document.createElement('div');
+            msg.textContent = mode === 'third' ? 'Third Person' : 'First Person';
+            msg.style.cssText = 'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:3000;padding:8px 14px;background:rgba(0,0,0,0.65);color:#fff;font:600 14px sans-serif;border-radius:4px;pointer-events:none;';
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 900);
+        }
+
+        function applyLocalCharacterProfile() {
+            const profile = loadLocalCharacterProfile();
+            if (window.player?.setCharacterProfile) window.player.setCharacterProfile(profile);
+            return profile;
+        }
+
+        function initStartCharacterEditor() {
+            const openBtn = document.getElementById('character-editor-button');
+            const overlay = document.getElementById('character-editor-overlay');
+            const frame = document.getElementById('character-editor-frame');
+            const applyBtn = document.getElementById('character-editor-apply');
+            const closeBtn = document.getElementById('character-editor-close');
+            if (!openBtn || !overlay || !frame || !applyBtn || !closeBtn) return;
+
+            const close = () => {
+                overlay.classList.remove('open');
+                overlay.setAttribute('aria-hidden', 'true');
+            };
+            const open = () => {
+                if (!frame.src) frame.src = 'character-editor.html';
+                overlay.classList.add('open');
+                overlay.setAttribute('aria-hidden', 'false');
+            };
+            const apply = () => {
+                const saveButton = frame.contentDocument?.getElementById('save-button');
+                if (saveButton) saveButton.click();
+                applyLocalCharacterProfile();
+                close();
+            };
+
+            bindPress(openBtn, open);
+            bindPress(applyBtn, apply);
+            bindPress(closeBtn, close);
+            overlay.addEventListener('click', (event) => {
+                if (event.target === overlay) close();
+            });
+            window.openCharacterEditor = open;
+            if (window.__butzcraftCharacterEditorRequested) {
+                window.__butzcraftCharacterEditorRequested = false;
+                open();
+            }
         }
 
         function lockControlsForDesktop() {
@@ -154,6 +216,16 @@
             if (!controls?.isLocked && !window.touchActive) lockControlsForDesktop();
         }
 
+        function handleCameraModeToggle(e) {
+            const tag = document.activeElement?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            if (e.code !== 'KeyV') return;
+            if (!gameStarted || manuallyPaused || isBlockingOverlayOpen()) return;
+            if (e.cancelable) e.preventDefault();
+            const mode = window.player.toggleCameraMode();
+            showCameraModeMessage(mode);
+        }
+
         window.butzcraftCanInteract = function() {
             return Boolean(
                 gameStarted &&
@@ -220,9 +292,9 @@
 
         function getControlsHintText() {
             if (shouldUseTouchMode() || window.innerWidth <= 760) {
-                return 'Linker Daumen bewegt · rechts umsehen · tippen abbauen · Buttons bauen, springen, Inventar, Pause';
+                return 'Schaue auf einen Baum und tippe zum Abbauen - linker Daumen bewegt - rechts umsehen';
             }
-            return 'WASD bewegen · Maus umsehen · Linksklick abbauen · Rechtsklick bauen · E Inventar';
+            return 'Schaue auf einen Baum und halte Linksklick - WASD bewegen - Maus umsehen - E Inventar';
         }
 
         function hideControlsHint() {
@@ -394,6 +466,15 @@
             setTimeout(() => msg.style.display = 'none', 3000);
         }
 
+        function showSaveNameError() {
+            const input = document.getElementById('save-input');
+            showSaveMessage('Bitte gib einen Namen fuer den Spielstand ein.', '#ff9800');
+            if (!input) return;
+            input.classList.add('save-input-error');
+            input.focus();
+            input.addEventListener('input', () => input.classList.remove('save-input-error'), { once: true });
+        }
+
         function updateVisibleChunksIfNeeded(playerPos, force = false) {
             const cx = Math.floor(playerPos.x / CHUNK_SIZE);
             const cz = Math.floor(playerPos.z / CHUNK_SIZE);
@@ -442,7 +523,9 @@
         window.startNewGame = function() {
             if (gameStarted) return;
             console.log("DEBUG: startNewGame starting...");
+            applyLocalCharacterProfile();
             document.getElementById('start-menu').style.display = 'none';
+            document.body.classList.add('game-started');
             currentSaveName = null;
             SoundManager.init();
             manuallyPaused = false;
@@ -464,6 +547,7 @@
             loadSaveData(name)
                 .then(data => {
                     document.getElementById('start-menu').style.display = 'none';
+                    document.body.classList.add('game-started');
                     lockControlsForDesktop();
                     gameStarted = true;
                     resetControlsHintForRun();
@@ -838,7 +922,7 @@
             }, false);
             document.addEventListener('pointerdown', relockControlsFromPointer, true);
 
-            window.player = new Player(scene, camera, document.body, CONFIG);
+            window.player = new Player(scene, camera, document.body, CONFIG, loadLocalCharacterProfile());
             controls = window.player.controls;
 
             // Sicherheits-Reset: Falls aus einem früheren Sprint-5-Bug-Run noch ein roll-Drift
@@ -874,6 +958,8 @@
             if (restartBtn) {
                 restartBtn.addEventListener('click', () => window.location.reload());
             }
+
+            initStartCharacterEditor();
 
             // Sprint 6: Auto-Load-Hint nach Reload (gesetzt vom Death-Overlay-Save-Klick)
             try {
@@ -1006,6 +1092,10 @@
                     toggleDebugHud();
                     return;
                 }
+                if (e.code === 'KeyV') {
+                    handleCameraModeToggle(e);
+                    return;
+                }
                 if (isGameplayKey(e) && e.cancelable) e.preventDefault();
 
                 if (e.code === 'Tab') {
@@ -1028,6 +1118,7 @@
                     if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
                     if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
                     if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
+                    if (manuallyPaused) window.resumeGame(); else window.pauseGame();
                     return;
                 }
 
@@ -1490,7 +1581,12 @@
             window.player.updateSword(delta);
 
 
-            renderer.render(scene, camera);
+            const cameraRestoreState = window.player.prepareCameraForRender(world);
+            try {
+                renderer.render(scene, camera);
+            } finally {
+                window.player.restoreCameraAfterRender(cameraRestoreState);
+            }
         }
 
 
@@ -1561,7 +1657,7 @@
 
         window.saveGame = function() {
             const name = document.getElementById('save-input').value.trim();
-            if(!name) { alert("Bitte einen Namen eingeben!"); return; }
+            if(!name) { showSaveNameError(); return; }
             
             const playerPos = camera.position;
             const gameData = stampSaveVersion({

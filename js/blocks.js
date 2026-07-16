@@ -238,15 +238,15 @@ export const BLOCK_TYPES = {
                 grad.addColorStop(0, 'rgba(255,255,255,0.08)'); grad.addColorStop(1, 'rgba(0,0,0,0.05)');
                 c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
             });
-            // WOLKE (Weiche Wolkenstruktur)
+            // WOLKE (helle, blockige Wolkenstruktur)
             drawTile(7, 0, (c) => {
-                c.fillStyle = '#ffffff'; c.fillRect(0, 0, 64, 64);
-                // Sanfte Schatten-Flecken
-                for (let i = 0; i < 8; i++) {
-                    c.fillStyle = 'rgba(200,210,220,0.15)';
-                    c.beginPath(); c.arc(Math.random()*64, Math.random()*64, 10+Math.random()*12, 0, Math.PI*2); c.fill();
+                c.fillStyle = '#fbfdff'; c.fillRect(0, 0, 64, 64);
+                drawNoise(c, 64, 64, 8, ['#ffffff', '#f7fbff', '#edf5fb']);
+                for (let i = 0; i < 10; i++) {
+                    c.fillStyle = 'rgba(190,210,225,0.18)';
+                    c.fillRect(Math.random()*56, Math.random()*56, 8, 8);
                 }
-                c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(0, 0, 64, 64);
+                c.fillStyle = 'rgba(255,255,255,0.36)'; c.fillRect(0, 0, 64, 28);
             });
             // SCHNEE (Kristallweiß mit Glitzer und Schatten)
             drawTile(8, 0, (c) => {

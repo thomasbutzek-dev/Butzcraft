@@ -1006,7 +1006,7 @@ function generateTerrain(cx, cz, buffer) {
                 } else if (y === CLOUD_HEIGHT) {
                     const cloudN = (Math.sin(wx * 0.1) + Math.cos(wz * 0.1)) * 0.5;
                     const cloudLarge = (Math.sin(wx * 0.04) + Math.cos(wz * 0.04)) * 0.5;
-                    if (cloudLarge > 0.75 || cloudN > 0.7 || (cloudN > 0.4 && rng() < 0.1)) data[idx] = 8;
+                    if (cloudLarge > 0.88 || (cloudLarge > 0.62 && cloudN > 0.28) || (cloudN > 0.74 && rng() < 0.45)) data[idx] = 8;
                 } else data[idx] = 0;
             }
 

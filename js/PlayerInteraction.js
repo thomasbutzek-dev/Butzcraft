@@ -16,6 +16,9 @@ const TOOL_TYPES = {
 const TOOL_DURABILITY = { wood: 60, stone: 131, iron: 250, gold: 32 };
 const MATERIAL_IDX = [0, 1, 2, 3]; // wood/stone/iron/gold = offset 0-3 in each category
 
+const WOOD_BLOCKS = new Set([5, 13, 15]);
+const MINING_HINT_COOLDOWN_MS = 1800;
+
 function getToolInfo(toolType) {
     for (const [cat, info] of Object.entries(TOOL_TYPES)) {
         const idx = info.materials.indexOf(toolType);
@@ -37,6 +40,7 @@ export class PlayerInteraction {
         this.context = context; 
         
         this.raycaster = new THREE.Raycaster();
+        this.lastMiningHintAt = 0;
     }
 
     spawnBlockBreakParticles(x, y, z, blockType, normal) {
@@ -241,7 +245,10 @@ export class PlayerInteraction {
         
         const hits = this.raycaster.intersectObjects(chunkMeshes);
         if (hits.length > 0) {
-            if (hits[0].distance > 3.0) return;
+            if (hits[0].distance > 3.0) {
+                if (e.button === 0) this.showMiningHint('Ziele auf einen Block in Reichweite');
+                return;
+            }
             
             const h = hits[0].object instanceof THREE.Mesh && hits[0].object.geometry ? hits[0] : null;
             if (!h) return;
@@ -254,7 +261,10 @@ export class PlayerInteraction {
                 const brokenType = this.world.getBlock(bx, by, bz);
                 
                 // Wasser und Bedrock können nicht abgebaut werden
-                if (brokenType === 4 || brokenType === 0 || brokenType === 20) return;
+                if (brokenType === 4 || brokenType === 0 || brokenType === 20) {
+                    this.showMiningHint('Diesen Block kannst du nicht abbauen');
+                    return;
+                }
 
                 // Wasser-Einströmen prüfen
                 const isNextToWater = (
@@ -377,6 +387,7 @@ export class PlayerInteraction {
                     this.showMessage('Feuer gelöscht! 🔥', '#FF6600', 18);
                 } else if (brokenType !== 0) {
                     this.context.addItemToInventory(brokenType, 1);
+                    if (WOOD_BLOCKS.has(brokenType)) this.showMessage('+ Holz', '#d9a45f', 20);
                 }
 
                 this.context.updateInventoryUI();
@@ -506,6 +517,8 @@ export class PlayerInteraction {
                 this.SoundManager.playSound('dig_' + this.SoundManager.getSoundCategory(currentItem.type), 0.5, 1.4);
                 this.context.updateInventoryUI();
             }
+        } else if (e.button === 0) {
+            this.showMiningHint('Schaue auf einen Baum und halte Linksklick');
         }
     }
 
@@ -607,5 +620,12 @@ export class PlayerInteraction {
         msg.style = `position:absolute; left:50%; top:45%; transform:translate(-50%,-50%); color:${color}; font-weight:bold; pointer-events:none; animation: fade-up 1.5s forwards; text-shadow: 0 0 10px rgba(0,0,0,0.5); font-size: ${fontSize}px; z-index: 2000;`;
         document.body.appendChild(msg);
         setTimeout(() => msg.remove(), 1500);
+    }
+
+    showMiningHint(text) {
+        const now = Date.now();
+        if (now - this.lastMiningHintAt < MINING_HINT_COOLDOWN_MS) return;
+        this.lastMiningHintAt = now;
+        this.showMessage(text, '#ffe066', 18);
     }
 }

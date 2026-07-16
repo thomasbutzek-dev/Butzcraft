@@ -122,6 +122,12 @@ export function getItemName(type) {
     return TRANSLATIONS[bName] || bName;
 }
 
+function buildSlotLabel(kind, index, item) {
+    const prefix = `${kind} Slot ${index + 1}`;
+    if (!item || item.count <= 0) return `${prefix} leer`;
+    return `${prefix} ${getItemName(item.type)} x${item.count}`;
+}
+
 export function updateInventoryUI() {
 
     const hotbarSlots = document.querySelectorAll('#inventory .slot');
@@ -149,8 +155,11 @@ export function updateInventoryUI() {
             if (name.textContent !== translatedName) name.textContent = translatedName;
             slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
-            icon.style.display = 'none'; count.style.display = 'none'; name.style.display = 'none'; slot.title = '';
+            icon.style.display = 'none'; count.style.display = 'none'; name.style.display = 'none'; slot.title = buildSlotLabel('Hotbar', i, item);
         }
+        slot.setAttribute('aria-label', buildSlotLabel('Hotbar', i, item));
+        slot.setAttribute('role', 'button');
+        slot.tabIndex = 0;
         if (i === selectedSlot) { if (!slot.classList.contains('active')) slot.classList.add('active'); } else { if (slot.classList.contains('active')) slot.classList.remove('active'); }
     });
 
@@ -158,6 +167,7 @@ export function updateInventoryUI() {
     gridSlots.forEach((slot) => {
         const sType = slot.dataset.slottype;
         const i = parseInt(slot.dataset.index);
+        if (!sType || Number.isNaN(i)) return;
         let item = null;
         if (sType === 'inventory') item = inventorySlots[i];
         else if (sType === 'crafting') item = craftingGridData[i];
@@ -188,8 +198,9 @@ export function updateInventoryUI() {
             slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
             icon.style.display = 'none'; count.style.display = 'none';
-            icon.innerHTML = ''; slot.title = '';
+            icon.innerHTML = ''; slot.title = buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item);
         }
+        slot.setAttribute('aria-label', buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item));
     });
 }
 
@@ -293,6 +304,9 @@ export function createSlotElement(i, sType = 'inventory') {
     slot.className = 'inv-slot';
     slot.dataset.index = i;
     slot.dataset.slottype = sType;
+    slot.setAttribute('role', 'button');
+    slot.tabIndex = 0;
+    slot.setAttribute('aria-label', buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, null));
     
     const iconContainer = document.createElement('div');
     iconContainer.className = 'slot-icon'; iconContainer.style.position = 'absolute'; iconContainer.style.left = '14px'; iconContainer.style.top = '14px'; iconContainer.style.transform = 'translateZ(10px)';

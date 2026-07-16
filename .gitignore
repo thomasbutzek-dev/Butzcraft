@@ -3,6 +3,7 @@ saves/
 js_backup_*/
 .claude/
 _backups/
+test-screenshots/
 dist/
 *.log
 .DS_Store
