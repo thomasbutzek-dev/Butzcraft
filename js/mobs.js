@@ -3,12 +3,13 @@ import { CONFIG } from '../config.js?v=20260511a';
 import { SoundManager } from './sound.js?v=20260507b';
 import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260507b';
 import { Physics } from './Physics.js?v=20260507b';
+import { Game } from './Game.js?v=20260507b';
 
 const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
 const { GRAVITY, MOB_JUMP_FORCE = 5.5 } = CONFIG.PHYSICS;
 const { HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
-window.droppedItems = window.droppedItems || [];
+Game.droppedItems = Game.droppedItems || [];
 
 // Wiederverwendbare Vektor-Objekte (vermeidet GC-Druck durch new Vector3 in update())
 const _tempDir = new THREE.Vector3();
@@ -1082,8 +1083,8 @@ export class Mob {
                     eggMesh.position.copy(pos);
                     eggMesh.position.y += 0.2; // Etwas über dem Boden spawnen
                     this.scene.add(eggMesh);
-                    if(!window.droppedItems) window.droppedItems=[];
-                    window.droppedItems.push({ mesh: eggMesh, velocityY: 0, blockType: 17 });
+                    if (!Game.droppedItems) Game.droppedItems = [];
+                    Game.droppedItems.push({ mesh: eggMesh, velocityY: 0, blockType: 17 });
                 }
 
                 if ((this.type === 'zombie' || this.type === 'skeleton') && dist < 2.0) onDamage(ZOMBIE_DAMAGE * delta);
@@ -1114,8 +1115,8 @@ export class Mob {
                         dropMesh.position.copy(this.group.position);
                         dropMesh.position.y += 0.3;
                         this.scene.add(dropMesh);
-                        if (!window.droppedItems) window.droppedItems = [];
-                        window.droppedItems.push({ mesh: dropMesh, velocityY: 2.0, blockType: blockType });
+                        if (!Game.droppedItems) Game.droppedItems = [];
+                        Game.droppedItems.push({ mesh: dropMesh, velocityY: 2.0, blockType: blockType });
                     }
                 }
             }

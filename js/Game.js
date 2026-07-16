@@ -6,7 +6,6 @@
  *                  `import { Game } from './Game.js'` benutzen anstatt window.player etc.
  *
  *  Phase 2 (später): Bestehende Module schrittweise migrieren — pro PR ein Modul:
- *                  - mobs.js: window.droppedItems → Game.droppedItems
  *                  - inventory.js: window.* Recipe-Hooks → Game-Methoden
  *
  *  Phase 3 (final): window.* Assignments aus GameMain.js entfernen, Game.set*() aufrufen.
