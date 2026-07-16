@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260507b';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260716e';
 
 // RENDER_DIST wird NICHT destrukturiert, damit Laufzeit-Änderungen via Settings sofort wirken.
 // CHUNK_SIZE/HEIGHT etc. sind hingegen statisch und werden beim Welt-Load fest verdrahtet.

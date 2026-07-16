@@ -1,4 +1,4 @@
-import { BLOCK_TYPES } from './blocks.js?v=20260507b';
+import { BLOCK_TYPES } from './blocks.js?v=20260716e';
 
 const OBJECTIVES = [
     {

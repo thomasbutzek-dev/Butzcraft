@@ -2,11 +2,12 @@
 import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260716c';
 import { craftingRecipes } from './recipes.js?v=20260716d';
 import { initRecipeBook } from './recipe_book.js?v=20260716e';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260716d';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260716e';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
+import { getFoodInfo } from './foodRules.js?v=20260716a';
 
 function getDurableItemInfo(type) {
     return getToolInfo(type) || getSwordInfo(type) || getBowInfo(type);
@@ -20,23 +21,12 @@ function isDurableItemType(type) {
 // Quelle der Wahrheit für Hunger-Werte ist PlayerInteraction.handleInteraction (Type-Match-Switch).
 // Hier dupliziert für UI-Anzeige — bei Änderung BEIDE Stellen synchron halten oder nach
 // CONFIG.GAMEPLAY zentralisieren (Future-Work).
-const HUNGER_RESTORES = {
-    17: 5,   // EGG
-    18: 15,  // MILK
-    21: 10,  // FISH
-    22: 15,  // MEAT
-    23: 10,  // CHICKEN
-    24: 5,   // ROTTEN_FLESH (30% Schaden-Risiko!)
-    25: 12,  // MUTTON
-    51: 8,   // BERRIES
-    55: 12   // TURTLE_MEAT
-};
 function buildItemTooltip(name, type) {
     let tip = name;
-    const hunger = HUNGER_RESTORES[type];
-    if (hunger !== undefined) {
-        tip += `\n+${hunger} Hunger`;
-        if (type === 24) tip += ' (30% Risiko: -5 HP!)';
+    const food = getFoodInfo(type);
+    if (food) {
+        tip += `\n+${food.hunger} Hunger`;
+        if (food.damageChance) tip += ` (${Math.round(food.damageChance * 100)}% Risiko: -${food.damage} HP!)`;
     }
     return tip;
 }
@@ -100,7 +90,9 @@ const TRANSLATIONS = {
     'CHEST': 'Truhe', 'SNOW_BLOCK': 'Schneeblock', 'ICE_BLOCK': 'Eisblock', 'PRESSURE_PLATE': 'Druckplatte', 'MINE_RAIL': 'Minengleis', 'MINE_SUPPORT': 'Minenbalken', 'SANDSTONE_CARVED': 'Gravierter Sandstein',
     'SPAWNER': 'Mob-Spawner', 'MOSSY_STONE': 'Moosiger Stein', 'COBBLESTONE': 'Bruchstein', 'FIRE': 'Feuer', 'VILLAGE_PATH': 'Dorfweg', 'HAY_BALE': 'Strohballen',
     'WOOD_SWORD': 'Holzschwert', 'STONE_SWORD': 'Steinschwert', 'IRON_SWORD': 'Eisenschwert', 'GOLD_SWORD': 'Goldschwert',
-    'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil'
+    'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil',
+    'COOKED_FISH': 'Gebratener Fisch', 'COOKED_MEAT': 'Gebratenes Fleisch', 'COOKED_CHICKEN': 'Gebratenes Hähnchen',
+    'COOKED_MUTTON': 'Gebratenes Hammelfleisch', 'COOKED_TURTLE_MEAT': 'Gebratenes Schildkrötenfleisch'
 };
 
 
@@ -247,7 +239,7 @@ export function createBlockHTML(type) {
     if (type === 25) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍖</div>`;
 
     const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
-        || (type >= 60 && type <= 74) || (type >= 89 && type <= 95)); // Kohle, Barren, Werkzeuge und Waffen als 2D-Icons
+        || (type >= 60 && type <= 74) || (type >= 89 && type <= 100)); // Kohle, Barren, Werkzeuge, Waffen und Nahrung als 2D-Icons
     let texIdx = 0;
     if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
     const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;

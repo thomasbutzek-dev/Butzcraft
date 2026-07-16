@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260511a';
 import { SoundManager } from './sound.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260716d';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260716e';
 import { Physics } from './Physics.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 

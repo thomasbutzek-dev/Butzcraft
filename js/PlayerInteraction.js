@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
-import { openFurnace } from './furnace.js?v=20260716i';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716k';
-import { BLOCK_COLORS } from './blocks.js?v=20260507b';
+import { openFurnace } from './furnace.js?v=20260716j';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716l';
+import { BLOCK_COLORS } from './blocks.js?v=20260716e';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260716a';
 import { getAttackProfile, getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
 import { PlayerArrowProjectile } from './playerArrow.js?v=20260716a';
+import { getFoodInfo } from './foodRules.js?v=20260716a';
 
-const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
+const { MAX_HUNGER, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
 const WOOD_BLOCKS = new Set([5, 13, 15]);
 const MINING_HINT_COOLDOWN_MS = 1800;
@@ -463,7 +464,7 @@ export class PlayerInteraction {
                 if (hitNpc) {
                     if (e.button === 2) {
                         // Rechtsklick: Handels-UI öffnen
-                        const { openTradeUI } = await import('./tradeUI.js?v=20260716j');
+                        const { openTradeUI } = await import('./tradeUI.js?v=20260716k');
                         openTradeUI(hitNpc, this._controls);
                         return;
                     } else if (e.button === 0) {
@@ -524,30 +525,20 @@ export class PlayerInteraction {
         }
 
         // 2. Konsumierbare Items prüfen (Live-Abfrage der Slot-Daten)
-        if (e.button === 2 && currentItem && (currentItem.type === 17 || currentItem.type === 18 || (currentItem.type >= 21 && currentItem.type <= 25) || currentItem.type === 51 || currentItem.type === 55)) {
+        const foodInfo = currentItem ? getFoodInfo(currentItem.type) : null;
+        if (e.button === 2 && currentItem && foodInfo) {
             if (currentItem.count > 0) {
                 currentItem.count--;
-                let gain = 0;
-                if (currentItem.type === 17) gain = HUNGER_GAIN_EGG;
-                else if (currentItem.type === 18) gain = HUNGER_GAIN_MILK;
-                else if (currentItem.type === 21) gain = 10; // Fisch
-                else if (currentItem.type === 22) gain = 15; // Fleisch
-                else if (currentItem.type === 23) gain = 10; // Hähnchen
-                else if (currentItem.type === 24) gain = 5;  // Zombie
-                else if (currentItem.type === 25) gain = 12; // Mutton
-                else if (currentItem.type === 51) gain = 8;  // Beeren
-                else if (currentItem.type === 55) gain = 12; // Schildkröte
-                // Wenn es vergammelt ist, 30% Chance auf kleinen Schaden
-                if (currentItem.type === 24 && Math.random() < 0.3) {
-                    Game.player.health -= 5;
+                if (foodInfo.damageChance && Math.random() < foodInfo.damageChance) {
+                    Game.player.health -= foodInfo.damage;
                     this.SoundManager.playSound('damage', 1.0, 1.0);
                 }
 
-                Game.player.hunger = Math.min(MAX_HUNGER, Game.player.hunger + gain);
+                Game.player.hunger = Math.min(MAX_HUNGER, Game.player.hunger + foodInfo.hunger);
                 this.SoundManager.playSound('step_grass', 0.5, 1.5);
                 this.context.updateInventoryUI();
                 this.context.updateUI();
-                this.showMessage("Yum! 😋", "#ffe066", 24);
+                this.showMessage(foodInfo.cooked ? 'Lecker gekocht!' : 'Yum!', '#ffe066', 24);
                 return;
             }
         }
@@ -632,7 +623,7 @@ export class PlayerInteraction {
                 // Werkzeuge, Barren, Items können nicht platziert werden
                 const unplaceable = [17, 18, 21, 22, 23, 24, 25, 31, 34, 39, 51,
                     60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
-                    89, 90, 91, 92, 93, 94, 95];
+                    89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100];
                 
                 if (currentItem.count <= 0 || currentItem.type === 0 || unplaceable.includes(currentItem.type)) {
                     return; 

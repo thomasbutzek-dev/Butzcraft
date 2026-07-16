@@ -12,7 +12,8 @@ export const BLOCK_TYPES = {
         SNOW_BLOCK: 77, ICE_BLOCK: 78, PRESSURE_PLATE: 79, MINE_RAIL: 80, MINE_SUPPORT: 81, SANDSTONE_CARVED: 82,
         SPAWNER: 83, MOSSY_STONE: 84, COBBLESTONE: 85, FIRE: 86, VILLAGE_PATH: 87, HAY_BALE: 88,
         WOOD_SWORD: 89, STONE_SWORD: 90, IRON_SWORD: 91, GOLD_SWORD: 92,
-        STRING: 93, BOW: 94, ARROW: 95
+        STRING: 93, BOW: 94, ARROW: 95,
+        COOKED_FISH: 96, COOKED_MEAT: 97, COOKED_CHICKEN: 98, COOKED_MUTTON: 99, COOKED_TURTLE_MEAT: 100
         };
 
         export const BLOCK_COLORS = {
@@ -34,7 +35,9 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.SNOW_BLOCK]: 0xF0F0F0, [BLOCK_TYPES.ICE_BLOCK]: 0x99DDEE, [BLOCK_TYPES.PRESSURE_PLATE]: 0x999999, [BLOCK_TYPES.MINE_RAIL]: 0x888888, [BLOCK_TYPES.MINE_SUPPORT]: 0x6B4226, [BLOCK_TYPES.SANDSTONE_CARVED]: 0xD2A85A,
             [BLOCK_TYPES.SPAWNER]: 0x1A1A2E, [BLOCK_TYPES.MOSSY_STONE]: 0x5A7A5A, [BLOCK_TYPES.COBBLESTONE]: 0x7A7A7A, [BLOCK_TYPES.FIRE]: 0xFF6600, [BLOCK_TYPES.VILLAGE_PATH]: 0x8B6B3D, [BLOCK_TYPES.HAY_BALE]: 0xD4A820,
             [BLOCK_TYPES.WOOD_SWORD]: 0xCD853F, [BLOCK_TYPES.STONE_SWORD]: 0x888888, [BLOCK_TYPES.IRON_SWORD]: 0xC0C0C0, [BLOCK_TYPES.GOLD_SWORD]: 0xFFD700,
-            [BLOCK_TYPES.STRING]: 0xF2F2F2, [BLOCK_TYPES.BOW]: 0x8B6B3D, [BLOCK_TYPES.ARROW]: 0xA0A0A0
+            [BLOCK_TYPES.STRING]: 0xF2F2F2, [BLOCK_TYPES.BOW]: 0x8B6B3D, [BLOCK_TYPES.ARROW]: 0xA0A0A0,
+            [BLOCK_TYPES.COOKED_FISH]: 0xB9783E, [BLOCK_TYPES.COOKED_MEAT]: 0x8B4513, [BLOCK_TYPES.COOKED_CHICKEN]: 0xC98B52,
+            [BLOCK_TYPES.COOKED_MUTTON]: 0xA65A3A, [BLOCK_TYPES.COOKED_TURTLE_MEAT]: 0x6F7A3D
         };
 
         export const BLOCK_TEX = {
@@ -55,7 +58,9 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.SNOW_BLOCK]: 8, [BLOCK_TYPES.ICE_BLOCK]: 9, [BLOCK_TYPES.PRESSURE_PLATE]: 79, [BLOCK_TYPES.MINE_RAIL]: 80, [BLOCK_TYPES.MINE_SUPPORT]: 81, [BLOCK_TYPES.SANDSTONE_CARVED]: 82,
             [BLOCK_TYPES.SPAWNER]: 83, [BLOCK_TYPES.MOSSY_STONE]: 84, [BLOCK_TYPES.COBBLESTONE]: 85, [BLOCK_TYPES.FIRE]: 86, [BLOCK_TYPES.VILLAGE_PATH]: 87, [BLOCK_TYPES.HAY_BALE]: 88,
             [BLOCK_TYPES.WOOD_SWORD]: 89, [BLOCK_TYPES.STONE_SWORD]: 90, [BLOCK_TYPES.IRON_SWORD]: 91, [BLOCK_TYPES.GOLD_SWORD]: 92,
-            [BLOCK_TYPES.STRING]: 93, [BLOCK_TYPES.BOW]: 94, [BLOCK_TYPES.ARROW]: 95
+            [BLOCK_TYPES.STRING]: 93, [BLOCK_TYPES.BOW]: 94, [BLOCK_TYPES.ARROW]: 95,
+            [BLOCK_TYPES.COOKED_FISH]: 96, [BLOCK_TYPES.COOKED_MEAT]: 97, [BLOCK_TYPES.COOKED_CHICKEN]: 98,
+            [BLOCK_TYPES.COOKED_MUTTON]: 99, [BLOCK_TYPES.COOKED_TURTLE_MEAT]: 100
         };
 
 // --- TEXTURE GENERATOR ---
@@ -1373,6 +1378,24 @@ export const BLOCK_TYPES = {
                 c.fillStyle = '#EEEEEE';
                 c.beginPath(); c.moveTo(10, 45); c.lineTo(5, 58); c.lineTo(18, 53); c.closePath(); c.fill();
             });
+
+            const drawCookedFoodTile = (tile, baseColor, accentColor) => drawTile(tile, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.fillStyle = baseColor;
+                c.beginPath();
+                c.ellipse(32, 34, 22, 15, -0.2, 0, Math.PI * 2);
+                c.fill();
+                c.fillStyle = accentColor;
+                c.fillRect(17, 27, 30, 4);
+                c.fillRect(21, 36, 24, 4);
+                c.fillStyle = 'rgba(255,255,255,0.25)';
+                c.fillRect(20, 22, 18, 3);
+            });
+            drawCookedFoodTile(96, '#B9783E', '#6D3F24');
+            drawCookedFoodTile(97, '#8B4513', '#4E2917');
+            drawCookedFoodTile(98, '#C98B52', '#7A4A29');
+            drawCookedFoodTile(99, '#A65A3A', '#673522');
+            drawCookedFoodTile(100, '#6F7A3D', '#3D4822');
 
             atlasDataURL = canvas.toDataURL("image/png");
 

@@ -170,6 +170,19 @@ describe('PlayerInteraction through the Game seam', () => {
         );
     }, 15000);
 
+    it('uses the shared cooked-food value when eating', async () => {
+        const { interaction, inventorySlots, context } = await createInteraction({
+            inventoryItem: { type: 97, count: 1 }
+        });
+
+        await interaction.handleInteraction({ button: 2 });
+
+        expect(Game.player.hunger).toBe(34);
+        expect(inventorySlots[0].count).toBe(0);
+        expect(context.updateUI).toHaveBeenCalled();
+        expect(interaction.showMessage).toHaveBeenCalledWith('Lecker gekocht!', '#ffe066', 24);
+    }, 15000);
+
     it('applies pressure-plate damage to the central player state', async () => {
         const { interaction, sound } = await createInteraction({ blockType: 79 });
 

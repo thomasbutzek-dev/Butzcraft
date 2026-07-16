@@ -2,9 +2,9 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260716d';
-        import { World, getBiomeAt, BIOMES } from './world.js?v=20260716b';
-        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716d';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260716e';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260716c';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716e';
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260716d';
@@ -12,16 +12,16 @@
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260716b';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716l';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716k';
-        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716i';
-        import { getOnboardingProgress } from './onboarding.js?v=20260716b';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716m';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716l';
+        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716j';
+        import { getOnboardingProgress } from './onboarding.js?v=20260716c';
         import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260716a';
-        import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716i';
-        import { WeatherSystem } from './weather.js?v=20260716b';
+        import { findNewGameSpawn } from './newGameSpawn.js?v=20260716b';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716j';
+        import { WeatherSystem } from './weather.js?v=20260716c';
         import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716j';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716k';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
         import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
@@ -40,7 +40,7 @@
 
         // --- KONSTANTEN & KONFIGURATION ---
         const { CHUNK_SIZE, CHUNK_HEIGHT, WATER_LEVEL, RENDER_DIST, CLOUD_HEIGHT } = CONFIG.WORLD;
-        const { DAY_DURATION, MAX_HEALTH, MAX_HUNGER, HUNGER_LOSS_PASSIVE, HUNGER_LOSS_MOVE, HUNGER_GAIN_PIG, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, REGEN_RATE, REGEN_THRESHOLD, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULT } = CONFIG.GAMEPLAY;
+        const { DAY_DURATION, MAX_HEALTH, MAX_HUNGER, HUNGER_LOSS_PASSIVE, HUNGER_LOSS_MOVE, REGEN_RATE, REGEN_THRESHOLD, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULT } = CONFIG.GAMEPLAY;
         const { GRAVITY, GRAVITY_MULTIPLIER, WATER_DRAG, JUMP_FORCE, PLAYER_JUMP_FORCE, WALK_SPEED, FRICTION, PLAYER_WIDTH } = CONFIG.PHYSICS;
         const { MAX_COUNT, SPAWN_CHANCE, SPAWN_DIST_MIN, SPAWN_DIST_MAX, ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS , WEIGHT_COW, WEIGHT_PIG, WEIGHT_SHEEP, WEIGHT_CHICKEN } = CONFIG.MOBS;
         const MOB_JUMP_FORCE = 5.5; // Konstante für das Springen von Tieren/Zombies (ca. 1.5 Blöcke hoch bei g=9.8)

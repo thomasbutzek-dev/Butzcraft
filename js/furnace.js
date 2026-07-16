@@ -1,6 +1,6 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
-import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260716k';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260716e';
+import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260716l';
 import { Game } from './Game.js?v=20260716b';
 
 // Schmelz-Rezepte: Input-Block → Output-Item
@@ -11,7 +11,16 @@ const SMELT_RECIPES = {
     [BLOCK_TYPES.STONE]:     { type: BLOCK_TYPES.STONE_BRICK, count: 1 },
     [BLOCK_TYPES.SAND]:      { type: BLOCK_TYPES.SANDSTONE,   count: 1 },
     [BLOCK_TYPES.WOOD]:      { type: BLOCK_TYPES.COAL,        count: 1 }, // Holzkohle
+    [BLOCK_TYPES.FISH]:      { type: BLOCK_TYPES.COOKED_FISH, count: 1 },
+    [BLOCK_TYPES.RAW_MEAT]:  { type: BLOCK_TYPES.COOKED_MEAT, count: 1 },
+    [BLOCK_TYPES.RAW_CHICKEN]: { type: BLOCK_TYPES.COOKED_CHICKEN, count: 1 },
+    [BLOCK_TYPES.MUTTON]:    { type: BLOCK_TYPES.COOKED_MUTTON, count: 1 },
+    [BLOCK_TYPES.TURTLE_MEAT]: { type: BLOCK_TYPES.COOKED_TURTLE_MEAT, count: 1 },
 };
+
+export function getSmeltRecipe(type) {
+    return SMELT_RECIPES[type] || null;
+}
 
 const SMELT_TIME = 10000; // 10 Sekunden in ms
 const FUEL_ITEMS = new Set([BLOCK_TYPES.COAL, BLOCK_TYPES.PLANKS, BLOCK_TYPES.STICK, BLOCK_TYPES.WOOD]);
@@ -82,7 +91,7 @@ function renderFurnaceUI() {
     if (bar) bar.style.width = (smeltProgress * 100).toFixed(1) + '%';
     const status = document.getElementById('furnace-status');
     if (status) {
-        if (smeltActive) status.textContent = 'Schmelzt... ' + Math.round(smeltProgress * 100) + '%';
+        if (smeltActive) status.textContent = 'Verarbeitet... ' + Math.round(smeltProgress * 100) + '%';
         else if (furnaceInput.count > 0 && SMELT_RECIPES[furnaceInput.type]) status.textContent = 'Warte auf Brennstoff';
         else if (furnaceInput.count > 0) status.textContent = 'Kein Rezept';
         else status.textContent = 'Bereit';

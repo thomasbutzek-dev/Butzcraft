@@ -18,7 +18,17 @@ vi.mock('../js/blocks.js', () => ({
         IRON_INGOT: 61,
         GOLD_INGOT: 62,
         PLANKS: 26,
-        STICK: 27
+        STICK: 27,
+        FISH: 21,
+        RAW_MEAT: 22,
+        RAW_CHICKEN: 23,
+        MUTTON: 25,
+        TURTLE_MEAT: 55,
+        COOKED_FISH: 96,
+        COOKED_MEAT: 97,
+        COOKED_CHICKEN: 98,
+        COOKED_MUTTON: 99,
+        COOKED_TURTLE_MEAT: 100
     },
     BLOCK_TEX: {},
     atlasDataURL: ''
@@ -57,6 +67,17 @@ beforeEach(() => {
 });
 
 describe('furnace inventory transfer', () => {
+    it('turns every raw animal food into its cooked version', async () => {
+        const furnace = await loadFurnace();
+
+        expect(furnace.getSmeltRecipe(21)).toEqual({ type: 96, count: 1 });
+        expect(furnace.getSmeltRecipe(22)).toEqual({ type: 97, count: 1 });
+        expect(furnace.getSmeltRecipe(23)).toEqual({ type: 98, count: 1 });
+        expect(furnace.getSmeltRecipe(25)).toEqual({ type: 99, count: 1 });
+        expect(furnace.getSmeltRecipe(55)).toEqual({ type: 100, count: 1 });
+        expect(furnace.getSmeltRecipe(24)).toBeNull();
+    });
+
     it('moves smeltable items from main inventory into an empty input slot', async () => {
         const furnace = await loadFurnace();
         inventoryMock.slots[16] = { type: 57, count: 1 };

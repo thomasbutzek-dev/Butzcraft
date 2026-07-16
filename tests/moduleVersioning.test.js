@@ -2,6 +2,34 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 describe('browser module identity', () => {
+    it('loads the large block atlas module through one URL everywhere', () => {
+        const consumers = [
+            'js/GameMain.js',
+            'js/PlayerInteraction.js',
+            'js/furnace.js',
+            'js/inventory.js',
+            'js/mobs.js',
+            'js/onboarding.js',
+            'js/world.js'
+        ];
+        const specifiers = consumers.map(file => {
+            const source = readFileSync(file, 'utf8');
+            return source.match(/\.\/blocks\.js\?v=[^'\"]+/)?.[0];
+        });
+
+        expect(new Set(specifiers)).toEqual(new Set(['./blocks.js?v=20260716e']));
+    });
+
+    it('loads world generation through one versioned URL everywhere', () => {
+        const consumers = ['js/GameMain.js', 'js/newGameSpawn.js', 'js/weather.js'];
+        const specifiers = consumers.map(file => {
+            const source = readFileSync(file, 'utf8');
+            return source.match(/\.\/world\.js\?v=[^'\"]+/)?.[0];
+        });
+
+        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260716c']));
+    });
+
     it('loads inventory through one versioned URL everywhere', () => {
         const consumers = [
             'js/GameMain.js',
@@ -15,7 +43,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/inventory\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716k']));
+        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716l']));
     });
 
     it('loads the Game singleton through one versioned URL everywhere', () => {
@@ -53,7 +81,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/tradeUI\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./tradeUI.js?v=20260716j']));
+        expect(new Set(specifiers)).toEqual(new Set(['./tradeUI.js?v=20260716k']));
     });
 
     it('loads the furnace through one versioned URL everywhere', () => {
@@ -63,6 +91,6 @@ describe('browser module identity', () => {
             return source.match(/\.\/furnace\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./furnace.js?v=20260716i']));
+        expect(new Set(specifiers)).toEqual(new Set(['./furnace.js?v=20260716j']));
     });
 });
