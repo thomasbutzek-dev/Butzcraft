@@ -22,8 +22,21 @@ export function getSmeltRecipe(type) {
     return SMELT_RECIPES[type] || null;
 }
 
-const SMELT_TIME = 10000; // 10 Sekunden in ms
-const FUEL_ITEMS = new Set([BLOCK_TYPES.COAL, BLOCK_TYPES.PLANKS, BLOCK_TYPES.STICK, BLOCK_TYPES.WOOD]);
+const SMELT_TIME = 6000;
+const FUEL_VALUES = new Map([
+    [BLOCK_TYPES.COAL, 8],
+    [BLOCK_TYPES.WOOD, 3],
+    [BLOCK_TYPES.PLANKS, 2],
+    [BLOCK_TYPES.STICK, 1],
+]);
+
+export function getFuelValue(type) {
+    return FUEL_VALUES.get(type) || 0;
+}
+
+export function getSmeltTime() {
+    return SMELT_TIME;
+}
 
 // Ofen-State
 let furnaceOpen = false;
@@ -31,6 +44,7 @@ let furnacePos = null; // {x, y, z}
 let furnaceInput  = { type: 0, count: 0 };
 let furnaceFuel   = { type: 0, count: 0 };
 let furnaceOutput = { type: 0, count: 0 };
+let fuelUsesRemaining = 0;
 let smeltProgress = 0;   // 0..1
 let smeltActive = false;
 let lastTick = 0;
@@ -91,9 +105,15 @@ function renderFurnaceUI() {
     if (bar) bar.style.width = (smeltProgress * 100).toFixed(1) + '%';
     const status = document.getElementById('furnace-status');
     if (status) {
-        if (smeltActive) status.textContent = 'Verarbeitet... ' + Math.round(smeltProgress * 100) + '%';
-        else if (furnaceInput.count > 0 && SMELT_RECIPES[furnaceInput.type]) status.textContent = 'Warte auf Brennstoff';
-        else if (furnaceInput.count > 0) status.textContent = 'Kein Rezept';
+        const fuelStatus = fuelUsesRemaining > 0 ? ` · Brennstoff: ${fuelUsesRemaining}` : '';
+        const recipe = furnaceInput.count > 0 ? SMELT_RECIPES[furnaceInput.type] : null;
+        const outputBlocked = recipe && furnaceOutput.count > 0 &&
+            (furnaceOutput.type !== recipe.type || furnaceOutput.count >= 64);
+        if (smeltActive) status.textContent = 'Verarbeitet... ' + Math.round(smeltProgress * 100) + '%' + fuelStatus;
+        else if (outputBlocked) status.textContent = 'Ausgabe leeren';
+        else if (furnaceInput.count > 0 && SMELT_RECIPES[furnaceInput.type] && fuelUsesRemaining <= 0 && furnaceFuel.count <= 0) status.textContent = 'Warte auf Brennstoff';
+        else if (fuelUsesRemaining > 0) status.textContent = `Bereit · Brennstoff: ${fuelUsesRemaining}`;
+        else if (furnaceInput.count > 0 && !SMELT_RECIPES[furnaceInput.type]) status.textContent = 'Kein Rezept';
         else status.textContent = 'Bereit';
     }
 }
@@ -105,7 +125,7 @@ function handleFurnaceSlotClick(slotId) {
             furnaceInput = returnItemToInventory(furnaceInput);
         }
     } else if (slotId === 'furnace-fuel-slot') {
-        if (!moveOneFromInventoryToFurnace(furnaceFuel, type => FUEL_ITEMS.has(type))) {
+        if (!moveOneFromInventoryToFurnace(furnaceFuel, type => getFuelValue(type) > 0)) {
             if (furnaceFuel.count <= 0) return;
             furnaceFuel = returnItemToInventory(furnaceFuel);
         }
@@ -168,18 +188,22 @@ export function tickFurnace(controls) {
     lastTick = now;
 
     const recipe = furnaceInput.count > 0 ? SMELT_RECIPES[furnaceInput.type] : null;
-    const hasFuel = furnaceFuel.count > 0;
+    const hasFuel = fuelUsesRemaining > 0 || furnaceFuel.count > 0;
     const canOutput = furnaceOutput.count === 0 || (recipe && furnaceOutput.type === recipe.type && furnaceOutput.count < 64);
 
     if (recipe && hasFuel && canOutput) {
+        if (fuelUsesRemaining <= 0) {
+            fuelUsesRemaining = getFuelValue(furnaceFuel.type);
+            furnaceFuel.count--;
+            if (furnaceFuel.count <= 0) furnaceFuel = { type: 0, count: 0 };
+        }
         smeltActive = true;
         smeltProgress += dt / SMELT_TIME;
         if (smeltProgress >= 1) {
             smeltProgress = 0;
             furnaceInput.count--;
             if (furnaceInput.count <= 0) furnaceInput = { type: 0, count: 0 };
-            furnaceFuel.count--;
-            if (furnaceFuel.count <= 0) furnaceFuel = { type: 0, count: 0 };
+            fuelUsesRemaining--;
             if (furnaceOutput.count === 0) furnaceOutput = { type: recipe.type, count: 1 };
             else furnaceOutput.count++;
         }

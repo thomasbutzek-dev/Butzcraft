@@ -53,10 +53,11 @@ function setFurnaceDom() {
 
 async function loadFurnace() {
     vi.resetModules();
-    return import('../js/furnace.js?v=20260716c');
+    return import('../js/furnace.js?v=20260716d');
 }
 
 beforeEach(() => {
+    vi.restoreAllMocks();
     setFurnaceDom();
     for (let i = 0; i < inventoryMock.slots.length; i++) {
         inventoryMock.slots[i] = { type: 0, count: 0 };
@@ -67,6 +68,64 @@ beforeEach(() => {
 });
 
 describe('furnace inventory transfer', () => {
+    it('makes dense fuel more valuable and keeps smelting casual-friendly', async () => {
+        const furnace = await loadFurnace();
+
+        expect(furnace.getFuelValue(60)).toBe(8);
+        expect(furnace.getFuelValue(5)).toBe(3);
+        expect(furnace.getFuelValue(26)).toBe(2);
+        expect(furnace.getFuelValue(27)).toBe(1);
+        expect(furnace.getFuelValue(57)).toBe(0);
+        expect(furnace.getSmeltTime()).toBe(6000);
+    });
+
+    it('smelts eight items with one piece of coal', async () => {
+        let now = 0;
+        vi.spyOn(performance, 'now').mockImplementation(() => now);
+        const furnace = await loadFurnace();
+        inventoryMock.slots[0] = { type: 57, count: 8 };
+        inventoryMock.slots[1] = { type: 60, count: 1 };
+        let selectedSlot = 0;
+        window.getSelectedSlot = () => selectedSlot;
+
+        furnace.openFurnace(0, 0, 0, null);
+        for (let i = 0; i < 8; i++) document.getElementById('furnace-input-slot').click();
+        selectedSlot = 1;
+        document.getElementById('furnace-fuel-slot').click();
+
+        for (let i = 0; i < 8; i++) {
+            now += 6000;
+            furnace.tickFurnace(null);
+        }
+
+        expect(document.querySelector('#furnace-output-slot .slot-count').textContent).toBe('8');
+        expect(document.getElementById('furnace-input-slot').title).toBe('');
+        expect(document.getElementById('furnace-fuel-slot').title).toBe('');
+    });
+
+    it('explains when a different output blocks the next recipe', async () => {
+        let now = 0;
+        vi.spyOn(performance, 'now').mockImplementation(() => now);
+        const furnace = await loadFurnace();
+        inventoryMock.slots[0] = { type: 57, count: 1 };
+        inventoryMock.slots[1] = { type: 60, count: 1 };
+        inventoryMock.slots[2] = { type: 58, count: 1 };
+        let selectedSlot = 0;
+        window.getSelectedSlot = () => selectedSlot;
+
+        furnace.openFurnace(0, 0, 0, null);
+        document.getElementById('furnace-input-slot').click();
+        selectedSlot = 1;
+        document.getElementById('furnace-fuel-slot').click();
+        now += 6000;
+        furnace.tickFurnace(null);
+        selectedSlot = 2;
+        document.getElementById('furnace-input-slot').click();
+        furnace.tickFurnace(null);
+
+        expect(document.getElementById('furnace-status').textContent).toBe('Ausgabe leeren');
+    });
+
     it('turns every raw animal food into its cooked version', async () => {
         const furnace = await loadFurnace();
 
