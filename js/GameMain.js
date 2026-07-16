@@ -32,7 +32,7 @@
         window.setSelectedSlot = setSelectedSlot;
         window.getBiomeAt = getBiomeAt;
 
-        window.SoundManager = SoundManager;
+        Game.SoundManager = SoundManager;
         window.BLOCK_TYPES = BLOCK_TYPES;
         window.BLOCK_TEX = BLOCK_TEX;
         window._blockTexData = { BLOCK_TEX, atlasDataURL };
@@ -59,6 +59,7 @@
         let lastBloodMoonRewardRetry = 0;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
+        Game.mobs = mobs;
         Game.droppedItems = [];
         const droppedItems = Game.droppedItems;
         let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
@@ -721,8 +722,8 @@
             el.style.opacity = String(0.4 + 0.5 * intensity);
             requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = '0'; }));
             try {
-                if (window.SoundManager && window.SoundManager.playSound) {
-                    window.SoundManager.playSound('water_splash', 0.5, 0.6 + Math.random() * 0.15, { skipCooldown: true });
+                if (SoundManager && SoundManager.playSound) {
+                    SoundManager.playSound('water_splash', 0.5, 0.6 + Math.random() * 0.15, { skipCooldown: true });
                 }
             } catch (e) { /* sound-system optional */ }
             _damageFx.shakeUntil = now + 150;
@@ -1129,11 +1130,6 @@
             Game.world = world;
             Game.renderer = renderer;
             Game.scene = scene;
-            window.SoundManager = SoundManager;
-            window.mobs = mobs;
-
-
-
             // Komfort-Funktion zum Testen von Wasser
             
         }

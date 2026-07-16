@@ -7,7 +7,7 @@
  *  Phase 2 (complete): PlayerInteraction and mob state use Game; the obsolete
  *                      global recipe refresh hook was removed from inventory.
  *
- *  Phase 3 (in progress): GameMain gameplay and render references increasingly use Game.
+ *  Phase 3 (in progress): GameMain gameplay, render and shared runtime state increasingly use Game.
  *                         Remaining proxied state will move in separate, testable steps.
  *
  * Vorteile dieses inkrementellen Ansatzes:
