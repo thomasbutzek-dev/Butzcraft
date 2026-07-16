@@ -860,10 +860,10 @@
             // WebGL Context-Loss Handling: tritt auf bei Tab-Wechsel auf Mobile, GPU-Reset, oder
             // wenn der Browser den Context wegen Inaktivität freigibt. Ohne preventDefault wird
             // der Context NIE wiederhergestellt → Canvas bleibt schwarz für immer.
-            window.webglContextLost = false;
+            Game.webglContextLost = false;
             renderer.domElement.addEventListener('webglcontextlost', (e) => {
                 e.preventDefault();
-                window.webglContextLost = true;
+                Game.webglContextLost = true;
                 console.warn('[WebGL] Context lost — pausing render loop, awaiting restore.');
                 let overlay = document.getElementById('webgl-context-lost-overlay');
                 if (!overlay) {
@@ -883,14 +883,14 @@
 
             renderer.domElement.addEventListener('webglcontextrestored', () => {
                 console.warn('[WebGL] Context restored — rebuilding chunk meshes.');
-                window.webglContextLost = false;
+                Game.webglContextLost = false;
                 const overlay = document.getElementById('webgl-context-lost-overlay');
                 if (overlay) overlay.style.display = 'none';
                 // Chunk-Meshes neu aufbauen — alte BufferGeometries sind nach Context-Loss ungültig.
-                if (window.world && window.world.chunks) {
-                    for (const chunk of window.world.chunks.values()) {
-                        window.world.disposeChunkMeshes(chunk);
-                        window.world.requestMesh(chunk.cx, chunk.cz);
+                if (Game.world && Game.world.chunks) {
+                    for (const chunk of Game.world.chunks.values()) {
+                        Game.world.disposeChunkMeshes(chunk);
+                        Game.world.requestMesh(chunk.cx, chunk.cz);
                     }
                 }
             }, false);
@@ -972,7 +972,7 @@
             scene.add(camera); // Kamera muss in die Szene, da sie nun Kinder hat
 
             world = new World(scene);
-            window.world = world;
+            Game.world = world;
 
             // Tier 3: Wetter-System initialisieren
             weatherSystem = new WeatherSystem(scene, world);
@@ -1124,11 +1124,11 @@
                 renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
-            window.camera = camera;
-            window.controls = controls;
-            window.world = world;
-            window.renderer = renderer;
-            window.scene = scene;
+            Game.camera = camera;
+            Game.controls = controls;
+            Game.world = world;
+            Game.renderer = renderer;
+            Game.scene = scene;
             window.SoundManager = SoundManager;
             window.mobs = mobs;
 
@@ -1216,7 +1216,7 @@
             requestAnimationFrame(animate);
             // Bei verlorenem WebGL-Context: prevTime trotzdem aktualisieren,
             // damit nach Restore kein riesiger delta-Spike entsteht (würde Wall-Phasing auslösen).
-            if (window.webglContextLost) { prevTime = performance.now(); return; }
+            if (Game.webglContextLost) { prevTime = performance.now(); return; }
             const now = performance.now();
             updateFpsCounter(now);
             const delta = Math.min((now - prevTime) / 1000, 0.02);
