@@ -1,7 +1,7 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting } from './crafting.js?v=20260507b';
+import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260716a';
 import { craftingRecipes } from './recipes.js?v=20260507b';
-import { initRecipeBook } from './recipe_book.js?v=20260716a';
+import { initRecipeBook } from './recipe_book.js?v=20260716c';
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
@@ -36,6 +36,11 @@ export const inventorySlots = Array.from({ length: 64 }, () => ({ type: 0, count
 export let cursorItem = { type: 0, count: 0 };
 export let selectedSlot = 0;
 export let inventoryOpened = false;
+export let craftingStation = 'inventory';
+
+export function getCraftingStation() {
+    return craftingStation;
+}
 
 function clearItem(item) {
     item.type = 0;
@@ -354,6 +359,9 @@ export function updateInventoryUI() {
         }
         slot.setAttribute('aria-label', buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item));
     });
+
+    const craftButton = document.getElementById('crafting-create-btn');
+    if (craftButton) craftButton.disabled = craftingResultData.count <= 0;
 }
 
 function handleSlotClick(e, sType, index) {
@@ -366,37 +374,9 @@ function handleSlotClick(e, sType, index) {
     
     if (!itemObj) return;
 
-    if (sType === 'result') {
-        const durableResult = isToolType(itemObj.type);
-        const canTakeResult = itemObj.count > 0 && (
-            cursorItem.count === 0 ||
-            (!durableResult && cursorItem.type === itemObj.type && cursorItem.count + itemObj.count <= 64)
-        );
-        if (canTakeResult) {
-            if (e.button === 0 || e.button === 2) {
-                if (cursorItem.count === 0) {
-                    cursorItem.type = itemObj.type;
-                    cursorItem.count = itemObj.count;
-                    const toolInfo = getToolInfo(itemObj.type);
-                    if (toolInfo) cursorItem.durability = toolInfo.maxDurability;
-                } else {
-                    cursorItem.count += itemObj.count;
-                }
-                clearItem(itemObj);
-
-                for (let i = 0; i < 9; i++) {
-                    if (craftingGridData[i] && craftingGridData[i].count > 0) {
-                        craftingGridData[i].count--;
-                        if (craftingGridData[i].count <= 0) craftingGridData[i].type = 0;
-                    }
-                }
-                checkCrafting();
-                updateInventoryUI();
-                // Crafting-Click: dig_wood bei hoher Pitch klingt wie ein Werkbank-Klick.
-                // Vorher: step_grass — semantisch falsch (Schritte beim Craften?).
-                SoundManager.playSound('dig_wood', 0.4, 1.8);
-            }
-        }
+    if (sType === 'result') return;
+    if (sType === 'crafting' && cursorItem.count > 0 && isToolType(cursorItem.type)) {
+        setCraftingStatus('Werkzeuge sind keine Bastelzutaten.', 'error');
         return;
     }
 
@@ -565,9 +545,17 @@ export function initInventoryGrid() {
     const cGrid = document.getElementById('crafting-grid');
     const cResult = document.getElementById('crafting-result');
     cGrid.innerHTML = ''; cResult.innerHTML = '';
-    
-    for (let i = 0; i < 9; i++) cGrid.appendChild(createSlotElement(i, 'crafting'));
+
+    const isWorkbench = craftingStation === 'workbench';
+    setCraftingGridSize(isWorkbench ? 3 : 2);
+    cGrid.classList.toggle('inventory-crafting', !isWorkbench);
+    cGrid.classList.toggle('workbench-crafting', isWorkbench);
+    const craftingIndices = isWorkbench ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 3, 4];
+    for (const index of craftingIndices) cGrid.appendChild(createSlotElement(index, 'crafting'));
     cResult.appendChild(createSlotElement(0, 'result'));
+
+    const label = document.getElementById('crafting-label');
+    if (label) label.textContent = isWorkbench ? 'Werkbank (3×3)' : 'Im Inventar (2×2)';
 
     const hbTitle = document.createElement('div');
     hbTitle.className = 'inv-section-title';
@@ -595,7 +583,10 @@ export function initInventoryGrid() {
 function getRecipeGrid(recipe) {
     const grid = Array(9).fill(0);
     if (recipe.kind === 'shapeless') {
-        recipe.ingredients.slice(0, 9).forEach((type, index) => grid[index] = type);
+        const slots = craftingStation === 'workbench'
+            ? [0, 1, 2, 3, 4, 5, 6, 7, 8]
+            : [0, 1, 3, 4];
+        recipe.ingredients.slice(0, slots.length).forEach((type, index) => grid[slots[index]] = type);
     } else if (recipe.gridSize === 3) {
         recipe.pattern.slice(0, 9).forEach((type, index) => grid[index] = type);
     } else {
@@ -603,6 +594,50 @@ function getRecipeGrid(recipe) {
         recipe.pattern.slice(0, 4).forEach((type, index) => grid[slots[index]] = type);
     }
     return grid;
+}
+
+function getActiveCraftingIndices() {
+    return craftingStation === 'workbench'
+        ? [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        : [0, 1, 3, 4];
+}
+
+function getMissingRecipeItems(recipe) {
+    const required = new Map();
+    for (const type of getRecipeGrid(recipe)) {
+        if (type !== 0) required.set(type, (required.get(type) || 0) + 1);
+    }
+
+    const available = new Map();
+    for (let i = 0; i < inventorySlots.length; i++) {
+        if (i >= 8 && i <= 15) continue;
+        const item = inventorySlots[i];
+        if (item && item.type !== 0 && item.count > 0) {
+            available.set(item.type, (available.get(item.type) || 0) + item.count);
+        }
+    }
+    for (const item of craftingGridData) {
+        if (item && item.type !== 0 && item.count > 0) {
+            available.set(item.type, (available.get(item.type) || 0) + item.count);
+        }
+    }
+
+    const missing = [];
+    for (const [type, count] of required) {
+        const missingCount = count - (available.get(type) || 0);
+        if (missingCount > 0) missing.push({ type, count: missingCount });
+    }
+    return missing;
+}
+
+function formatMissingItems(missing) {
+    return `Fehlt: ${missing.map(item => `${item.count}× ${getItemName(item.type)}`).join(', ')}.`;
+}
+
+function getRecipeLockReason(recipe) {
+    if (recipe.gridSize === 3 && craftingStation !== 'workbench') return 'Werkbank erforderlich.';
+    const missing = getMissingRecipeItems(recipe);
+    return missing.length > 0 ? formatMissingItems(missing) : '';
 }
 
 function removeInventoryItems(type, count) {
@@ -620,6 +655,9 @@ function removeInventoryItems(type, count) {
 }
 
 function tryFillRecipeFromInventory(recipe) {
+    const lockReason = getRecipeLockReason(recipe);
+    if (lockReason) return { filled: false, message: lockReason };
+
     const inventorySnapshot = inventorySlots.map(slot => ({ ...slot }));
     const craftingSnapshot = craftingGridData.map(slot => ({ ...slot }));
     const recipeGrid = getRecipeGrid(recipe);
@@ -649,7 +687,7 @@ function tryFillRecipeFromInventory(recipe) {
         for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = inventorySnapshot[i];
         for (let i = 0; i < craftingGridData.length; i++) craftingGridData[i] = craftingSnapshot[i];
         updateInventoryUI();
-        return false;
+        return { filled: false, message: 'Kein Platz für vorhandene Bastelzutaten.' };
     }
 
     recipeGrid.forEach((type, index) => {
@@ -657,43 +695,124 @@ function tryFillRecipeFromInventory(recipe) {
     });
     checkCrafting();
     updateInventoryUI();
+    return { filled: true, message: 'Rezept eingesetzt.' };
+}
+
+function setCraftingStatus(message, state = '') {
+    const status = document.getElementById('crafting-status');
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle('success', state === 'success');
+    status.classList.toggle('error', state === 'error');
+}
+
+export function craftCurrentRecipe() {
+    if (craftingResultData.type === 0 || craftingResultData.count <= 0) {
+        setCraftingStatus('Lege ein gültiges Rezept ein.', 'error');
+        return { crafted: false, reason: 'no-recipe' };
+    }
+
+    const inventorySnapshot = inventorySlots.map(slot => ({ ...slot }));
+    const craftingSnapshot = craftingGridData.map(slot => ({ ...slot }));
+    const output = { ...craftingResultData };
+    const addResult = addItemToInventory(output.type, output.count);
+    if (addResult.remaining > 0) {
+        for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = inventorySnapshot[i];
+        for (let i = 0; i < craftingGridData.length; i++) craftingGridData[i] = craftingSnapshot[i];
+        checkCrafting();
+        updateInventoryUI();
+        setCraftingStatus('Inventar voll – nichts wurde verbraucht.', 'error');
+        return { crafted: false, reason: 'inventory-full' };
+    }
+
+    for (const index of getActiveCraftingIndices()) {
+        const item = craftingGridData[index];
+        if (!item || item.count <= 0) continue;
+        item.count--;
+        if (item.count <= 0) craftingGridData[index] = { type: 0, count: 0 };
+    }
+    checkCrafting();
+    updateInventoryUI();
+    setCraftingStatus(`${getItemName(output.type)} hergestellt.`, 'success');
+    SoundManager.playSound('dig_wood', 0.4, 1.8);
+    return { crafted: true, reason: null };
+}
+
+function returnCraftingItemsToInventory() {
+    const inventorySnapshot = inventorySlots.map(slot => ({ ...slot }));
+    const craftingSnapshot = craftingGridData.map(slot => ({ ...slot }));
+    for (let i = 0; i < craftingGridData.length; i++) {
+        const item = craftingGridData[i];
+        if (!item || item.type === 0 || item.count <= 0) continue;
+        const result = addItemToInventory(item.type, item.count);
+        if (result.remaining > 0) {
+            for (let j = 0; j < inventorySlots.length; j++) inventorySlots[j] = inventorySnapshot[j];
+            for (let j = 0; j < craftingGridData.length; j++) craftingGridData[j] = craftingSnapshot[j];
+            checkCrafting();
+            updateInventoryUI();
+            return false;
+        }
+        craftingGridData[i] = { type: 0, count: 0 };
+    }
+    checkCrafting();
+    updateInventoryUI();
     return true;
+}
+
+function renderRecipeBook() {
+    const onRecipeClick = (recipe) => {
+        const result = tryFillRecipeFromInventory(recipe);
+        setCraftingStatus(result.message, result.filled ? 'success' : 'error');
+    };
+    initRecipeBook(
+        atlasDataURL,
+        BLOCK_TEX,
+        craftingRecipes,
+        BLOCK_TYPES,
+        TRANSLATIONS,
+        onRecipeClick,
+        { getLockReason: getRecipeLockReason }
+    );
+}
+
+function openCraftingOverlay(station, gameStarted, spawning, controls) {
+    if (!gameStarted || spawning) return false;
+    craftingStation = station;
+    inventoryOpened = true;
+    setCraftingGridSize(station === 'workbench' ? 3 : 2);
+    document.getElementById('inventory-overlay').style.display = 'flex';
+    if (!Game.touchActive) controls.unlock();
+    initInventoryGrid();
+    setCraftingStatus(
+        station === 'workbench'
+            ? '3×3-Werkbank bereit. Wähle ein Rezept.'
+            : '2×2-Crafting. Für Werkzeuge brauchst du eine Werkbank.'
+    );
+    renderRecipeBook();
+    updateInventoryUI();
+    return true;
+}
+
+export function openWorkbenchCrafting(gameStarted, spawning, controls) {
+    return openCraftingOverlay('workbench', gameStarted, spawning, controls);
 }
 
 export function toggleInventory(gameStarted, spawning, controls) {
     if (!gameStarted || spawning) return false;
-    inventoryOpened = !inventoryOpened;
-    
-    // Rezeptbuch initialisieren/umbauen
-    if (inventoryOpened) {
-        const craftingStatus = document.getElementById('crafting-status');
-        if (craftingStatus) {
-            craftingStatus.textContent = 'Rezept anklicken, um Zutaten einzusetzen.';
-            craftingStatus.classList.remove('success', 'error');
-        }
-        const onRecipeClick = (recipe) => {
-            const filled = tryFillRecipeFromInventory(recipe);
-            if (craftingStatus) {
-                craftingStatus.textContent = filled ? 'Rezept eingesetzt.' : 'Zutaten fehlen – Bastelfeld bleibt unverändert.';
-                craftingStatus.classList.toggle('success', filled);
-                craftingStatus.classList.toggle('error', !filled);
-            }
-        };
-        initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick);
+    if (!inventoryOpened) return openCraftingOverlay('inventory', gameStarted, spawning, controls);
+
+    if (!returnCraftingItemsToInventory()) {
+        setCraftingStatus('Inventar voll – Bastelzutaten können nicht zurückgelegt werden.', 'error');
+        return true;
     }
-    
-    document.getElementById('inventory-overlay').style.display = inventoryOpened ? 'flex' : 'none';
-    if (inventoryOpened) {
-        if (!Game.touchActive) controls.unlock();
-        initInventoryGrid();
-        updateInventoryUI();
-    } else {
-        if (!Game.touchActive) {
-            if (typeof window.resumeGame === 'function') window.resumeGame();
-            else controls.lock();
-        }
+    inventoryOpened = false;
+    craftingStation = 'inventory';
+    document.getElementById('inventory-overlay').style.display = 'none';
+    if (!Game.touchActive) {
+        if (typeof window.resumeGame === 'function') window.resumeGame();
+        else controls.lock();
     }
-    return inventoryOpened;
+    return false;
 }
 
 export function setupInventoryEvents() {
@@ -710,6 +829,9 @@ export function setupInventoryEvents() {
             }
         });
     }
+
+    const craftButton = document.getElementById('crafting-create-btn');
+    if (craftButton) craftButton.addEventListener('click', craftCurrentRecipe);
 
     const updateCursorPreview = (e) => {
         if (!inventoryOpened) return;

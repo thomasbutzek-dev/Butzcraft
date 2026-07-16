@@ -12,16 +12,16 @@
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716h';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716g';
-        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716e';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716j';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716i';
+        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716g';
         import { getOnboardingProgress } from './onboarding.js?v=20260716b';
         import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260716a';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716e';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716g';
         import { WeatherSystem } from './weather.js?v=20260716b';
         import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716f';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716h';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
         import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
@@ -1136,7 +1136,8 @@
                 getInventorySlots: () => inventorySlots,
                 addItemToInventory: addItemToInventoryOrDrop,
                 updateInventoryUI: updateInventoryUI,
-                updateUI: updateUI
+                updateUI: updateUI,
+                openWorkbenchCrafting: () => openWorkbenchCrafting(gameStarted, spawning, controls)
             });
             window.playerInteractions = window.playerInteraction; // Alias für Backwards-Compat
             window.playerInteraction.init(controls, () => gameActive, () => spawning);

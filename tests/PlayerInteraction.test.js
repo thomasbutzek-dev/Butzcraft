@@ -31,7 +31,8 @@ async function createInteraction({ blockType = 0, inventoryItem = null } = {}) {
         getInventorySlots: () => inventorySlots,
         addItemToInventory: vi.fn(),
         updateInventoryUI: vi.fn(),
-        updateUI: vi.fn()
+        updateUI: vi.fn(),
+        openWorkbenchCrafting: vi.fn()
     };
     let currentBlockType = blockType;
     const world = {
@@ -117,5 +118,21 @@ describe('PlayerInteraction through the Game seam', () => {
         expect(world.setBlock).not.toHaveBeenCalled();
         expect(interaction.showMessage).toHaveBeenCalledWith('Du brauchst eine Holz-Spitzhacke.', '#ffe066', 18);
         expect(interaction.miningHeld).toBe(false);
+    }, 15000);
+
+    it('opens the 3x3 station when a placed workbench is used', async () => {
+        const { interaction, context, world } = await createInteraction({ blockType: 28 });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        world.chunks.set('0,0', { mesh });
+        interaction.raycaster.intersectObjects = vi.fn(objects => objects.length === 0 ? [] : [{
+            distance: 2,
+            object: mesh,
+            point: new THREE.Vector3(0.5, 0.5, 0.5),
+            face: { normal: new THREE.Vector3(0, 1, 0) }
+        }]);
+
+        await interaction.handleInteraction({ button: 2 });
+
+        expect(context.openWorkbenchCrafting).toHaveBeenCalledOnce();
     }, 15000);
 });

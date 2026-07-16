@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260716h">
+    <link rel="stylesheet" href="style.css?v=20260716j">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -355,8 +355,11 @@
                 <!-- Wird dynamisch mit 9 inv-slot für Crafting gefüllt -->
             </div>
             <div style="font-size: 24px; color: white;">➔</div>
-            <div id="crafting-result" style="width: 60px; height: 60px;">
-                <!-- Result Slot -->
+            <div id="crafting-output">
+                <div id="crafting-result" style="width: 60px; height: 60px;">
+                    <!-- Result Slot -->
+                </div>
+                <button id="crafting-create-btn" type="button">Herstellen</button>
             </div>
         </div>
         <div id="crafting-status" role="status" aria-live="polite">Rezept anklicken, um Zutaten einzusetzen.</div>
@@ -433,7 +436,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260716w"
+        src="./js/GameMain.js?v=20260716y"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
-import { openFurnace } from './furnace.js?v=20260716e';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716g';
+import { openFurnace } from './furnace.js?v=20260716g';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716i';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260716a';
@@ -369,7 +369,7 @@ export class PlayerInteraction {
                 if (hitNpc) {
                     if (e.button === 2) {
                         // Rechtsklick: Handels-UI öffnen
-                        const { openTradeUI } = await import('./tradeUI.js?v=20260716f');
+                        const { openTradeUI } = await import('./tradeUI.js?v=20260716h');
                         openTradeUI(hitNpc, this._controls);
                         return;
                     } else if (e.button === 0) {
@@ -491,6 +491,13 @@ export class PlayerInteraction {
                 p.add(h.face.normal.clone().multiplyScalar(-0.5));
                 const harvestX = Math.floor(p.x), harvestY = Math.floor(p.y), harvestZ = Math.floor(p.z);
                 const harvestBlock = this.world.getBlock(harvestX, harvestY, harvestZ);
+
+                if (harvestBlock === 28 || harvestBlock === 36) {
+                    if (typeof this.context.openWorkbenchCrafting === 'function') {
+                        this.context.openWorkbenchCrafting();
+                    }
+                    return;
+                }
 
                 if (harvestBlock === 38 || harvestBlock === 39) {
                     if (typeof window.trySleepInBed === 'function') {

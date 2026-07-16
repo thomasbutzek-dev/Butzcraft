@@ -1,6 +1,6 @@
 import { normalizeRecipe } from './recipes.js?v=20260507b';
 
-export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick) {
+export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick, options = {}) {
     const EMOJI_MAP = { 21: '🐟', 22: '🥩', 23: '🍗', 24: '🧟', 25: '🍖' };
 
     const createMiniHTML = (type) => {
@@ -74,10 +74,31 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
 
         const tooltip = ensureTooltip();
 
-        craftingRecipes.forEach(rawRecipe => {
+        let currentSection = '';
+        const sortedRecipes = [...craftingRecipes].sort((first, second) => {
+            const firstAtWorkbench = normalizeRecipe(first).gridSize === 3 ? 1 : 0;
+            const secondAtWorkbench = normalizeRecipe(second).gridSize === 3 ? 1 : 0;
+            return firstAtWorkbench - secondAtWorkbench;
+        });
+        sortedRecipes.forEach(rawRecipe => {
             const recipe = normalizeRecipe(rawRecipe);
+            const section = recipe.gridSize === 3 ? 'An der Werkbank' : 'Im Inventar';
+            if (section !== currentSection) {
+                const sectionTitle = document.createElement('div');
+                sectionTitle.className = 'recipe-section-title';
+                sectionTitle.textContent = section;
+                container.appendChild(sectionTitle);
+                currentSection = section;
+            }
             const entry = document.createElement('div');
             entry.className = 'recipe-entry';
+            const lockReason = typeof options.getLockReason === 'function'
+                ? options.getLockReason(recipe)
+                : '';
+            if (lockReason) {
+                entry.classList.add('locked');
+                entry.setAttribute('aria-disabled', 'true');
+            }
 
             // Zutaten-Grid erstellen: Das Rezeptbuch zeigt immer die aktuelle 3x3-Werkbank.
             // Legacy-2x2-Rezepte bleiben logisch 2x2, werden aber optisch oben links in 3x3 eingebettet.
@@ -143,6 +164,12 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
 
             resultContainer.appendChild(resultSlot);
             resultContainer.appendChild(nameDiv);
+            if (lockReason) {
+                const reasonDiv = document.createElement('div');
+                reasonDiv.className = 'recipe-lock-reason';
+                reasonDiv.textContent = lockReason;
+                resultContainer.appendChild(reasonDiv);
+            }
 
             entry.appendChild(ingredientsDiv);
             entry.appendChild(arrow);
