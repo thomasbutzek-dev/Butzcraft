@@ -1,6 +1,6 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260507b';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716a';
 
 // Schmelz-Rezepte: Input-Block → Output-Item
 const SMELT_RECIPES = {
@@ -92,23 +92,27 @@ function handleFurnaceSlotClick(slotId) {
     if (slotId === 'furnace-input-slot') {
         if (!moveOneFromInventoryToFurnace(furnaceInput, type => SMELT_RECIPES[type])) {
             if (furnaceInput.count <= 0) return;
-            if (window.addItemToInventory) window.addItemToInventory(furnaceInput.type, furnaceInput.count);
-            furnaceInput = { type: 0, count: 0 };
+            furnaceInput = returnItemToInventory(furnaceInput);
         }
     } else if (slotId === 'furnace-fuel-slot') {
         if (!moveOneFromInventoryToFurnace(furnaceFuel, type => FUEL_ITEMS.has(type))) {
             if (furnaceFuel.count <= 0) return;
-            if (window.addItemToInventory) window.addItemToInventory(furnaceFuel.type, furnaceFuel.count);
-            furnaceFuel = { type: 0, count: 0 };
+            furnaceFuel = returnItemToInventory(furnaceFuel);
         }
     } else if (slotId === 'furnace-output-slot') {
         if (furnaceOutput.count > 0) {
-            if (window.addItemToInventory) window.addItemToInventory(furnaceOutput.type, furnaceOutput.count);
-            furnaceOutput = { type: 0, count: 0 };
+            furnaceOutput = returnItemToInventory(furnaceOutput);
             if (window.updateInventoryUI) window.updateInventoryUI();
         }
     }
     renderFurnaceUI();
+}
+
+function returnItemToInventory(item) {
+    if (!window.addItemToInventory) return item;
+    const result = window.addItemToInventory(item.type, item.count);
+    if (!result || result.remaining <= 0) return { type: 0, count: 0 };
+    return { type: item.type, count: result.remaining };
 }
 
 function moveOneFromInventoryToFurnace(targetSlot, acceptsType) {

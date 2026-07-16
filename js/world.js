@@ -153,7 +153,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                         this.queuedChunks.delete(this.getChunkKey(cx, cz));
 
                         if (!this.isChunkInsideActiveView(cx, cz, 1)) {
-                            if (data) this.chunkPool.push(data);
+                            if (data) this.chunkPool.push(data.buffer);
                             return;
                         }
                         

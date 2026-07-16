@@ -73,4 +73,20 @@ describe('furnace inventory transfer', () => {
         expect(window.addItemToInventory).toHaveBeenCalledWith(57, 1);
         expect(document.getElementById('furnace-input-slot').title).toBe('');
     });
+
+    it('keeps an occupied input slot when the inventory is full', async () => {
+        const furnace = await loadFurnace();
+        window.inventorySlots[16] = { type: 57, count: 1 };
+
+        furnace.openFurnace(0, 0, 0, null);
+        document.getElementById('furnace-input-slot').click();
+        for (let i = 0; i < window.inventorySlots.length; i++) {
+            if (i < 8 || i >= 16) window.inventorySlots[i] = { type: 1, count: 64 };
+        }
+        window.addItemToInventory.mockReturnValue({ added: 0, remaining: 1 });
+
+        document.getElementById('furnace-input-slot').click();
+
+        expect(document.getElementById('furnace-input-slot').title).toBe('Item 57');
+    });
 });

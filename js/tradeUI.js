@@ -5,8 +5,8 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName } from './inventory.js?v=20260507b';
-import { getQuestProgress, removeQuestItems } from './quests.js?v=20260515b';
+import { createBlockHTML, getItemName, tryExchangeInventory } from './inventory.js?v=20260716a';
+import { getQuestProgress } from './quests.js?v=20260515b';
 
 let currentNPC = null;
 
@@ -118,35 +118,14 @@ function buildQuestRow(quest) {
  * Trade ausführen.
  */
 function executeTrade(trade, idx) {
-    const inventorySlots = window.inventorySlots;
-    if (!inventorySlots) return;
-
-    // Prüfe ob genug Items vorhanden
-    let totalAvailable = 0;
-    for (const slot of inventorySlots) {
-        if (slot.type === trade.give.type) totalAvailable += slot.count;
-    }
-
-    if (totalAvailable < trade.give.count) {
+    const result = tryExchangeInventory(trade.give, trade.receive);
+    if (result.reason === 'insufficient-items') {
         showTradeMessage('Nicht genug Items! ❌', '#ff4444');
         return;
     }
-
-    // Items abziehen
-    let toRemove = trade.give.count;
-    for (const slot of inventorySlots) {
-        if (toRemove <= 0) break;
-        if (slot.type === trade.give.type) {
-            const remove = Math.min(slot.count, toRemove);
-            slot.count -= remove;
-            toRemove -= remove;
-            if (slot.count <= 0) { slot.type = 0; slot.count = 0; }
-        }
-    }
-
-    // Items hinzufügen
-    if (window.addItemToInventory) {
-        window.addItemToInventory(trade.receive.type, trade.receive.count);
+    if (!result.exchanged) {
+        showTradeMessage('Inventar voll! ❌', '#ff9800');
+        return;
     }
 
     // UI aktualisieren
@@ -173,9 +152,10 @@ function executeQuest(quest, btn) {
     const progress = getQuestProgress(inventorySlots, quest);
     if (!progress.complete) return;
 
-    if (!removeQuestItems(inventorySlots, quest)) return;
-    if (window.addItemToInventory) {
-        window.addItemToInventory(quest.receive.type, quest.receive.count);
+    const result = tryExchangeInventory(quest.give, quest.receive);
+    if (!result.exchanged) {
+        showTradeMessage('Inventar voll! ❌', '#ff9800');
+        return;
     }
     if (window.updateInventoryUI) window.updateInventoryUI();
 

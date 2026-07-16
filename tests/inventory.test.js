@@ -22,7 +22,7 @@ vi.mock('../js/recipe_book.js', () => ({ initRecipeBook: () => {} }));
 vi.mock('../js/sound.js', () => ({ SoundManager: { playSound: () => {} } }));
 
 // Nach den Mocks importieren — top-level await funktioniert in Vitest.
-const { inventorySlots, addItemToInventory } = await import('../js/inventory.js');
+const { inventorySlots, addItemToInventory, canAddItemToInventory, tryAddItemsToInventory } = await import('../js/inventory.js');
 
 // updateInventoryUI hängt am DOM; wir machen sie zum No-Op via document.querySelectorAll-stub.
 beforeEach(() => {
@@ -58,6 +58,45 @@ describe('addItemToInventory – Basis', () => {
         addItemToInventory(3, 10);
         expect(inventorySlots[0].count).toBe(64);
         expect(inventorySlots[1]).toEqual({ type: 3, count: 6 });
+    });
+});
+
+describe('addItemToInventory full inventory', () => {
+    it('reports the quantity that could not be stored', () => {
+        for (let i = 0; i < inventorySlots.length; i++) {
+            if (i < 8 || i >= 16) inventorySlots[i] = { type: 1, count: 64 };
+        }
+
+        const result = addItemToInventory(3, 5);
+
+        expect(result).toEqual({ added: 0, remaining: 5 });
+        expect(inventorySlots.every((slot, index) => (
+            index >= 8 && index <= 15 ? slot.count === 0 : slot.count === 64
+        ))).toBe(true);
+    });
+
+    it('reports that an item does not fit before changing the inventory', () => {
+        for (let i = 0; i < inventorySlots.length; i++) {
+            if (i < 8 || i >= 16) inventorySlots[i] = { type: 1, count: 64 };
+        }
+
+        expect(canAddItemToInventory(3, 1)).toBe(false);
+    });
+
+    it('rolls back a multi-item reward when only part of it fits', () => {
+        for (let i = 0; i < inventorySlots.length; i++) {
+            if (i < 8 || i >= 16) inventorySlots[i] = { type: 1, count: 64 };
+        }
+        inventorySlots[0] = { type: 3, count: 63 };
+        const before = inventorySlots.map(slot => ({ ...slot }));
+
+        const result = tryAddItemsToInventory([
+            { type: 3, count: 1 },
+            { type: 5, count: 1 }
+        ]);
+
+        expect(result).toEqual({ added: false, reason: 'inventory-full' });
+        expect(inventorySlots).toEqual(before);
     });
 });
 

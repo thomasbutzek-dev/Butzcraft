@@ -75,15 +75,87 @@ export function isInventoryOpened() {
 const TOUCH_LONG_PRESS_MS = 420;
 const TOUCH_MOVE_CANCEL_PX = 10;
 
+export function canAddItemToInventory(type, count) {
+    if (type === 0 || count <= 0) return false;
+    let remaining = count;
+    for (let i = 0; i < inventorySlots.length; i++) {
+        if (i >= 8 && i <= 15) continue;
+        const slot = inventorySlots[i];
+        if (slot.type === type) remaining -= Math.max(0, 64 - slot.count);
+        else if (slot.type === 0 || slot.count <= 0) remaining -= 64;
+        if (remaining <= 0) return true;
+    }
+    return false;
+}
+
+export function tryAddItemsToInventory(items) {
+    if (!Array.isArray(items) || items.length === 0) return { added: false, reason: 'invalid-items' };
+    const snapshot = inventorySlots.map(slot => ({ type: slot.type, count: slot.count }));
+
+    for (const item of items) {
+        if (!item || item.type === 0 || item.count <= 0) {
+            for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = snapshot[i];
+            updateInventoryUI();
+            return { added: false, reason: 'invalid-items' };
+        }
+        const result = addItemToInventory(item.type, item.count);
+        if (result.remaining > 0) {
+            for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = snapshot[i];
+            updateInventoryUI();
+            return { added: false, reason: 'inventory-full' };
+        }
+    }
+
+    return { added: true, reason: null };
+}
+
+export function tryExchangeInventory(give, receive) {
+    if (!give || !receive || give.type === 0 || receive.type === 0 || give.count <= 0 || receive.count <= 0) {
+        return { exchanged: false, reason: 'invalid-exchange' };
+    }
+
+    let available = 0;
+    for (let i = 0; i < inventorySlots.length; i++) {
+        if (i >= 8 && i <= 15) continue;
+        if (inventorySlots[i].type === give.type) available += inventorySlots[i].count;
+    }
+    if (available < give.count) return { exchanged: false, reason: 'insufficient-items' };
+
+    const snapshot = inventorySlots.map(slot => ({ type: slot.type, count: slot.count }));
+    let toRemove = give.count;
+    for (let i = 0; i < inventorySlots.length && toRemove > 0; i++) {
+        if (i >= 8 && i <= 15) continue;
+        const slot = inventorySlots[i];
+        if (slot.type !== give.type) continue;
+        const remove = Math.min(slot.count, toRemove);
+        slot.count -= remove;
+        toRemove -= remove;
+        if (slot.count <= 0) inventorySlots[i] = { type: 0, count: 0 };
+    }
+
+    const result = addItemToInventory(receive.type, receive.count);
+    if (result.remaining > 0) {
+        for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = snapshot[i];
+        updateInventoryUI();
+        return { exchanged: false, reason: 'inventory-full' };
+    }
+
+    return { exchanged: true, reason: null };
+}
+
 export function addItemToInventory(type, count) {
-    if (type === 0) return;
+    if (type === 0) return { added: 0, remaining: count };
+    const requestedCount = count;
     for (let i = 0; i < 64; i++) {
         if (i >= 8 && i <= 15) continue; 
         if (inventorySlots[i].type === type && inventorySlots[i].count < 64) {
             const add = Math.min(count, 64 - inventorySlots[i].count);
             inventorySlots[i].count += add;
             count -= add;
-            if (count <= 0) { updateInventoryUI(); return; }
+            if (count <= 0) {
+                updateInventoryUI();
+                return { added: requestedCount, remaining: 0 };
+            }
         }
     }
     for (let i = 0; i < 64; i++) {
@@ -92,10 +164,14 @@ export function addItemToInventory(type, count) {
             const add = Math.min(count, 64);
             inventorySlots[i] = { type: type, count: add };
             count -= add;
-            if (count <= 0) { updateInventoryUI(); return; }
+            if (count <= 0) {
+                updateInventoryUI();
+                return { added: requestedCount, remaining: 0 };
+            }
         }
     }
     updateInventoryUI();
+    return { added: requestedCount - count, remaining: count };
 }
 
 // Erzeugt HTML für ein Block-/Item-Icon (2D flat oder 3D Cube)

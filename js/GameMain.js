@@ -3,7 +3,7 @@
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
-        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260507c';
+        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260716a';
         import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260511a';
 
         import { Input } from './Input.js?v=20260507b';
@@ -12,12 +12,13 @@
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260507c';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260511a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260507c';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716a';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716a';
+        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716a';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716a';
         import { WeatherSystem } from './weather.js?v=20260517a';
         import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260507c';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716a';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
         import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
@@ -52,6 +53,8 @@
         let time = DAY_DURATION * 0.45, prevTime = performance.now(), spawnTimer = 0;
         let collectedEggs = 0, collectedWool = 0;
         let lastBloodMoonRewardDay = -1;
+        let pendingBloodMoonRewardDay = -1;
+        let lastBloodMoonRewardRetry = 0;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
         window.droppedItems = [];
@@ -504,6 +507,22 @@
             }
         }
 
+        function createOverflowDrop(type, count) {
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.25, 0.25, 0.25),
+                new THREE.MeshPhongMaterial({ color: BLOCK_COLORS[type] || 0xffffff })
+            );
+            const playerPosition = controls?.getObject?.()?.position || camera?.position;
+            if (playerPosition) mesh.position.copy(playerPosition);
+            mesh.position.y += 0.3;
+            scene.add(mesh);
+            droppedItems.push({ mesh, velocityY: 2, blockType: type, count });
+        }
+
+        function addItemToInventoryOrDrop(type, count) {
+            return addItemOrCreateDrop(type, count, createOverflowDrop);
+        }
+
         function resetRuntimeForLoadedGame() {
             while (mobs.length > 0) {
                 const mob = mobs.pop();
@@ -574,6 +593,7 @@
                     
                     collectedWool = data.collectedWool || 0;
                     lastBloodMoonRewardDay = typeof data.lastBloodMoonRewardDay === 'number' ? data.lastBloodMoonRewardDay : -1;
+                    pendingBloodMoonRewardDay = typeof data.pendingBloodMoonRewardDay === 'number' ? data.pendingBloodMoonRewardDay : -1;
                     updateInventoryUI();
                     updateUI();
                     
@@ -668,16 +688,25 @@
         };
         const BLOOD_MOON_INTERVAL = CONFIG.GAMEPLAY.BLOOD_MOON_INTERVAL || 3;
 
-        function grantBloodMoonReward(dayCount) {
+        function grantBloodMoonReward(dayCount, notifyFailure = true) {
             if (BLOOD_MOON_INTERVAL <= 0) return;
             if (dayCount % BLOOD_MOON_INTERVAL !== BLOOD_MOON_INTERVAL - 1) return;
             if (lastBloodMoonRewardDay === dayCount) return;
             if (!window.player || window.player.health <= 0) return;
 
+            const result = tryAddItemsToInventory([
+                { type: 61, count: 1 },
+                { type: 60, count: 4 },
+                { type: 31, count: 2 }
+            ]);
+            if (!result.added) {
+                pendingBloodMoonRewardDay = dayCount;
+                if (notifyFailure) showSaveMessage('Blutmond-Belohnung wartet: Inventar voll', '#ff9800');
+                return;
+            }
+
             lastBloodMoonRewardDay = dayCount;
-            addItemToInventory(61, 1);
-            addItemToInventory(60, 4);
-            addItemToInventory(31, 2);
+            pendingBloodMoonRewardDay = -1;
             showSaveMessage('Blutmond ueberlebt: +1 Eisenbarren, +4 Kohle, +2 Knochen', '#FFD700');
         }
 
@@ -1069,7 +1098,7 @@
             window.playerInteraction = new PlayerInteraction(camera, scene, world, mobs, SoundManager, {
                 getSelectedSlot: getSelectedSlot,
                 getInventorySlots: () => inventorySlots,
-                addItemToInventory: addItemToInventory,
+                addItemToInventory: addItemToInventoryOrDrop,
                 updateInventoryUI: updateInventoryUI,
                 updateUI: updateUI
             });
@@ -1335,6 +1364,10 @@
                 time += delta;
                 const currentDayCount = Math.floor(time / DAY_DURATION);
                 if (currentDayCount > previousDayCount) grantBloodMoonReward(previousDayCount);
+                if (pendingBloodMoonRewardDay >= 0 && now - lastBloodMoonRewardRetry >= 1000) {
+                    lastBloodMoonRewardRetry = now;
+                    grantBloodMoonReward(pendingBloodMoonRewardDay, false);
+                }
 
                 // Tier 3: Wetter-System Update
                 if (weatherSystem) {
@@ -1557,9 +1590,7 @@
                         const bB = world.getBlock(Math.floor(ip.x), Math.floor(ip.y - 0.1), Math.floor(ip.z));
                         if (bB !== 0 && bB !== 4 && bB !== 8 && bB !== 9 && item.velocityY < 0) { ip.y = Math.floor(ip.y - 0.1) + 1.0; item.velocityY = 0; }
                         if (Math.hypot(ip.x - playerPos.x, ip.z - playerPos.z) < 2.0 && Math.abs(ip.y - playerPos.y) < 2.5) {
-                            disposeDrop(item);
-                            items.splice(i, 1);
-                            addItemToInventory(item.blockType, 1);
+                            tryCollectDroppedItem(items, i, disposeDrop);
                         }
                     }
                 };
@@ -1669,6 +1700,7 @@
                 collectedEggs: collectedEggs,
                 collectedWool: collectedWool,
                 lastBloodMoonRewardDay: lastBloodMoonRewardDay,
+                pendingBloodMoonRewardDay: pendingBloodMoonRewardDay,
                 modifiedBlocks: world.modifiedBlocks,
                 blockMeta: world.blockMeta,
                 chestContents: world.chestContents,

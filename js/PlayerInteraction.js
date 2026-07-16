@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
 import { openFurnace } from './furnace.js?v=20260507b';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260507b';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716a';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
@@ -577,7 +577,14 @@ export class PlayerInteraction {
                     slot.onclick = () => {
                         const currentItem = contents[i];
                         if (!currentItem || currentItem.count <= 0) return;
-                        this.context.addItemToInventory(currentItem.type, currentItem.count);
+                        const result = this.context.addItemToInventory(currentItem.type, currentItem.count);
+                        if (result && result.remaining > 0) {
+                            currentItem.count = result.remaining;
+                            countEl.textContent = currentItem.count > 1 ? currentItem.count : '';
+                            this.world.chestContents[key] = contents;
+                            this.context.updateInventoryUI();
+                            return;
+                        }
                         contents[i] = { type: 0, count: 0 };
                         this.world.chestContents[key] = contents;
                         slot.innerHTML = '';
