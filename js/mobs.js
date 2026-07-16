@@ -3,7 +3,7 @@ import { CONFIG } from '../config.js?v=20260511a';
 import { SoundManager } from './sound.js?v=20260507b';
 import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260507b';
 import { Physics } from './Physics.js?v=20260507b';
-import { Game } from './Game.js?v=20260716a';
+import { Game } from './Game.js?v=20260716b';
 
 const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
 const { GRAVITY, MOB_JUMP_FORCE = 5.5 } = CONFIG.PHYSICS;

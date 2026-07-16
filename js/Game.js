@@ -7,8 +7,7 @@
  *  Phase 2 (complete): PlayerInteraction and mob state use Game; the obsolete
  *                      global recipe refresh hook was removed from inventory.
  *
- *  Phase 3 (in progress): GameMain gameplay, render and shared runtime state increasingly use Game.
- *                         Remaining proxied state will move in separate, testable steps.
+ *  Phase 3 (complete): Game owns shared runtime state; private and imported dependencies stay local.
  *
  * Vorteile dieses inkrementellen Ansatzes:
  *  - Kein Big-Bang-Refactor (Risiko zu hoch für Hobby-Projekt)
@@ -16,27 +15,18 @@
  *  - Game-Singleton dient als ausgezeichneter Insertion-Point für Tests/Mocks
  */
 
-// Legacy-Slots, die Game weiterhin transparent zu window.* leitet.
-const PROXIED_SLOTS = [
-    'player', 'world', 'scene', 'camera', 'renderer', 'controls',
-    'mobs', 'droppedItems', 'projectiles',
-    'BLOCK_TYPES', 'BLOCK_TEX', 'SoundManager',
-    'inventorySlots',
-    'webglContextLost'
-];
+const STATE_DEFAULTS = Object.freeze({
+    player: undefined,
+    world: undefined,
+    renderer: undefined,
+    droppedItems: undefined,
+    webglContextLost: false,
+    touchActive: false
+});
 
 class GameClass {
     constructor() {
-        // Define accessor properties auf this, die transparent gegen window proxien.
-        for (const slot of PROXIED_SLOTS) {
-            Object.defineProperty(this, slot, {
-                get: () => (typeof window !== 'undefined' ? window[slot] : undefined),
-                set: (v) => { if (typeof window !== 'undefined') window[slot] = v; },
-                enumerable: true,
-                configurable: true
-            });
-        }
-        this.touchActive = false;
+        this.reset();
     }
 
     // Convenience: Player-Position. null wenn Spiel nicht aktiv.
@@ -58,10 +48,7 @@ class GameClass {
     // Reset für Test-Szenarien. Setzt alle Slots auf undefined (sowohl auf Game als auch auf window).
     // NICHT für Production-Code — nur für Tests/Tear-Down.
     reset() {
-        for (const slot of PROXIED_SLOTS) {
-            this[slot] = undefined;
-        }
-        this.touchActive = false;
+        Object.assign(this, STATE_DEFAULTS);
     }
 }
 

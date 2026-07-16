@@ -4,7 +4,7 @@ import { craftingRecipes } from './recipes.js?v=20260507b';
 import { initRecipeBook } from './recipe_book.js?v=20260716a';
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
 import { SoundManager } from './sound.js?v=20260507b';
-import { Game } from './Game.js?v=20260716a';
+import { Game } from './Game.js?v=20260716b';
 
 // Sprint 6: Tooltip-Hint für essbare Items.
 // Quelle der Wahrheit für Hunger-Werte ist PlayerInteraction.handleInteraction (Type-Match-Switch).

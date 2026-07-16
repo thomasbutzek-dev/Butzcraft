@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { rollLoot } from './structures.js?v=20260507b';
-import { openFurnace } from './furnace.js?v=20260716c';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716d';
+import { openFurnace } from './furnace.js?v=20260716d';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260716e';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
-import { Game } from './Game.js?v=20260716a';
+import { Game } from './Game.js?v=20260716b';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
@@ -205,7 +205,7 @@ export class PlayerInteraction {
 
         // 2. Konsumierbare Items prüfen (Live-Abfrage der Slot-Daten)
         const currentSlotIdx = (typeof window.getSelectedSlot === 'function') ? window.getSelectedSlot() : this.context.getSelectedSlot();
-        const inventorySlots = (window.inventorySlots) ? window.inventorySlots : this.context.getInventorySlots();
+        const inventorySlots = this.context.getInventorySlots();
         const currentItem = inventorySlots[currentSlotIdx];
         
         if (e.button === 2 && currentItem && (currentItem.type === 17 || currentItem.type === 18 || (currentItem.type >= 21 && currentItem.type <= 25) || currentItem.type === 51 || currentItem.type === 55)) {

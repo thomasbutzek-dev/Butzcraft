@@ -4,37 +4,33 @@
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
         import { World, getBiomeAt, BIOMES } from './world.js?v=20260716b';
-        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716b';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716c';
 
         import { Input } from './Input.js?v=20260507b';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260716b';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260716c';
         import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716d';
-        import { Game } from './Game.js?v=20260716a'; // Central state container
+        import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716d';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716d';
-        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716c';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716e';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716e';
+        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716d';
         import { getOnboardingProgress } from './onboarding.js?v=20260716a';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716c';
-        import { WeatherSystem } from './weather.js?v=20260517a';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716d';
+        import { WeatherSystem } from './weather.js?v=20260716b';
         import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716c';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716d';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
         import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
-        Game.inventorySlots = inventorySlots;
         window.updateInventoryUI = updateInventoryUI;
         window.getSelectedSlot = getSelectedSlot;
         window.setSelectedSlot = setSelectedSlot;
         window.getBiomeAt = getBiomeAt;
 
-        Game.SoundManager = SoundManager;
-        window.BLOCK_TYPES = BLOCK_TYPES;
-        window.BLOCK_TEX = BLOCK_TEX;
         window._blockTexData = { BLOCK_TEX, atlasDataURL };
         
 
@@ -59,7 +55,6 @@
         let lastBloodMoonRewardRetry = 0;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
-        Game.mobs = mobs;
         Game.droppedItems = [];
         const droppedItems = Game.droppedItems;
         let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
@@ -75,7 +70,6 @@
         
         
         let inventoryOpened = false;
-        window.BLOCK_TEX = BLOCK_TEX;
         let gameActive = true, spawning = true, gameStarted = false, manuallyPaused = false;
         let currentSaveName = null;
         const CHARACTER_PROFILE_STORAGE_KEY = 'butzcraft.characterProfile';
@@ -1125,11 +1119,8 @@
                 renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
                 renderer.setSize(window.innerWidth, window.innerHeight);
             });
-            Game.camera = camera;
-            Game.controls = controls;
             Game.world = world;
             Game.renderer = renderer;
-            Game.scene = scene;
             // Komfort-Funktion zum Testen von Wasser
             
         }

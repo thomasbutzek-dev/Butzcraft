@@ -15,7 +15,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/inventory\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716d']));
+        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260716e']));
     });
 
     it('loads the Game singleton through one versioned URL everywhere', () => {
@@ -33,6 +33,16 @@ describe('browser module identity', () => {
             return source.match(/\.\/Game\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./Game.js?v=20260716a']));
+        expect(new Set(specifiers)).toEqual(new Set(['./Game.js?v=20260716b']));
+    });
+
+    it('loads touch detection through one versioned URL everywhere', () => {
+        const consumers = ['js/GameMain.js', 'js/particles.js'];
+        const specifiers = consumers.map(file => {
+            const source = readFileSync(file, 'utf8');
+            return source.match(/\.\/touch\.js\?v=[^'\"]+/)?.[0];
+        });
+
+        expect(new Set(specifiers)).toEqual(new Set(['./touch.js?v=20260716c']));
     });
 });

@@ -5,9 +5,9 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName, tryExchangeInventory } from './inventory.js?v=20260716d';
+import { createBlockHTML, getItemName, inventorySlots, tryExchangeInventory } from './inventory.js?v=20260716e';
 import { getQuestProgress } from './quests.js?v=20260515b';
-import { Game } from './Game.js?v=20260716a';
+import { Game } from './Game.js?v=20260716b';
 
 let currentNPC = null;
 
@@ -80,7 +80,7 @@ export function openTradeUI(npc, controls) {
 }
 
 function buildQuestRow(quest) {
-    const progress = getQuestProgress(window.inventorySlots, quest);
+    const progress = getQuestProgress(inventorySlots, quest);
     const row = document.createElement('div');
     row.className = 'trade-row quest-row';
 
@@ -147,9 +147,6 @@ function executeTrade(trade, idx) {
 }
 
 function executeQuest(quest, btn) {
-    const inventorySlots = window.inventorySlots;
-    if (!inventorySlots) return;
-
     const progress = getQuestProgress(inventorySlots, quest);
     if (!progress.complete) return;
 

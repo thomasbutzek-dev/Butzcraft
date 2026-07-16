@@ -51,7 +51,6 @@ describe('PlayerInteraction through the Game seam', () => {
         Game.player = { health: 10, hunger: 10, isSwinging: false, swingProgress: 1 };
         window.npcs = [];
         window.getSelectedSlot = undefined;
-        window.inventorySlots = undefined;
     });
 
     afterEach(() => {

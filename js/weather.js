@@ -11,7 +11,7 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
-import { ParticleSystem } from './particles.js?v=20260517a';
+import { ParticleSystem } from './particles.js?v=20260716a';
 import { BIOMES } from './world.js?v=20260507b';
 import { SoundManager } from './sound.js?v=20260507b';
 

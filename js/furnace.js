@@ -1,7 +1,7 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716d';
-import { Game } from './Game.js?v=20260716a';
+import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260716e';
+import { Game } from './Game.js?v=20260716b';
 
 // Schmelz-Rezepte: Input-Block → Output-Item
 const SMELT_RECIPES = {
@@ -134,7 +134,7 @@ function moveOneFromInventoryToFurnace(targetSlot, acceptsType) {
 }
 
 function findFurnaceSourceSlot(targetSlot, acceptsType) {
-    const inv = window.inventorySlots;
+    const inv = inventorySlots;
     if (!inv) return null;
 
     const canUse = (slot) => {

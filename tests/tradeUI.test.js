@@ -30,7 +30,6 @@ beforeEach(() => {
     for (let i = 0; i < inventory.inventorySlots.length; i++) {
         inventory.inventorySlots[i] = { type: 0, count: 0 };
     }
-    window.inventorySlots = inventory.inventorySlots;
     window.addItemToInventory = inventory.addItemToInventory;
     window.updateInventoryUI = () => {};
 });
