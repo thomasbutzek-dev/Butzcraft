@@ -28,3 +28,15 @@ describe('first-day objective HUD', () => {
         expect(document.querySelectorAll('#first-objective')).toHaveLength(1);
     });
 });
+
+describe('pause menu focus', () => {
+    it('hides gameplay HUD elements while the pause menu is open', () => {
+        const source = readFileSync('js/GameMain.js', 'utf8');
+        const styles = readFileSync('style.css', 'utf8');
+
+        expect(source).toContain("document.body.classList.add('game-paused')");
+        expect(source).toContain("document.body.classList.remove('game-paused')");
+        expect(styles).toContain('body.game-paused #bottom-ui');
+        expect(styles).toContain('body.game-paused #top-ui');
+    });
+});

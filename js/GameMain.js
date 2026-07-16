@@ -240,12 +240,14 @@
         function showPauseMenu() {
             const inst = document.getElementById('instructions');
             if (!inst) return;
+            document.body.classList.add('game-paused');
             inst.style.display = 'block';
             if (typeof window.loadGamesList === 'function') window.loadGamesList();
         }
 
         function hidePauseMenu() {
             const inst = document.getElementById('instructions');
+            document.body.classList.remove('game-paused');
             if (inst) inst.style.display = 'none';
         }
 

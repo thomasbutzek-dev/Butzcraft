@@ -443,6 +443,14 @@ body {
             z-index: 1000 !important;
         }
 
+        body.game-paused #top-ui,
+        body.game-paused #bottom-ui,
+        body.game-paused #crosshair,
+        body.game-paused #controls-hint,
+        body.game-paused #first-objective {
+            visibility: hidden;
+        }
+
         @media (prefers-reduced-motion: reduce) {
             #controls-hint {
                 transition: none;
