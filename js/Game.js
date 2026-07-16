@@ -7,8 +7,8 @@
  *  Phase 2 (complete): PlayerInteraction and mob state use Game; the obsolete
  *                      global recipe refresh hook was removed from inventory.
  *
- *  Phase 3 (in progress): GameMain player state now uses Game.player. Remaining proxied
- *                         state will move in separate, testable steps.
+ *  Phase 3 (in progress): GameMain player and dropped-item state now use Game. Remaining
+ *                         proxied state will move in separate, testable steps.
  *
  * Vorteile dieses inkrementellen Ansatzes:
  *  - Kein Big-Bang-Refactor (Risiko zu hoch für Hobby-Projekt)

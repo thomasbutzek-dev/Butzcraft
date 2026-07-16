@@ -59,8 +59,8 @@
         let lastBloodMoonRewardRetry = 0;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
-        window.droppedItems = [];
-        const droppedItems = window.droppedItems;
+        Game.droppedItems = [];
+        const droppedItems = Game.droppedItems;
         let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
         const npcs = [];            // Tier 3: NPC-Array
         window.npcs = npcs;
