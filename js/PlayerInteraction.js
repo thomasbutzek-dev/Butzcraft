@@ -4,6 +4,7 @@ import { rollLoot } from './structures.js?v=20260507b';
 import { openFurnace } from './furnace.js?v=20260507b';
 import { createBlockHTML, getItemName } from './inventory.js?v=20260716a';
 import { BLOCK_COLORS } from './blocks.js?v=20260507b';
+import { Game } from './Game.js?v=20260507b';
 
 const { MAX_HUNGER, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
@@ -127,8 +128,8 @@ export class PlayerInteraction {
     async handleInteraction(e) {
         // Schlag-Animation triggern
         if (e.button === 0) { 
-            window.player.isSwinging = true; 
-            window.player.swingProgress = 0; 
+            Game.player.isSwinging = true;
+            Game.player.swingProgress = 0;
             this.SoundManager.playSword();
         }
 
@@ -174,7 +175,7 @@ export class PlayerInteraction {
                 if (e.button === 0) { // Angreifen
                     hitMob.takeDamage(10, (amount) => {
                         if (hitMob.type === 'pig') {
-                            window.player.hunger = Math.min(MAX_HUNGER, window.player.hunger + HUNGER_GAIN_PIG);
+                            Game.player.hunger = Math.min(MAX_HUNGER, Game.player.hunger + HUNGER_GAIN_PIG);
                         }
                     });
                 } else if (e.button === 2 && hitMob.type === 'cow') { // Melken
@@ -222,11 +223,11 @@ export class PlayerInteraction {
                 else if (currentItem.type === 55) gain = 12; // Schildkröte
                 // Wenn es vergammelt ist, 30% Chance auf kleinen Schaden
                 if (currentItem.type === 24 && Math.random() < 0.3) {
-                    window.player.health -= 5;
+                    Game.player.health -= 5;
                     this.SoundManager.playSound('damage', 1.0, 1.0);
                 }
 
-                window.player.hunger = Math.min(MAX_HUNGER, window.player.hunger + gain);
+                Game.player.hunger = Math.min(MAX_HUNGER, Game.player.hunger + gain);
                 this.SoundManager.playSound('step_grass', 0.5, 1.5);
                 this.context.updateInventoryUI();
                 this.context.updateUI();
@@ -615,7 +616,7 @@ export class PlayerInteraction {
     checkPressurePlates(playerX, playerY, playerZ) {
         const bx = Math.floor(playerX), by = Math.floor(playerY - 0.1), bz = Math.floor(playerZ);
         if (this.world.getBlock(bx, by, bz) === 79) {
-            window.player.health = Math.max(0, window.player.health - 2);
+            Game.player.health = Math.max(0, Game.player.health - 2);
             this.SoundManager.playSound('damage', 0.8, 1.0);
             this.showMessage('Falle! -2 HP', '#ff0000', 18);
         }

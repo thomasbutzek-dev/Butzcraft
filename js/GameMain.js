@@ -12,7 +12,7 @@
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716a';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716b';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716a';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716a';
         import { getOnboardingProgress } from './onboarding.js?v=20260716a';
