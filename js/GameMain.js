@@ -3,7 +3,7 @@
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
-        import { World, getBiomeAt, BIOMES } from './world.js?v=20260716a';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260716b';
         import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260511a';
 
         import { Input } from './Input.js?v=20260507b';
@@ -1554,6 +1554,7 @@
             tickFurnace(controls);
 
             updateVisibleChunksIfNeeded(playerPos);
+            world.processPendingMeshResults();
             window.player.updateSword(delta);
 
 

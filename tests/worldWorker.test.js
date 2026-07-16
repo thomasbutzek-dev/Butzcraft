@@ -84,3 +84,49 @@ describe('World worker buffer recycling', () => {
         expect(worker.messages.at(-1).message.buffer === staleData.buffer).toBe(true);
     }, 15000);
 });
+
+describe('World mesh result scheduling', () => {
+    it('applies at most the requested number of mesh results per frame', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+        const arrays = {
+            pos: [0, 0, 0, 1, 0, 0, 0, 1, 0],
+            col: [1, 1, 1, 1, 1, 1, 1, 1, 1],
+            norm: [0, 0, 1, 0, 0, 1, 0, 0, 1],
+            uv: [0, 0, 1, 0, 0, 1],
+            sway: [0, 0, 0],
+            atlasUV: [-1, -1, -1, -1, -1, -1],
+            idx: [0, 1, 2]
+        };
+
+        for (const cx of [0, 1]) {
+            const key = world.getChunkKey(cx, 0);
+            world.chunks.set(key, {
+                cx,
+                cz: 0,
+                data: new Uint8Array(16 * 64 * 16),
+                mesh: null,
+                waterMesh: null,
+                spawnerKeys: new Set()
+            });
+            world.pendingMeshes.add(key);
+            worker.onmessage({
+                data: { type: 'meshResult', cx, cz: 0, opaque: arrays, water: null, epoch: world.meshEpoch }
+            });
+        }
+
+        expect(world.pendingMeshResults).toHaveLength(2);
+        expect(world.chunks.get('0,0').mesh).toBeNull();
+        expect(world.chunks.get('1,0').mesh).toBeNull();
+
+        expect(world.processPendingMeshResults(1)).toBe(1);
+        expect(world.chunks.get('0,0').mesh).toBeInstanceOf(THREE.Mesh);
+        expect(world.chunks.get('1,0').mesh).toBeNull();
+        expect(world.pendingMeshResults).toHaveLength(1);
+
+        expect(world.processPendingMeshResults(1)).toBe(1);
+        expect(world.chunks.get('1,0').mesh).toBeInstanceOf(THREE.Mesh);
+        expect(world.pendingMeshResults).toHaveLength(0);
+    }, 15000);
+});

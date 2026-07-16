@@ -140,6 +140,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 // mit per-Block-Farbvariation auf Eis-/Schnee-/Wolken-Flächen statt
                 // großer einheitlich gefärbter Greedy-Quads).
                 this.dirtyMeshes = new Set();
+                this.pendingMeshResults = [];
                 
                 this.worker.onmessage = (e) => {
                     const msg = e.data;
@@ -205,46 +206,42 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     // Mesh-Ergebnis empfangen
                     // ==============================
                     if (msg.type === 'meshResult') {
-                        const { cx, cz, opaque, water, epoch } = msg;
-                        if (epoch !== undefined && epoch !== this.meshEpoch) return;
-                        const meshKey = this.getChunkKey(cx, cz);
-                        this.pendingMeshes.delete(meshKey);
-
-                        const chunk = this.chunks.get(meshKey);
-                        if (!chunk) {
-                            this.dirtyMeshes.delete(meshKey);
-                            return;
-                        }
-
-                        // Alte Meshes entfernen
-                        this.disposeMesh(chunk.mesh);
-                        this.disposeMesh(chunk.waterMesh);
-                        chunk.mesh = null;
-                        chunk.waterMesh = null;
-
-                        // Opaque Mesh erstellen
-                        if (opaque) {
-                            chunk.mesh = this._createMeshFromArrays(opaque, this.opaqueMaterial, cx, cz);
-                            this.scene.add(chunk.mesh);
-                        }
-
-                        // Water Mesh erstellen
-                        if (water) {
-                            chunk.waterMesh = this._createMeshFromArrays(water, this.waterMaterial, cx, cz);
-                            this.scene.add(chunk.waterMesh);
-                        }
-
-                        // Race-Fix: Falls während des Meshings ein Re-Mesh angefordert
-                        // wurde (z.B. weil ein Nachbar-Chunk zwischenzeitlich geladen
-                        // wurde), jetzt nachholen. Das aktuelle Mesh hatte u.U. unvoll-
-                        // ständige AO-Daten an den Rändern.
-                        if (this.dirtyMeshes.has(meshKey)) {
-                            this.dirtyMeshes.delete(meshKey);
-                            this.requestMesh(cx, cz);
-                        }
+                        if (msg.epoch !== undefined && msg.epoch !== this.meshEpoch) return;
+                        this.pendingMeshResults.push(msg);
                         return;
                     }
                 };
+            }
+
+            // Keep worker bursts from monopolizing the main thread between rendered frames.
+            processPendingMeshResults(maxResults = 2) {
+                let processed = 0;
+                while (processed < maxResults && this.pendingMeshResults.length > 0) {
+                    const { cx, cz, opaque, water, epoch } = this.pendingMeshResults.shift();
+                    if (epoch !== undefined && epoch !== this.meshEpoch) continue;
+
+                    const meshKey = this.getChunkKey(cx, cz);
+                    this.pendingMeshes.delete(meshKey);
+                    const chunk = this.chunks.get(meshKey);
+                    if (!chunk) {
+                        this.dirtyMeshes.delete(meshKey);
+                        continue;
+                    }
+
+                    this.disposeMesh(chunk.mesh);
+                    this.disposeMesh(chunk.waterMesh);
+                    chunk.mesh = opaque ? this._createMeshFromArrays(opaque, this.opaqueMaterial, cx, cz) : null;
+                    chunk.waterMesh = water ? this._createMeshFromArrays(water, this.waterMaterial, cx, cz) : null;
+                    if (chunk.mesh) this.scene.add(chunk.mesh);
+                    if (chunk.waterMesh) this.scene.add(chunk.waterMesh);
+
+                    if (this.dirtyMeshes.has(meshKey)) {
+                        this.dirtyMeshes.delete(meshKey);
+                        this.requestMesh(cx, cz);
+                    }
+                    processed++;
+                }
+                return processed;
             }
 
             // Konvertiert BLOCK_COLORS zu einem flachen Objekt mit Integer-Werten
@@ -476,6 +473,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 this.queuedChunks.clear();
                 this.pendingMeshes.clear();
                 this.dirtyMeshes.clear();
+                this.pendingMeshResults.length = 0;
             }
 
             update(time) {
