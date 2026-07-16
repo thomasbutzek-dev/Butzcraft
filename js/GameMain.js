@@ -68,7 +68,7 @@
         // verwenden — `this` ist in einer Top-Level-Funktion innerhalb eines ES-Moduls `undefined`
         // (strict mode), und `this.x = 0` wirft TypeError. Das war der Grund, warum nach dem
         // Tier-3-Update die gesamte Steuerung blockiert war: animate() ist jeden Frame in dieser
-        // Zeile abgestürzt, BEVOR `window.player.updatePhysics(...)` aufgerufen werden konnte.
+        // Zeile abgestürzt, BEVOR `Game.player.updatePhysics(...)` aufgerufen werden konnte.
         let _spawnerTickTimer = 0;
         let _lastVisibleChunkX = null, _lastVisibleChunkZ = null, _lastVisibleRenderDist = null;
         
@@ -112,7 +112,7 @@
 
         function applyLocalCharacterProfile() {
             const profile = loadLocalCharacterProfile();
-            if (window.player?.setCharacterProfile) window.player.setCharacterProfile(profile);
+            if (Game.player?.setCharacterProfile) Game.player.setCharacterProfile(profile);
             return profile;
         }
 
@@ -227,7 +227,7 @@
             if (e.code !== 'KeyV') return;
             if (!gameStarted || manuallyPaused || isBlockingOverlayOpen()) return;
             if (e.cancelable) e.preventDefault();
-            const mode = window.player.toggleCameraMode();
+            const mode = Game.player.toggleCameraMode();
             showCameraModeMessage(mode);
         }
 
@@ -454,7 +454,7 @@
         }
 
         function applyRenderDistanceVisuals() {
-            if (scene?.fog && !window.player?.inWater) scene.fog.density = getRenderDistanceFogDensity();
+            if (scene?.fog && !Game.player?.inWater) scene.fog.density = getRenderDistanceFogDensity();
         }
 
         function disposeDroppedItem(item) {
@@ -537,8 +537,8 @@
 
                     const playerPos = camera.position;
                     playerPos.set(data.pos.x, data.pos.y, data.pos.z);
-                    window.player.health = data.health;
-                    window.player.hunger = data.hunger;
+                    Game.player.health = data.health;
+                    Game.player.hunger = data.hunger;
                     time = data.time;
                     spawning = false;
 
@@ -647,7 +647,7 @@
             if (BLOOD_MOON_INTERVAL <= 0) return;
             if (dayCount % BLOOD_MOON_INTERVAL !== BLOOD_MOON_INTERVAL - 1) return;
             if (lastBloodMoonRewardDay === dayCount) return;
-            if (!window.player || window.player.health <= 0) return;
+            if (!Game.player || Game.player.health <= 0) return;
 
             const result = tryAddItemsToInventory([
                 { type: 61, count: 1 },
@@ -685,8 +685,8 @@
             mobs.forEach(m => {
                 if (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'spider' || m.type === 'geist') m.isDead = true;
             });
-            window.player.health = Math.min(MAX_HEALTH, window.player.health + 10);
-            window.player.hunger = Math.max(0, window.player.hunger - 5);
+            Game.player.health = Math.min(MAX_HEALTH, Game.player.health + 10);
+            Game.player.hunger = Math.max(0, Game.player.hunger - 5);
             updateUI();
             return { ok: true, message: 'Gut geschlafen. Es ist Morgen.' };
         };
@@ -896,8 +896,8 @@
             }, false);
             document.addEventListener('pointerdown', relockControlsFromPointer, true);
 
-            window.player = new Player(scene, camera, document.body, CONFIG, loadLocalCharacterProfile());
-            controls = window.player.controls;
+            Game.player = new Player(scene, camera, document.body, CONFIG, loadLocalCharacterProfile());
+            controls = Game.player.controls;
 
             // Sicherheits-Reset: Falls aus einem früheren Sprint-5-Bug-Run noch ein roll-Drift
             // in der Camera-Quaternion saß (Sprint 5 setzte camera.rotation.z direkt), hier
@@ -1006,8 +1006,8 @@
                 try { localStorage.setItem(RD_STORAGE_KEY, String(n)); } catch (e) { /* QuotaExceeded etc. ignorieren */ }
                 applyRenderDistanceVisuals();
                 // Sofort wirksam machen, wenn Spieler bereits in der Welt ist
-                if (window.player && window.player.controls) {
-                    const p = window.player.controls.getObject().position;
+                if (Game.player && Game.player.controls) {
+                    const p = Game.player.controls.getObject().position;
                     updateVisibleChunksIfNeeded(p, true);
                 }
             };
@@ -1160,8 +1160,8 @@
         function updateUI(force = true, now = performance.now()) {
             if (force || now - lastUiUpdateAt >= UI_UPDATE_INTERVAL_MS) {
                 lastUiUpdateAt = now;
-                DOM.healthFill.style.width = Math.max(0, window.player.health) + '%';
-                DOM.hungerFill.style.width = Math.max(0, window.player.hunger) + '%';
+                DOM.healthFill.style.width = Math.max(0, Game.player.health) + '%';
+                DOM.hungerFill.style.width = Math.max(0, Game.player.hunger) + '%';
                 const tm = Math.floor((time / DAY_DURATION) * 1440), hh = Math.floor(tm / 60) % 24, mm = tm % 60, dd = Math.floor(time / DAY_DURATION) + 1;
                 const dayRatioUI = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
                 const dayCountUI = Math.floor(time / DAY_DURATION);
@@ -1170,7 +1170,7 @@
                 const bloodMoonActive = isBloodMoonUI && (dayRatioUI > 0.80 || dayRatioUI < 0.20) ? ' | \u{1F7E5} BLUTMOND' : '';
                 DOM.timeInfo.textContent = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}${bloodMoonWarning}${bloodMoonActive}`;
             }
-            if (window.player.health <= 0 && gameActive && !spawning) {
+            if (Game.player.health <= 0 && gameActive && !spawning) {
                 gameActive = false;
                 controls.unlock();
                 hideFirstObjective();
@@ -1236,7 +1236,7 @@
             applyCameraShake();
 
             // 1. VOID PROTECTION (Immer aktiv)
-            window.player.updateWaterAndVoid(world, SoundManager, delta);
+            Game.player.updateWaterAndVoid(world, SoundManager, delta);
             // 3. SKY & HUD (Immer aktiv)
             const dayRatio = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
             const dayCount = Math.floor(time / DAY_DURATION);
@@ -1262,7 +1262,7 @@
             } else { SKY.hColor.copy(nightH); SKY.zColor.copy(nightZ); skyInty = 0.05; }
             sun.intensity = skyInty;
 
-            if (window.player.inWater) {
+            if (Game.player.inWater) {
                 scene.background = SKY.underwaterColor;
                 if (scene.fog) { scene.fog.color.copy(SKY.underwaterColor); scene.fog.density = 0.12; }
             } else {
@@ -1323,10 +1323,10 @@
                     const cx = Math.floor(playerPos.x / CHUNK_SIZE);
                     const cz = Math.floor(playerPos.z / CHUNK_SIZE);
                     if (!world.chunks.has(world.getChunkKey(cx, cz))) {
-                        window.player.velocity.set(0, 0, 0);
+                        Game.player.velocity.set(0, 0, 0);
                         playerPos.y = CHUNK_HEIGHT + 10; 
                     } else {
-                        window.player.velocity.y = Math.max(window.player.velocity.y, -4.0);
+                        Game.player.velocity.y = Math.max(Game.player.velocity.y, -4.0);
                         const bt = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z));
                         if (bt !== 0 && bt !== 8 && bt !== 9 && bt !== 10) {
                             spawning = false;
@@ -1340,7 +1340,7 @@
                 // _lastPainAt verhindert Sound-Spam bei kontinuierlichem Zombie-Damage (≤ 1 Sound/300ms).
                 const onPlayerDamage = (d) => {
                     if (d <= 0) return;
-                    window.player.health -= d;
+                    Game.player.health -= d;
                     triggerDamageFeedback(d);
                 };
                 mobs.forEach(m => {
@@ -1542,9 +1542,9 @@
                 updateItems(droppedItems);
 
                 // PLAYER PHYSICS
-                window.player.updatePhysics(delta, Input, world, SoundManager);
-                window.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (window.player.hunger <= 0) { window.player.hunger = 0; window.player.health -= 2 * delta; }
-                if (window.player.hunger > REGEN_THRESHOLD && window.player.health < MAX_HEALTH) window.player.health += REGEN_RATE * delta;
+                Game.player.updatePhysics(delta, Input, world, SoundManager);
+                Game.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (Game.player.hunger <= 0) { Game.player.hunger = 0; Game.player.health -= 2 * delta; }
+                if (Game.player.hunger > REGEN_THRESHOLD && Game.player.health < MAX_HEALTH) Game.player.health += REGEN_RATE * delta;
 
                 // Druckplatten-Schaden
                 if (window.playerInteraction) window.playerInteraction.checkPressurePlates(playerPos.x, playerPos.y, playerPos.z);
@@ -1555,14 +1555,14 @@
 
             updateVisibleChunksIfNeeded(playerPos);
             world.processPendingMeshResults();
-            window.player.updateSword(delta);
+            Game.player.updateSword(delta);
 
 
-            const cameraRestoreState = window.player.prepareCameraForRender(world);
+            const cameraRestoreState = Game.player.prepareCameraForRender(world);
             try {
                 renderer.render(scene, camera);
             } finally {
-                window.player.restoreCameraAfterRender(cameraRestoreState);
+                Game.player.restoreCameraAfterRender(cameraRestoreState);
             }
         }
 
@@ -1639,8 +1639,8 @@
             const playerPos = camera.position;
             const gameData = stampSaveVersion({
                 pos: { x: playerPos.x, y: playerPos.y, z: playerPos.z },
-                health: window.player.health,
-                hunger: window.player.hunger,
+                health: Game.player.health,
+                hunger: Game.player.hunger,
                 time: time,
                 inventory: inventorySlots,
                 collectedEggs: collectedEggs,

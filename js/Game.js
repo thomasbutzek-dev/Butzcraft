@@ -1,15 +1,14 @@
-/* js/Game.js - Butzcraft zentraler State-Container (Phase 1)
+/* js/Game.js - Butzcraft zentraler State-Container
  *
  * MIGRATIONS-PFAD aus window-Pollution heraus:
  *
- *  Phase 1 (HIER): Game proxy-zu-window. Existierender Code unverändert. Neuer Code soll
- *                  `import { Game } from './Game.js'` benutzen anstatt window.player etc.
+ *  Phase 1 (complete): Game proxies legacy window state while modules migrate.
  *
  *  Phase 2 (complete): PlayerInteraction and mob state use Game; the obsolete
  *                      global recipe refresh hook was removed from inventory.
  *
- *  Phase 3 (final): window.* Assignments aus GameMain.js entfernen, Game.set*() aufrufen.
- *                  Tests können Game.reset() aufrufen statt window-Properties zu löschen.
+ *  Phase 3 (in progress): GameMain player state now uses Game.player. Remaining proxied
+ *                         state will move in separate, testable steps.
  *
  * Vorteile dieses inkrementellen Ansatzes:
  *  - Kein Big-Bang-Refactor (Risiko zu hoch für Hobby-Projekt)
