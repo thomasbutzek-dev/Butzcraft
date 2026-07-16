@@ -2,7 +2,7 @@
  *
  * Tests für das Versions-basierte Migrations-System. Decken ab:
  *  - v0 (Legacy) → v1 (Array-Inventory) Konvertierung
- *  - Bereits-aktuelle Saves bleiben unverändert (Idempotenz)
+ *  - Bereits-aktuelle Saves behalten Daten und Referenzen (Idempotenz)
  *  - Migrations sind nicht-destruktiv für andere Felder (pos, health, time)
  *  - stampSaveVersion setzt korrekt die Version
  */
@@ -43,7 +43,7 @@ describe('migrateSave – v0 → v1 (Inventory-Format)', () => {
 });
 
 describe('migrateSave – Idempotenz', () => {
-    it('lässt aktuelles Save unverändert (keine erneute Konversion)', () => {
+    it('behält aktuelle Inventory-Einträge und die Array-Referenz', () => {
         const current = {
             version: CURRENT_SAVE_VERSION,
             inventory: [{ type: 1, count: 5 }, { type: 0, count: 0 }],
@@ -52,6 +52,8 @@ describe('migrateSave – Idempotenz', () => {
         const migrated = migrateSave(current);
         expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
         expect(migrated.inventory).toBe(current.inventory); // gleiche Referenz
+        expect(migrated.inventory).toHaveLength(64);
+        expect(migrated.inventory[0]).toEqual({ type: 1, count: 5 });
     });
 
     it('mehrfache migrateSave-Aufrufe sind safe', () => {
@@ -91,6 +93,19 @@ describe('migrateSave – Edge Cases', () => {
         expect(migrated.version).toBe(6);
         expect(migrated.onboardingObjectiveIndex).toBe(0);
         expect(migrated.pendingBloodMoonRewardDay).toBe(-1);
+    });
+
+    it('pads short current inventories so loading replaces all 64 slots', () => {
+        const data = {
+            version: CURRENT_SAVE_VERSION,
+            inventory: [{ type: 3, count: 7 }]
+        };
+
+        const migrated = migrateSave(data);
+
+        expect(migrated.inventory).toHaveLength(64);
+        expect(migrated.inventory[0]).toEqual({ type: 3, count: 7 });
+        expect(migrated.inventory[40]).toEqual({ type: 0, count: 0 });
     });
 });
 

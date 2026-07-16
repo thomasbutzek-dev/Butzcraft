@@ -91,6 +91,16 @@ const MIGRATIONS = {
     6: migrateV5toV6
 };
 
+function normalizeInventory(data) {
+    if (!Array.isArray(data.inventory)) data.inventory = [];
+    data.inventory.length = Math.min(data.inventory.length, 64);
+    for (let i = 0; i < 64; i++) {
+        const slot = data.inventory[i];
+        if (!slot || typeof slot !== 'object') data.inventory[i] = { type: 0, count: 0 };
+    }
+    return data;
+}
+
 /**
  * Wendet alle nötigen Migrations an, damit das Save-Object die CURRENT_SAVE_VERSION hat.
  * Idempotent: bereits aktuelle Saves werden unverändert zurückgegeben.
@@ -112,7 +122,7 @@ export function migrateSave(data) {
         v = next;
     }
     data.version = v;
-    return data;
+    return normalizeInventory(data);
 }
 
 /**

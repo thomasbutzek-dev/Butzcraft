@@ -8,7 +8,7 @@
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
-        import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260716b';
+        import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260716c';
         import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
@@ -545,10 +545,8 @@
                     time = data.time;
                     spawning = false;
 
-                    // Nach migrateSave ist data.inventory garantiert ein Array (v1+).
-                    if (Array.isArray(data.inventory)) {
-                        data.inventory.forEach((item, i) => inventorySlots[i] = item);
-                    }
+                    // migrateSave liefert immer exakt 64 Slots und ersetzt damit den vorherigen Inventarstand vollständig.
+                    data.inventory.forEach((item, i) => inventorySlots[i] = item);
                     resetControlsHintForRun(data.onboardingObjectiveIndex);
                     
                     collectedWool = data.collectedWool || 0;
