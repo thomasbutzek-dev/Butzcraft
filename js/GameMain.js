@@ -26,7 +26,7 @@
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
-        window.inventorySlots = inventorySlots;
+        Game.inventorySlots = inventorySlots;
         window.updateInventoryUI = updateInventoryUI;
         window.getSelectedSlot = getSelectedSlot;
         window.setSelectedSlot = setSelectedSlot;
