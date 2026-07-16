@@ -8,6 +8,7 @@
 import { createBlockHTML, getItemName, inventorySlots, tryExchangeInventory } from './inventory.js?v=20260716f';
 import { getQuestProgress } from './quests.js?v=20260515b';
 import { Game } from './Game.js?v=20260716b';
+import { STORY_EVENTS } from './storyProgress.js?v=20260716a';
 
 let currentNPC = null;
 
@@ -76,6 +77,7 @@ export function openTradeUI(npc, controls) {
     });
 
     overlay.style.display = 'flex';
+    window.dispatchEvent(new CustomEvent(STORY_EVENTS.VILLAGER_MET));
     if (controls) controls.unlock();
 }
 
@@ -158,6 +160,7 @@ function executeQuest(quest, btn) {
     if (window.updateInventoryUI) window.updateInventoryUI();
 
     showTradeMessage(`Auftrag erledigt: +${quest.receive.count}x ${getItemName(quest.receive.type)}`, '#4caf50');
+    window.dispatchEvent(new CustomEvent(STORY_EVENTS.QUEST_COMPLETED));
     if (currentNPC) openTradeUI(currentNPC);
 }
 

@@ -45,4 +45,14 @@ describe('browser module identity', () => {
 
         expect(new Set(specifiers)).toEqual(new Set(['./touch.js?v=20260716c']));
     });
+
+    it('loads the trade UI through one versioned URL everywhere', () => {
+        const consumers = ['js/GameMain.js', 'js/PlayerInteraction.js'];
+        const specifiers = consumers.map(file => {
+            const source = readFileSync(file, 'utf8');
+            return source.match(/\.\/tradeUI\.js\?v=[^'\"]+/)?.[0];
+        });
+
+        expect(new Set(specifiers)).toEqual(new Set(['./tradeUI.js?v=20260716e']));
+    });
 });

@@ -8,19 +8,20 @@
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260716c';
-        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716d';
+        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716e';
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260602a';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716e';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716f';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716f';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716d';
         import { getOnboardingProgress } from './onboarding.js?v=20260716b';
+        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260716a';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716d';
         import { WeatherSystem } from './weather.js?v=20260716b';
         import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716d';
+        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716e';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
         import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
@@ -53,6 +54,7 @@
         let lastBloodMoonRewardDay = -1;
         let pendingBloodMoonRewardDay = -1;
         let lastBloodMoonRewardRetry = 0;
+        let storyObjectiveIndex = 0;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
         Game.droppedItems = [];
@@ -258,6 +260,7 @@
         let controlsHintShownForRun = false;
         let miniObjectiveIndex = 0;
         let currentMiniObjective = null;
+        let currentStoryObjective = null;
 
         function getControlsHintText() {
             if (shouldUseTouchMode() || window.innerWidth <= 760) {
@@ -316,25 +319,28 @@
             const step = document.getElementById('first-objective-step');
             const text = document.getElementById('first-objective-text');
             const hint = document.getElementById('first-objective-hint');
-            const objective = currentMiniObjective;
+            const objective = currentMiniObjective || currentStoryObjective;
             if (!el || !label || !step || !text || !hint || !objective) return;
-            const needsRender = el.dataset.objectiveStep !== String(objective.step) || el.classList.contains('complete');
+            const objectiveSource = currentMiniObjective ? 'onboarding' : 'story';
+            const objectiveKey = `${objectiveSource}-${objective.step}`;
+            const needsRender = el.dataset.objectiveKey !== objectiveKey || el.classList.contains('complete');
             el.classList.remove('complete');
             if (needsRender) {
                 label.textContent = objective.label;
                 step.textContent = `Schritt ${objective.step} von ${objective.total}`;
                 text.textContent = objective.text;
                 hint.textContent = shouldUseTouchMode() ? objective.touchHint : objective.hint;
-                updateObjectiveProgress(objective.step);
-                el.dataset.objectiveStep = String(objective.step);
+                updateObjectiveProgress(objective.step, objective.total);
+                el.dataset.objectiveKey = objectiveKey;
             }
             if (!el.classList.contains('visible')) el.classList.add('visible');
             if (el.getAttribute('aria-hidden') !== 'false') el.setAttribute('aria-hidden', 'false');
         }
 
-        function updateObjectiveProgress(completedSteps) {
+        function updateObjectiveProgress(completedSteps, totalSteps) {
             const segments = document.querySelectorAll('#first-objective-progress i');
             segments.forEach((segment, index) => {
+                segment.classList.toggle('unused', index >= totalSteps);
                 segment.classList.toggle('active', index < completedSteps);
             });
         }
@@ -351,7 +357,7 @@
             step.textContent = `Schritt ${objective.step} von ${objective.total}`;
             text.textContent = objective.text;
             hint.textContent = 'Nächstes Ziel kommt gleich.';
-            updateObjectiveProgress(objective.step);
+            updateObjectiveProgress(objective.step, objective.total);
             el.classList.add('complete', 'visible');
             el.setAttribute('aria-hidden', 'false');
 
@@ -364,6 +370,7 @@
 
         function updateFirstObjective() {
             const { advanced, completedObjective } = advanceMiniObjective();
+            updateStoryObjectiveFromTime();
             const controlsHint = document.getElementById('controls-hint');
             const controlsHintVisible = controlsHint && controlsHint.classList.contains('visible');
             if (!gameStarted || spawning || manuallyPaused || isBlockingOverlayOpen() || controlsHintVisible) {
@@ -375,22 +382,46 @@
                 showObjectiveCompletion(completedObjective);
                 return;
             }
-            if (!currentMiniObjective) {
+            if (!currentMiniObjective && !currentStoryObjective) {
                 hideFirstObjective();
                 return;
             }
             showFirstObjective();
         }
 
-        function resetControlsHintForRun(restoredObjectiveIndex = 0) {
+        function updateStoryObjectiveFromTime() {
+            const progress = getStoryProgress(storyObjectiveIndex, {
+                dayCount: Math.floor(time / DAY_DURATION)
+            });
+            storyObjectiveIndex = progress.index;
+            currentStoryObjective = progress.objective;
+        }
+
+        function handleStoryEvent(eventName) {
+            updateStoryObjectiveFromTime();
+            const nextIndex = advanceStoryProgress(storyObjectiveIndex, eventName);
+            if (nextIndex === storyObjectiveIndex) return;
+            storyObjectiveIndex = nextIndex;
+            updateStoryObjectiveFromTime();
+            updateFirstObjective();
+        }
+
+        window.addEventListener(STORY_EVENTS.VILLAGER_MET, () => handleStoryEvent(STORY_EVENTS.VILLAGER_MET));
+        window.addEventListener(STORY_EVENTS.QUEST_COMPLETED, () => handleStoryEvent(STORY_EVENTS.QUEST_COMPLETED));
+        window.addEventListener(STORY_EVENTS.BLOOD_MOON_SURVIVED, () => handleStoryEvent(STORY_EVENTS.BLOOD_MOON_SURVIVED));
+
+        function resetControlsHintForRun(restoredObjectiveIndex = 0, restoredStoryObjectiveIndex = 0) {
             controlsHintShownForRun = false;
             miniObjectiveIndex = restoredObjectiveIndex;
+            storyObjectiveIndex = restoredStoryObjectiveIndex;
             currentMiniObjective = null;
+            currentStoryObjective = null;
             if (objectiveCompletionTimer) {
                 clearTimeout(objectiveCompletionTimer);
                 objectiveCompletionTimer = null;
             }
             advanceMiniObjective();
+            updateStoryObjectiveFromTime();
             hideControlsHint();
             hideFirstObjective();
         }
@@ -599,7 +630,7 @@
 
                     // migrateSave liefert immer exakt 64 Slots und ersetzt damit den vorherigen Inventarstand vollständig.
                     data.inventory.forEach((item, i) => inventorySlots[i] = item);
-                    resetControlsHintForRun(data.onboardingObjectiveIndex);
+                    resetControlsHintForRun(data.onboardingObjectiveIndex, data.storyObjectiveIndex);
                     
                     collectedWool = data.collectedWool || 0;
                     lastBloodMoonRewardDay = typeof data.lastBloodMoonRewardDay === 'number' ? data.lastBloodMoonRewardDay : -1;
@@ -703,6 +734,10 @@
             if (dayCount % BLOOD_MOON_INTERVAL !== BLOOD_MOON_INTERVAL - 1) return;
             if (lastBloodMoonRewardDay === dayCount) return;
             if (!Game.player || Game.player.health <= 0) return;
+            const shouldAnnounceSurvival = pendingBloodMoonRewardDay !== dayCount;
+            if (shouldAnnounceSurvival) {
+                window.dispatchEvent(new CustomEvent(STORY_EVENTS.BLOOD_MOON_SURVIVED));
+            }
 
             const result = tryAddItemsToInventory([
                 { type: 61, count: 1 },
@@ -1695,6 +1730,7 @@
                 lastBloodMoonRewardDay: lastBloodMoonRewardDay,
                 pendingBloodMoonRewardDay: pendingBloodMoonRewardDay,
                 onboardingObjectiveIndex: miniObjectiveIndex,
+                storyObjectiveIndex: storyObjectiveIndex,
                 modifiedBlocks: world.modifiedBlocks,
                 blockMeta: world.blockMeta,
                 chestContents: world.chestContents,

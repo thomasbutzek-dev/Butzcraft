@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const gradient = { addColorStop() {} };
 const canvasContext = new Proxy({}, {
@@ -35,6 +35,22 @@ beforeEach(() => {
 });
 
 describe('NPC trade transactions', () => {
+    it('announces when the player meets a villager', () => {
+        const listener = vi.fn();
+        window.addEventListener('butzcraft:villager-met', listener, { once: true });
+        const npc = {
+            profession: {
+                name: 'Bauer',
+                quest: null,
+                trades: []
+            }
+        };
+
+        openTradeUI(npc, { unlock() {} });
+
+        expect(listener).toHaveBeenCalledOnce();
+    });
+
     it('keeps the payment when the reward does not fit', () => {
         for (let i = 0; i < inventory.inventorySlots.length; i++) {
             if (i < 8 || i >= 16) inventory.inventorySlots[i] = { type: 1, count: 64 };
@@ -73,5 +89,24 @@ describe('NPC trade transactions', () => {
 
         expect(inventory.inventorySlots[0]).toEqual({ type: 60, count: 64 });
         expect(inventory.inventorySlots.some(slot => slot.type === 61)).toBe(false);
+    });
+
+    it('announces a successfully completed village quest', () => {
+        inventory.inventorySlots[0] = { type: 60, count: 10 };
+        const listener = vi.fn();
+        window.addEventListener('butzcraft:quest-completed', listener, { once: true });
+        const npc = {
+            profession: {
+                name: 'Schmied',
+                quest: { give: { type: 60, count: 10 }, receive: { type: 61, count: 1 } },
+                trades: []
+            }
+        };
+
+        openTradeUI(npc, { unlock() {} });
+        document.querySelector('.quest-row .trade-btn').click();
+
+        expect(listener).toHaveBeenCalledOnce();
+        expect(inventory.inventorySlots.some(slot => slot.type === 61 && slot.count === 1)).toBe(true);
     });
 });

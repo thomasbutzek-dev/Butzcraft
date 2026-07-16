@@ -15,7 +15,7 @@
  */
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 6;
+export const CURRENT_SAVE_VERSION = 7;
 
 // Migration v0 → v1: Inventory-Format vom Objekt {type: count} auf Array<{type, count}>
 const OLD_INVENTORY_MAP = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
@@ -81,6 +81,11 @@ function migrateV5toV6(data) {
     return data;
 }
 
+function migrateV6toV7(data) {
+    if (typeof data.storyObjectiveIndex !== 'number') data.storyObjectiveIndex = 0;
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
@@ -88,7 +93,8 @@ const MIGRATIONS = {
     3: migrateV2toV3,
     4: migrateV3toV4,
     5: migrateV4toV5,
-    6: migrateV5toV6
+    6: migrateV5toV6,
+    7: migrateV6toV7
 };
 
 function normalizeInventory(data) {

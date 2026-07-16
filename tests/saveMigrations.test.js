@@ -90,9 +90,18 @@ describe('migrateSave – Edge Cases', () => {
 
         const migrated = migrateSave(data);
 
-        expect(migrated.version).toBe(6);
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
         expect(migrated.onboardingObjectiveIndex).toBe(0);
         expect(migrated.pendingBloodMoonRewardDay).toBe(-1);
+    });
+
+    it('ergaenzt den Reise-Fortschritt ab Version 7', () => {
+        const data = { version: 6, inventory: [] };
+
+        const migrated = migrateSave(data);
+
+        expect(migrated.version).toBe(7);
+        expect(migrated.storyObjectiveIndex).toBe(0);
     });
 
     it('pads short current inventories so loading replaces all 64 slots', () => {

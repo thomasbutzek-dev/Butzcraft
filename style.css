@@ -594,6 +594,10 @@ body {
             background: #ffd84d;
         }
 
+        #first-objective-progress i.unused {
+            display: none;
+        }
+
         #first-objective.complete #first-objective-progress i.active {
             background: #71d679;
         }

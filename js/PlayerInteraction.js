@@ -149,7 +149,7 @@ export class PlayerInteraction {
                 if (hitNpc) {
                     if (e.button === 2) {
                         // Rechtsklick: Handels-UI öffnen
-                        const { openTradeUI } = await import('./tradeUI.js');
+                        const { openTradeUI } = await import('./tradeUI.js?v=20260716e');
                         openTradeUI(hitNpc, this._controls);
                         return;
                     } else if (e.button === 0) {
