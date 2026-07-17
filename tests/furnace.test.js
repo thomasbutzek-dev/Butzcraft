@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
 
 const inventoryMock = vi.hoisted(() => ({
     slots: Array.from({ length: 64 }, () => ({ type: 0, count: 0 }))
@@ -47,13 +48,15 @@ function setFurnaceDom() {
         <div id="furnace-fuel-slot"></div>
         <div id="furnace-output-slot"></div>
         <div id="furnace-progress-bar"></div>
+        <div id="furnace-fuel-reserve"></div>
         <div id="furnace-status"></div>
+        <div id="furnace-inventory-grid"></div>
     `;
 }
 
 async function loadFurnace() {
     vi.resetModules();
-    return import('../js/furnace.js?v=20260716d');
+    return import('../js/furnace.js?v=20260717e');
 }
 
 beforeEach(() => {
@@ -68,6 +71,82 @@ beforeEach(() => {
 });
 
 describe('furnace inventory transfer', () => {
+    it('contains the item picker and visible fuel reserve in the real furnace UI', () => {
+        const html = readFileSync('index.html', 'utf8');
+
+        expect(html).toContain('id="furnace-inventory-grid"');
+        expect(html).toContain('id="furnace-fuel-reserve"');
+    });
+
+    it('lets the player choose a specific smeltable inventory stack', async () => {
+        const furnace = await loadFurnace();
+        inventoryMock.slots[0] = { type: 57, count: 1 };
+        inventoryMock.slots[1] = { type: 58, count: 1 };
+
+        furnace.openFurnace(0, 0, 0, null);
+        const goldButton = document.querySelector('[data-furnace-inventory-index="1"]');
+        expect(goldButton).not.toBeNull();
+        goldButton.click();
+
+        expect(document.getElementById('furnace-input-slot').title).toBe('Item 58');
+        expect(inventoryMock.slots[0]).toEqual({ type: 57, count: 1 });
+    });
+
+    it('shows consumed fuel as an active reserve', async () => {
+        let now = 0;
+        vi.spyOn(performance, 'now').mockImplementation(() => now);
+        const furnace = await loadFurnace();
+        inventoryMock.slots[0] = { type: 57, count: 1 };
+        inventoryMock.slots[1] = { type: 60, count: 1 };
+
+        furnace.openFurnace(0, 0, 0, null);
+        document.querySelector('[data-furnace-inventory-index="0"]').click();
+        document.getElementById('furnace-fuel-slot').click();
+        document.querySelector('[data-furnace-inventory-index="1"]').click();
+        now += 100;
+        furnace.tickFurnace(null);
+
+        expect(document.getElementById('furnace-fuel-reserve').textContent).toContain('Item 60');
+        expect(document.getElementById('furnace-fuel-reserve').textContent).toContain('8');
+    });
+
+    it('keeps contents and fuel separate for each furnace position', async () => {
+        const furnace = await loadFurnace();
+        inventoryMock.slots[0] = { type: 57, count: 1 };
+
+        furnace.openFurnace(1, 2, 3, null);
+        document.querySelector('[data-furnace-inventory-index="0"]').click();
+        furnace.closeFurnace(null);
+        furnace.openFurnace(9, 2, 3, null);
+
+        expect(document.getElementById('furnace-input-slot').title).toBe('');
+    });
+
+    it('does not let one furnace power another furnace', async () => {
+        let now = 0;
+        vi.spyOn(performance, 'now').mockImplementation(() => now);
+        const furnace = await loadFurnace();
+        inventoryMock.slots[0] = { type: 57, count: 1 };
+        inventoryMock.slots[1] = { type: 60, count: 1 };
+        inventoryMock.slots[2] = { type: 58, count: 1 };
+
+        furnace.openFurnace(1, 2, 3, null);
+        document.querySelector('[data-furnace-inventory-index="0"]').click();
+        document.getElementById('furnace-fuel-slot').click();
+        document.querySelector('[data-furnace-inventory-index="1"]').click();
+        now += 100;
+        furnace.tickFurnace(null);
+        furnace.closeFurnace(null);
+
+        furnace.openFurnace(9, 2, 3, null);
+        document.querySelector('[data-furnace-inventory-index="2"]').click();
+        now += 6000;
+        furnace.tickFurnace(null);
+
+        expect(document.getElementById('furnace-status').textContent).toBe('Warte auf Brennstoff');
+        expect(document.getElementById('furnace-output-slot').title).toBe('');
+    });
+
     it('makes dense fuel more valuable and keeps smelting casual-friendly', async () => {
         const furnace = await loadFurnace();
 
@@ -85,13 +164,10 @@ describe('furnace inventory transfer', () => {
         const furnace = await loadFurnace();
         inventoryMock.slots[0] = { type: 57, count: 8 };
         inventoryMock.slots[1] = { type: 60, count: 1 };
-        let selectedSlot = 0;
-        window.getSelectedSlot = () => selectedSlot;
-
         furnace.openFurnace(0, 0, 0, null);
-        for (let i = 0; i < 8; i++) document.getElementById('furnace-input-slot').click();
-        selectedSlot = 1;
+        document.querySelector('[data-furnace-inventory-index="0"]').click();
         document.getElementById('furnace-fuel-slot').click();
+        document.querySelector('[data-furnace-inventory-index="1"]').click();
 
         for (let i = 0; i < 8; i++) {
             now += 6000;
@@ -110,17 +186,14 @@ describe('furnace inventory transfer', () => {
         inventoryMock.slots[0] = { type: 57, count: 1 };
         inventoryMock.slots[1] = { type: 60, count: 1 };
         inventoryMock.slots[2] = { type: 58, count: 1 };
-        let selectedSlot = 0;
-        window.getSelectedSlot = () => selectedSlot;
-
         furnace.openFurnace(0, 0, 0, null);
-        document.getElementById('furnace-input-slot').click();
-        selectedSlot = 1;
+        document.querySelector('[data-furnace-inventory-index="0"]').click();
         document.getElementById('furnace-fuel-slot').click();
+        document.querySelector('[data-furnace-inventory-index="1"]').click();
         now += 6000;
         furnace.tickFurnace(null);
-        selectedSlot = 2;
         document.getElementById('furnace-input-slot').click();
+        document.querySelector('[data-furnace-inventory-index="2"]').click();
         furnace.tickFurnace(null);
 
         expect(document.getElementById('furnace-status').textContent).toBe('Ausgabe leeren');
@@ -137,12 +210,12 @@ describe('furnace inventory transfer', () => {
         expect(furnace.getSmeltRecipe(24)).toBeNull();
     });
 
-    it('moves smeltable items from main inventory into an empty input slot', async () => {
+    it('moves the selected stack from main inventory into an empty input slot', async () => {
         const furnace = await loadFurnace();
         inventoryMock.slots[16] = { type: 57, count: 1 };
 
         furnace.openFurnace(0, 0, 0, null);
-        document.getElementById('furnace-input-slot').click();
+        document.querySelector('[data-furnace-inventory-index="16"]').click();
 
         expect(inventoryMock.slots[16]).toEqual({ type: 0, count: 0 });
         expect(document.getElementById('furnace-input-slot').title).toBe('Item 57');
@@ -154,7 +227,7 @@ describe('furnace inventory transfer', () => {
         inventoryMock.slots[0] = { type: 57, count: 1 };
 
         furnace.openFurnace(0, 0, 0, null);
-        document.getElementById('furnace-input-slot').click();
+        document.querySelector('[data-furnace-inventory-index="0"]').click();
         document.getElementById('furnace-input-slot').click();
 
         expect(window.addItemToInventory).toHaveBeenCalledWith(57, 1);
@@ -166,7 +239,7 @@ describe('furnace inventory transfer', () => {
         inventoryMock.slots[16] = { type: 57, count: 1 };
 
         furnace.openFurnace(0, 0, 0, null);
-        document.getElementById('furnace-input-slot').click();
+        document.querySelector('[data-furnace-inventory-index="16"]').click();
         for (let i = 0; i < inventoryMock.slots.length; i++) {
             if (i < 8 || i >= 16) inventoryMock.slots[i] = { type: 1, count: 64 };
         }

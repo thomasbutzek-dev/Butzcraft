@@ -38,21 +38,40 @@ export function getSmeltTime() {
     return SMELT_TIME;
 }
 
-// Ofen-State
+function createFurnaceState() {
+    return {
+        input: { type: 0, count: 0 },
+        fuel: { type: 0, count: 0 },
+        output: { type: 0, count: 0 },
+        fuelUsesRemaining: 0,
+        activeFuelType: 0,
+        smeltProgress: 0,
+        smeltActive: false,
+        lastTick: 0,
+    };
+}
+
+function getFurnaceKey(x, y, z) {
+    return `${Math.floor(x)},${Math.floor(y)},${Math.floor(z)}`;
+}
+
+const furnaceStates = new Map();
 let furnaceOpen = false;
-let furnacePos = null; // {x, y, z}
-let furnaceInput  = { type: 0, count: 0 };
-let furnaceFuel   = { type: 0, count: 0 };
-let furnaceOutput = { type: 0, count: 0 };
-let fuelUsesRemaining = 0;
-let smeltProgress = 0;   // 0..1
-let smeltActive = false;
-let lastTick = 0;
+let furnacePos = null;
+let furnaceState = null;
+let activeTarget = 'input';
+let renderedInventorySignature = '';
 
 export function openFurnace(x, y, z, controls) {
     furnacePos = { x, y, z };
+    const key = getFurnaceKey(x, y, z);
+    if (!furnaceStates.has(key)) furnaceStates.set(key, createFurnaceState());
+    furnaceState = furnaceStates.get(key);
+    furnaceState.smeltActive = false;
     furnaceOpen = true;
-    lastTick = performance.now();
+    furnaceState.lastTick = performance.now();
+    activeTarget = 'input';
+    renderedInventorySignature = '';
     const overlay = document.getElementById('furnace-overlay');
     if (overlay) overlay.style.display = 'flex';
     if (controls && controls.isLocked) controls.unlock();
@@ -61,6 +80,7 @@ export function openFurnace(x, y, z, controls) {
 
 export function closeFurnace(controls) {
     furnaceOpen = false;
+    if (furnaceState) furnaceState.smeltActive = false;
     const overlay = document.getElementById('furnace-overlay');
     if (overlay) overlay.style.display = 'none';
     if (controls && !Game.touchActive) {
@@ -74,6 +94,7 @@ window.closeFurnace = () => closeFurnace(window._furnaceControls);
 export function isFurnaceOpen() { return furnaceOpen; }
 
 function renderFurnaceUI() {
+    if (!furnaceState) return;
     const renderSlot = (elId, item) => {
         const el = document.getElementById(elId);
         if (!el) return;
@@ -96,45 +117,102 @@ function renderFurnaceUI() {
         } else {
             el.title = '';
         }
+        const targetName = elId === 'furnace-input-slot' ? 'input' : elId === 'furnace-fuel-slot' ? 'fuel' : null;
+        el.classList.toggle('furnace-target-active', targetName === activeTarget);
+        if (targetName) el.setAttribute('aria-pressed', String(targetName === activeTarget));
         el.onclick = () => handleFurnaceSlotClick(elId);
     };
-    renderSlot('furnace-input-slot', furnaceInput);
-    renderSlot('furnace-fuel-slot', furnaceFuel);
-    renderSlot('furnace-output-slot', furnaceOutput);
+    renderSlot('furnace-input-slot', furnaceState.input);
+    renderSlot('furnace-fuel-slot', furnaceState.fuel);
+    renderSlot('furnace-output-slot', furnaceState.output);
+    renderFurnaceInventory();
+    renderFurnaceProgress();
+}
+
+function renderFurnaceInventory() {
+    const grid = document.getElementById('furnace-inventory-grid');
+    if (!grid || !furnaceState) return;
+
+    const targetSlot = furnaceState[activeTarget];
+    const signature = `${activeTarget}:${targetSlot.type}:${targetSlot.count}|` +
+        inventorySlots.map(item => `${item?.type || 0}:${item?.count || 0}`).join('|');
+    if (signature === renderedInventorySignature) return;
+    renderedInventorySignature = signature;
+    grid.innerHTML = '';
+
+    let itemCount = 0;
+    inventorySlots.forEach((item, index) => {
+        if (!item || item.count <= 0) return;
+        itemCount++;
+        const acceptsType = activeTarget === 'input' ? Boolean(SMELT_RECIPES[item.type]) : getFuelValue(item.type) > 0;
+        const canStack = targetSlot.count === 0 || targetSlot.type === item.type;
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'inv-slot furnace-inventory-item';
+        button.dataset.furnaceInventoryIndex = String(index);
+        button.disabled = !acceptsType || !canStack || targetSlot.count >= 64;
+        button.setAttribute('aria-label', `${getItemName(item.type)}, ${item.count} Stück`);
+        button.title = button.disabled ? `${getItemName(item.type)} passt nicht in diesen Slot` : getItemName(item.type);
+        button.innerHTML = createBlockHTML(item.type);
+        const count = document.createElement('span');
+        count.className = 'slot-count';
+        count.textContent = item.count > 1 ? item.count : '';
+        button.appendChild(count);
+        button.onclick = () => moveInventoryStackToTarget(index);
+        grid.appendChild(button);
+    });
+
+    if (itemCount === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'furnace-inventory-empty';
+        empty.textContent = 'Inventar ist leer';
+        grid.appendChild(empty);
+    }
+}
+
+function renderFurnaceProgress() {
+    if (!furnaceState) return;
     const bar = document.getElementById('furnace-progress-bar');
-    if (bar) bar.style.width = (smeltProgress * 100).toFixed(1) + '%';
+    if (bar) bar.style.width = (furnaceState.smeltProgress * 100).toFixed(1) + '%';
+    const reserve = document.getElementById('furnace-fuel-reserve');
+    if (reserve) {
+        reserve.textContent = furnaceState.fuelUsesRemaining > 0
+            ? `🔥 Aktiv: ${getItemName(furnaceState.activeFuelType)} · ${furnaceState.fuelUsesRemaining} Ladungen`
+            : 'Keine aktive Brennstoffladung';
+        reserve.classList.toggle('active', furnaceState.fuelUsesRemaining > 0);
+    }
     const status = document.getElementById('furnace-status');
     if (status) {
-        const fuelStatus = fuelUsesRemaining > 0 ? ` · Brennstoff: ${fuelUsesRemaining}` : '';
-        const recipe = furnaceInput.count > 0 ? SMELT_RECIPES[furnaceInput.type] : null;
-        const outputBlocked = recipe && furnaceOutput.count > 0 &&
-            (furnaceOutput.type !== recipe.type || furnaceOutput.count >= 64);
-        if (smeltActive) status.textContent = 'Verarbeitet... ' + Math.round(smeltProgress * 100) + '%' + fuelStatus;
+        const fuelStatus = furnaceState.fuelUsesRemaining > 0 ? ` · Brennstoff: ${furnaceState.fuelUsesRemaining}` : '';
+        const recipe = furnaceState.input.count > 0 ? SMELT_RECIPES[furnaceState.input.type] : null;
+        const outputBlocked = recipe && furnaceState.output.count > 0 &&
+            (furnaceState.output.type !== recipe.type || furnaceState.output.count >= 64);
+        if (furnaceState.smeltActive) status.textContent = 'Verarbeitet... ' + Math.round(furnaceState.smeltProgress * 100) + '%' + fuelStatus;
         else if (outputBlocked) status.textContent = 'Ausgabe leeren';
-        else if (furnaceInput.count > 0 && SMELT_RECIPES[furnaceInput.type] && fuelUsesRemaining <= 0 && furnaceFuel.count <= 0) status.textContent = 'Warte auf Brennstoff';
-        else if (fuelUsesRemaining > 0) status.textContent = `Bereit · Brennstoff: ${fuelUsesRemaining}`;
-        else if (furnaceInput.count > 0 && !SMELT_RECIPES[furnaceInput.type]) status.textContent = 'Kein Rezept';
+        else if (furnaceState.input.count > 0 && recipe && furnaceState.fuelUsesRemaining <= 0 && furnaceState.fuel.count <= 0) status.textContent = 'Warte auf Brennstoff';
+        else if (furnaceState.fuelUsesRemaining > 0) status.textContent = `Bereit · Brennstoff: ${furnaceState.fuelUsesRemaining}`;
+        else if (furnaceState.input.count > 0 && !recipe) status.textContent = 'Kein Rezept';
         else status.textContent = 'Bereit';
     }
 }
 
 function handleFurnaceSlotClick(slotId) {
-    if (slotId === 'furnace-input-slot') {
-        if (!moveOneFromInventoryToFurnace(furnaceInput, type => SMELT_RECIPES[type])) {
-            if (furnaceInput.count <= 0) return;
-            furnaceInput = returnItemToInventory(furnaceInput);
-        }
-    } else if (slotId === 'furnace-fuel-slot') {
-        if (!moveOneFromInventoryToFurnace(furnaceFuel, type => getFuelValue(type) > 0)) {
-            if (furnaceFuel.count <= 0) return;
-            furnaceFuel = returnItemToInventory(furnaceFuel);
-        }
-    } else if (slotId === 'furnace-output-slot') {
-        if (furnaceOutput.count > 0) {
-            furnaceOutput = returnItemToInventory(furnaceOutput);
+    if (!furnaceState) return;
+    if (slotId === 'furnace-output-slot') {
+        if (furnaceState.output.count > 0) {
+            furnaceState.output = returnItemToInventory(furnaceState.output);
             if (window.updateInventoryUI) window.updateInventoryUI();
         }
+    } else {
+        const targetName = slotId === 'furnace-fuel-slot' ? 'fuel' : 'input';
+        const targetSlot = furnaceState[targetName];
+        if (activeTarget === targetName && targetSlot.count > 0) {
+            furnaceState[targetName] = returnItemToInventory(targetSlot);
+        } else {
+            activeTarget = targetName;
+        }
     }
+    renderedInventorySignature = '';
     renderFurnaceUI();
 }
 
@@ -145,72 +223,72 @@ function returnItemToInventory(item) {
     return { type: item.type, count: result.remaining };
 }
 
-function moveOneFromInventoryToFurnace(targetSlot, acceptsType) {
-    if (!targetSlot || targetSlot.count >= 64) return false;
+function moveInventoryStackToTarget(sourceIndex) {
+    if (!furnaceState) return false;
+    const source = inventorySlots[sourceIndex];
+    const targetSlot = furnaceState[activeTarget];
+    if (!source || source.count <= 0 || targetSlot.count >= 64) return false;
 
-    const source = findFurnaceSourceSlot(targetSlot, acceptsType);
-    if (!source) return false;
+    const acceptsType = activeTarget === 'input' ? Boolean(SMELT_RECIPES[source.type]) : getFuelValue(source.type) > 0;
+    if (!acceptsType || (targetSlot.count > 0 && targetSlot.type !== source.type)) return false;
 
+    const moved = Math.min(source.count, 64 - targetSlot.count);
     if (targetSlot.count === 0) targetSlot.type = source.type;
-    targetSlot.count++;
-    source.count--;
+    targetSlot.count += moved;
+    source.count -= moved;
     if (source.count <= 0) {
         source.type = 0;
         source.count = 0;
     }
+    renderedInventorySignature = '';
     if (window.updateInventoryUI) window.updateInventoryUI();
+    renderFurnaceUI();
     return true;
-}
-
-function findFurnaceSourceSlot(targetSlot, acceptsType) {
-    const inv = inventorySlots;
-    if (!inv) return null;
-
-    const canUse = (slot) => {
-        if (!slot || slot.count <= 0 || !acceptsType(slot.type)) return false;
-        return targetSlot.count === 0 || targetSlot.type === slot.type;
-    };
-
-    const selIdx = window.getSelectedSlot ? window.getSelectedSlot() : 0;
-    if (canUse(inv[selIdx])) return inv[selIdx];
-
-    if (targetSlot.count === 0) return inv.find(canUse) || null;
-    return null;
 }
 
 // Tick-Funktion — wird jeden Frame aus dem Game-Loop aufgerufen
 export function tickFurnace(controls) {
     window._furnaceControls = controls;
-    if (!furnaceOpen) return;
+    if (!furnaceOpen || !furnaceState) return;
 
     const now = performance.now();
-    const dt = now - lastTick;
-    lastTick = now;
+    const dt = now - furnaceState.lastTick;
+    furnaceState.lastTick = now;
 
-    const recipe = furnaceInput.count > 0 ? SMELT_RECIPES[furnaceInput.type] : null;
-    const hasFuel = fuelUsesRemaining > 0 || furnaceFuel.count > 0;
-    const canOutput = furnaceOutput.count === 0 || (recipe && furnaceOutput.type === recipe.type && furnaceOutput.count < 64);
+    const recipe = furnaceState.input.count > 0 ? SMELT_RECIPES[furnaceState.input.type] : null;
+    const hasFuel = furnaceState.fuelUsesRemaining > 0 || furnaceState.fuel.count > 0;
+    const canOutput = furnaceState.output.count === 0 || (recipe && furnaceState.output.type === recipe.type && furnaceState.output.count < 64);
+    let slotsChanged = false;
 
     if (recipe && hasFuel && canOutput) {
-        if (fuelUsesRemaining <= 0) {
-            fuelUsesRemaining = getFuelValue(furnaceFuel.type);
-            furnaceFuel.count--;
-            if (furnaceFuel.count <= 0) furnaceFuel = { type: 0, count: 0 };
+        if (furnaceState.fuelUsesRemaining <= 0) {
+            furnaceState.activeFuelType = furnaceState.fuel.type;
+            furnaceState.fuelUsesRemaining = getFuelValue(furnaceState.fuel.type);
+            furnaceState.fuel.count--;
+            if (furnaceState.fuel.count <= 0) furnaceState.fuel = { type: 0, count: 0 };
+            slotsChanged = true;
         }
-        smeltActive = true;
-        smeltProgress += dt / SMELT_TIME;
-        if (smeltProgress >= 1) {
-            smeltProgress = 0;
-            furnaceInput.count--;
-            if (furnaceInput.count <= 0) furnaceInput = { type: 0, count: 0 };
-            fuelUsesRemaining--;
-            if (furnaceOutput.count === 0) furnaceOutput = { type: recipe.type, count: 1 };
-            else furnaceOutput.count++;
+        furnaceState.smeltActive = true;
+        furnaceState.smeltProgress += dt / SMELT_TIME;
+        if (furnaceState.smeltProgress >= 1) {
+            furnaceState.smeltProgress = 0;
+            furnaceState.input.count--;
+            if (furnaceState.input.count <= 0) furnaceState.input = { type: 0, count: 0 };
+            furnaceState.fuelUsesRemaining--;
+            if (furnaceState.fuelUsesRemaining <= 0) furnaceState.activeFuelType = 0;
+            if (furnaceState.output.count === 0) furnaceState.output = { type: recipe.type, count: 1 };
+            else furnaceState.output.count++;
+            slotsChanged = true;
         }
     } else {
-        smeltActive = false;
-        if (!recipe || !canOutput) smeltProgress = 0;
+        furnaceState.smeltActive = false;
+        if (!recipe || !canOutput) furnaceState.smeltProgress = 0;
     }
 
-    renderFurnaceUI();
+    if (slotsChanged) {
+        renderedInventorySignature = '';
+        renderFurnaceUI();
+    } else {
+        renderFurnaceProgress();
+    }
 }

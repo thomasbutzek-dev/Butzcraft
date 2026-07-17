@@ -12,13 +12,13 @@
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260716b';
         import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716o';
+        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716p';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716l';
         import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716j';
         import { getOnboardingProgress } from './onboarding.js?v=20260716d';
         import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260716a';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260716b';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260716k';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260717l';
         import { WeatherSystem } from './weather.js?v=20260716c';
         import { NPC } from './npc.js?v=20260507b';
         import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716k';

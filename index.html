@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260716k">
+    <link rel="stylesheet" href="style.css?v=20260717l">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -376,7 +376,7 @@
 
     <!-- OFEN-UI OVERLAY -->
     <div id="furnace-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center;">
-        <div style="background:#2a2a2a; border:2px solid #555; border-radius:8px; padding:24px; min-width:340px; color:white; font-family:monospace;">
+        <div class="furnace-panel" style="background:#2a2a2a; border:2px solid #555; border-radius:8px; padding:24px; min-width:340px; color:white; font-family:monospace;">
             <div style="text-align:center; font-size:18px; margin-bottom:16px; color:#ff9900;">🔥 Ofen</div>
             <div style="display:flex; gap:16px; align-items:center; justify-content:center; margin-bottom:16px;">
                 <div style="text-align:center;">
@@ -396,7 +396,11 @@
             <div id="furnace-progress" style="background:#444; border-radius:4px; height:12px; margin-bottom:12px; overflow:hidden;">
                 <div id="furnace-progress-bar" style="background:#ff6600; height:100%; width:0%; transition:width 0.5s;"></div>
             </div>
+            <div id="furnace-fuel-reserve">Keine aktive Brennstoffladung</div>
             <div id="furnace-status" style="text-align:center; font-size:12px; color:#aaa; margin-bottom:16px;">Bereit</div>
+            <div class="furnace-selection-help">1. Schmelzen oder Brennstoff wählen · 2. Gegenstand anklicken</div>
+            <div id="furnace-inventory-grid" aria-label="Inventar für den Ofen"></div>
+            <div class="furnace-return-help">Gewählten belegten Slot erneut anklicken: zurück ins Inventar</div>
             <button onclick="window.closeFurnace && window.closeFurnace()" style="display:block; margin:0 auto; padding:8px 24px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Schließen (E)</button>
         </div>
     </div>
@@ -440,7 +444,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260717e"
+        src="./js/GameMain.js?v=20260717f"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

@@ -91,6 +91,6 @@ describe('browser module identity', () => {
             return source.match(/\.\/furnace\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./furnace.js?v=20260716k']));
+        expect(new Set(specifiers)).toEqual(new Set(['./furnace.js?v=20260717l']));
     });
 });
