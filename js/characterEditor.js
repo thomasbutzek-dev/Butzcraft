@@ -7,9 +7,8 @@ import {
     parseCharacterProfile,
     serializeCharacterProfile
 } from './characterProfile.js';
-import { createCharacterModel } from './characterModel.js';
+import { createCharacterModel } from './characterModel.js?v=20260717a';
 
-const STORAGE_KEY = 'butzcraft.characterProfile';
 const preview = document.getElementById('character-preview');
 const form = document.getElementById('character-form');
 const jsonOutput = document.getElementById('profile-json');
@@ -17,7 +16,8 @@ const statusLine = document.getElementById('status-line');
 const displayName = document.getElementById('display-name');
 const importFile = document.getElementById('import-file');
 
-let profile = loadProfile();
+let profile = createCharacterProfile();
+let loadedProfile = createCharacterProfile();
 let characterGroup;
 
 const scene = new THREE.Scene();
@@ -65,8 +65,7 @@ form.addEventListener('input', () => {
 });
 
 document.getElementById('save-button').addEventListener('click', () => {
-    localStorage.setItem(STORAGE_KEY, serializeCharacterProfile(profile));
-    setStatus('Profil lokal gespeichert.');
+    applyDraft();
 });
 
 document.getElementById('export-button').addEventListener('click', async () => {
@@ -113,7 +112,7 @@ importFile.addEventListener('change', async () => {
     try {
         profile = parseCharacterProfile(await file.text());
         applyProfile(profile);
-        updateProfile({ persist: true, message: 'Profil importiert und gespeichert.' });
+        updateProfile({ persist: false, message: 'Profil importiert.' });
     } catch {
         setStatus('Import fehlgeschlagen: keine gültige Profil-Datei.');
     } finally {
@@ -127,13 +126,34 @@ renderer.setAnimationLoop(() => {
     renderer.render(scene, camera);
 });
 
-function loadProfile() {
-    try {
-        const saved = localStorage.getItem(STORAGE_KEY);
-        return saved ? parseCharacterProfile(saved) : createCharacterProfile();
-    } catch {
-        return createCharacterProfile();
+window.addEventListener('message', (event) => {
+    if (event.origin !== window.location.origin || !event.data) return;
+    if (event.data.type === 'load-profile') {
+        loadedProfile = normalizeCharacterProfile(event.data.profile);
+        profile = normalizeCharacterProfile(loadedProfile);
+        applyProfile(profile);
+        setStatus('Profil geladen.');
     }
+    if (event.data.type === 'apply-profile') applyDraft();
+    if (event.data.type === 'cancel') {
+        profile = normalizeCharacterProfile(loadedProfile);
+        applyProfile(profile);
+        setStatus('Änderungen verworfen.');
+    }
+});
+
+if (window.parent !== window) {
+    window.parent.postMessage({ type: 'editor-ready' }, window.location.origin);
+}
+
+function applyDraft() {
+    profile = normalizeCharacterProfile(readFormProfile());
+    if (window.parent !== window) {
+        window.parent.postMessage({ type: 'apply-profile', profile }, window.location.origin);
+        setStatus('Profil übernommen.');
+        return;
+    }
+    setStatus('Profil ist gültig. Öffne den Editor über einen Spielstand, um es zu übernehmen.');
 }
 
 function applyProfile(nextProfile) {
@@ -156,7 +176,6 @@ function applyProfile(nextProfile) {
 function updateProfile({ persist, message }) {
     rebuildCharacter(profile);
     jsonOutput.value = serializeCharacterProfile(profile);
-    if (persist) localStorage.setItem(STORAGE_KEY, jsonOutput.value);
     if (message) setStatus(message);
 }
 
@@ -186,9 +205,23 @@ function readFormProfile() {
 }
 
 function rebuildCharacter(nextProfile) {
-    if (characterGroup) scene.remove(characterGroup);
+    if (characterGroup) {
+        scene.remove(characterGroup);
+        disposeCharacter(characterGroup);
+    }
     characterGroup = createCharacterModel(nextProfile);
     scene.add(characterGroup);
+}
+
+function disposeCharacter(character) {
+    character.traverse((child) => {
+        child.geometry?.dispose?.();
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        for (const material of materials) {
+            material?.map?.dispose?.();
+            material?.dispose?.();
+        }
+    });
 }
 
 function applyGenderDefaults(nextProfile, previousGender) {

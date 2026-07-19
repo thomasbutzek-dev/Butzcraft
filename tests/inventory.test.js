@@ -28,6 +28,7 @@ const {
     addItemToInventory,
     canAddItemToInventory,
     createSlotElement,
+    updateInventoryUI,
     tryAddItemsToInventory
 } = await import('../js/inventory.js');
 
@@ -103,6 +104,23 @@ describe('addItemToInventory – Basis', () => {
         expect(inventorySlots[0]).toEqual({ type: 0, count: 0 });
         expect(inventorySlots[1]).toEqual({ type: 63, count: 1, durability: 37 });
         expect(cursorItem).toEqual({ type: 0, count: 0 });
+    });
+
+    it('restores an item icon when an emptied slot receives the same item type again', () => {
+        const slot = createSlotElement(0, 'inventory');
+        document.querySelectorAll = (selector) => selector === '.inv-slot' ? [slot] : [];
+
+        inventorySlots[0] = { type: 3, count: 1 };
+        updateInventoryUI();
+        const icon = slot.querySelector('.slot-color-preview');
+        expect(icon.innerHTML).not.toBe('');
+
+        inventorySlots[0] = { type: 0, count: 0 };
+        updateInventoryUI();
+        inventorySlots[0] = { type: 3, count: 1 };
+        updateInventoryUI();
+
+        expect(icon.innerHTML).not.toBe('');
     });
 });
 

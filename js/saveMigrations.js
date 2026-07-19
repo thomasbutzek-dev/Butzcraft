@@ -15,9 +15,10 @@
  */
 
 import { getToolInfo } from './miningRules.js?v=20260716a';
+import { normalizeCharacterProfile } from './characterProfile.js?v=20260602a';
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 9;
+export const CURRENT_SAVE_VERSION = 11;
 
 // Migration v0 → v1: Inventory-Format vom Objekt {type: count} auf Array<{type, count}>
 const OLD_INVENTORY_MAP = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
@@ -124,6 +125,19 @@ function migrateV8toV9(data) {
     return data;
 }
 
+function migrateV9toV10(data) {
+    if (!Object.prototype.hasOwnProperty.call(data, 'characterProfile')) data.characterProfile = null;
+    if (!data.thirdPersonCamera || typeof data.thirdPersonCamera !== 'object') {
+        data.thirdPersonCamera = { distance: 4.2 };
+    }
+    return data;
+}
+
+function migrateV10toV11(data) {
+    if (!Array.isArray(data.minecarts)) data.minecarts = [];
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
@@ -134,8 +148,20 @@ const MIGRATIONS = {
     6: migrateV5toV6,
     7: migrateV6toV7,
     8: migrateV7toV8,
-    9: migrateV8toV9
+    9: migrateV8toV9,
+    10: migrateV9toV10,
+    11: migrateV10toV11
 };
+
+function normalizeCharacterSettings(data) {
+    if (data.characterProfile) data.characterProfile = normalizeCharacterProfile(data.characterProfile);
+    if (!data.thirdPersonCamera || typeof data.thirdPersonCamera !== 'object') data.thirdPersonCamera = {};
+    const distance = Number(data.thirdPersonCamera.distance);
+    data.thirdPersonCamera.distance = Number.isFinite(distance)
+        ? Math.max(2, Math.min(6, distance))
+        : 4.2;
+    return data;
+}
 
 function normalizeInventory(data) {
     if (!Array.isArray(data.inventory)) data.inventory = [];
@@ -168,7 +194,7 @@ export function migrateSave(data) {
         v = next;
     }
     data.version = v;
-    return normalizeInventory(data);
+    return normalizeCharacterSettings(normalizeInventory(data));
 }
 
 export function prepareSaveForLoad(rawData) {

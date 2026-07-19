@@ -1,11 +1,29 @@
 import { describe, expect, it } from 'vitest';
-import { getDayRatio, getSleepBlockReason, getWakeTime, isNight } from '../js/sleep.js';
+import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime, isNight } from '../js/sleep.js';
 
 describe('sleep helpers', () => {
     it('erkennt Nacht vor und nach Mitternacht', () => {
         expect(isNight(0.1)).toBe(true);
         expect(isNight(0.8)).toBe(true);
         expect(isNight(0.5)).toBe(false);
+    });
+
+    it('macht den Tag doppelt so lang und laesst die Nacht unveraendert', () => {
+        const virtualDayDuration = 300;
+        const daylightDuration = virtualDayDuration * 0.5 / getDayCycleSpeed(0.5);
+        const nightDuration = virtualDayDuration * 0.5 / getDayCycleSpeed(0.9);
+
+        expect(daylightDuration).toBe(300);
+        expect(nightDuration).toBe(150);
+        expect(getDayCycleSpeed(0.25)).toBe(0.5);
+        expect(getDayCycleSpeed(0.75)).toBe(0.5);
+    });
+
+    it('haelt die Nachtbeleuchtung auf einem spielbaren Minimum', () => {
+        expect(getSkyLightIntensity(0.1)).toBeCloseTo(0.12);
+        expect(getSkyLightIntensity(0.5)).toBe(1);
+        expect(getAmbientLightIntensity(0.12, 0.18, 0.88)).toBeGreaterThan(0.4);
+        expect(getAmbientLightIntensity(1, 0.18, 0.88)).toBeCloseTo(0.88);
     });
 
     it('blockiert Schlafen am Tag, bei Blutmond und bei Monstern', () => {

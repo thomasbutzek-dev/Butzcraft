@@ -14,7 +14,7 @@ describe('long-term story progress', () => {
                 label: 'Deine Reise',
                 text: 'Überstehe deine erste Nacht',
                 step: 1,
-                total: 4
+                total: 5
             })
         });
     });
@@ -23,10 +23,24 @@ describe('long-term story progress', () => {
         expect(getStoryProgress(0, { dayCount: 1 })).toEqual({
             index: 1,
             objective: expect.objectContaining({
-                text: 'Finde ein Dorf',
+                text: 'Folge den Spuren zu einem Dorf',
                 step: 2
             })
         });
+    });
+
+    it('points toward the nearest known village', () => {
+        const progress = getStoryProgress(1, {
+            playerPosition: { x: 0, z: 0 },
+            villages: [
+                { houses: [{ x: 300, z: 300 }] },
+                { houses: [{ x: 30, z: -40 }, { x: 30, z: -40 }] }
+            ]
+        });
+
+        expect(progress.objective.hint).toContain('etwa 50 Blöcke nordöstlich');
+        expect(progress.objective.hint).toContain('Rechtsklick');
+        expect(progress.objective.touchHint).toContain('Tippe');
     });
 
     it('only accepts the event belonging to the current objective', () => {
@@ -36,8 +50,16 @@ describe('long-term story progress', () => {
         expect(advanceStoryProgress(3, STORY_EVENTS.BLOOD_MOON_SURVIVED)).toBe(4);
     });
 
-    it('never regresses restored progress and ends after the blood moon', () => {
+    it('never regresses restored progress and opens the sandbox epilogue after the blood moon', () => {
         expect(getStoryProgress(3, { dayCount: 0 }).index).toBe(3);
-        expect(getStoryProgress(4, { dayCount: 10 })).toEqual({ index: 4, objective: null });
+        expect(getStoryProgress(4, { dayCount: 10 })).toEqual({
+            index: 4,
+            objective: expect.objectContaining({
+                label: 'Freie Reise',
+                text: 'Schreibe deine eigene Geschichte',
+                step: 5,
+                total: 5
+            })
+        });
     });
 });

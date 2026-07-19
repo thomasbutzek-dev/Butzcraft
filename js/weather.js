@@ -11,14 +11,21 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
-import { ParticleSystem } from './particles.js?v=20260716a';
-import { BIOMES } from './world.js?v=20260716c';
+import { ParticleSystem } from './particles.js?v=20260717b';
+import { BIOMES } from './world.js?v=20260719a';
 import { SoundManager } from './sound.js?v=20260507b';
+import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
 
 const W = CONFIG.WEATHER;
 
 // Brennbare Block-Typen (Holz, Blätter, Planken, Wolle etc.)
 const FLAMMABLE_IDS = new Set([5, 6, 13, 14, 15, 16, 19, 26, 43, 44, 46, 49, 50, 52, 81, 88]);
+
+export function getWeatherVisualProfile(painterly = graphicsPrototype.usesPainterlyTextures) {
+    return painterly
+        ? { rainSkyDarkening: 0.2, stormSkyDarkening: 0.36, rainFog: 0.014, stormFog: 0.022, snowFog: 0.017, lightningFlash: 1.35 }
+        : { rainSkyDarkening: 0.3, stormSkyDarkening: 0.5, rainFog: 0.02, stormFog: 0.03, snowFog: 0.025, lightningFlash: 1.5 };
+}
 
 export class WeatherSystem {
     /**
@@ -28,6 +35,8 @@ export class WeatherSystem {
     constructor(scene, world) {
         this.scene = scene;
         this.world = world;
+        this.painterly = graphicsPrototype.usesPainterlyTextures;
+        this.visualProfile = getWeatherVisualProfile(this.painterly);
 
         // State
         this.state = 'clear';       // 'clear' | 'rain' | 'snow' | 'thunderstorm'
@@ -152,18 +161,20 @@ export class WeatherSystem {
      */
     getSkyMultiplier() {
         if (this.state === 'thunderstorm') {
-            return this.lightningFlash > 0 ? 1.5 : (1.0 - this.intensity * 0.5);
+            return this.lightningFlash > 0
+                ? this.visualProfile.lightningFlash
+                : (1.0 - this.intensity * this.visualProfile.stormSkyDarkening);
         }
-        return 1.0 - this.intensity * 0.3;
+        return 1.0 - this.intensity * this.visualProfile.rainSkyDarkening;
     }
 
     /**
      * Zusätzliche Fog-Dichte für Wetter
      */
     getExtraFogDensity() {
-        if (this.state === 'thunderstorm') return this.intensity * 0.03;
-        if (this.state === 'rain') return this.intensity * 0.02;
-        if (this.state === 'snow') return this.intensity * 0.025;
+        if (this.state === 'thunderstorm') return this.intensity * this.visualProfile.stormFog;
+        if (this.state === 'rain') return this.intensity * this.visualProfile.rainFog;
+        if (this.state === 'snow') return this.intensity * this.visualProfile.snowFog;
         return 0;
     }
 
@@ -291,15 +302,28 @@ export class WeatherSystem {
         }
 
         const material = new THREE.LineBasicMaterial({
-            color: 0xeef6ff,
+            color: this.painterly ? 0xfff4d6 : 0xeef6ff,
             transparent: true,
             opacity: 0.95,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
             fog: false
         });
-        const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const bolt = new THREE.Line(geometry, material);
+        let boltPoints = points;
+        if (this.painterly) {
+            boltPoints = [];
+            for (let i = 1; i < points.length; i++) boltPoints.push(points[i - 1], points[i]);
+            for (const index of [2, 5, 7]) {
+                const start = points[index];
+                const direction = index % 2 === 0 ? 1 : -1;
+                boltPoints.push(
+                    start,
+                    new THREE.Vector3(start.x + direction * (0.8 + index * 0.06), start.y - 1.4, start.z + direction * 0.45)
+                );
+            }
+        }
+        const geometry = new THREE.BufferGeometry().setFromPoints(boltPoints);
+        const bolt = this.painterly ? new THREE.LineSegments(geometry, material) : new THREE.Line(geometry, material);
         bolt.frustumCulled = false;
 
         this.lightningBolt = bolt;

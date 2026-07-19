@@ -142,4 +142,9 @@ describe('matchRecipe – Smoke-Test mit echten Spiel-Rezepten', () => {
         expect(matchRecipe([27,93,27,93], 2, craftingRecipes)).toBeNull();
         expect(matchRecipe([3,27,0,0], 2, craftingRecipes)).toEqual({ type: 95, count: 4 });
     });
+
+    it('Kohle und Stock ergeben vier Fackeln im Inventar-Grid', () => {
+        expect(matchRecipe([60, 27, 0, 0], 2, craftingRecipes)).toEqual({ type: 101, count: 4 });
+        expect(matchRecipe([0, 27, 60, 0], 2, craftingRecipes)).toEqual({ type: 101, count: 4 });
+    });
 });

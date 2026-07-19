@@ -52,6 +52,16 @@ describe('Physics.isSolid', () => {
         expect(Physics.isSolid(w, 0, 0, 0)).toBe(false);
     });
 
+    it('Fackeln (101) sind nicht solide', () => {
+        const w = mockWorld({ '0,0,0': 101 });
+        expect(Physics.isSolid(w, 0, 0, 0)).toBe(false);
+    });
+
+    it('Minengleise (80) sind flach und nicht solide', () => {
+        const w = mockWorld({ '0,0,0': 80 });
+        expect(Physics.isSolid(w, 0, 0, 0)).toBe(false);
+    });
+
     it('Block -1 (ungeladener Chunk) wirkt wie unsichtbare Wand', () => {
         const w = { getBlock: () => -1 };
         expect(Physics.isSolid(w, 0, 0, 0)).toBe(true);

@@ -10,11 +10,28 @@
  */
 
 import * as THREE from 'three';
-import { isTouchDevice } from './touch.js?v=20260716d';
+import { isTouchDevice } from './touch.js?v=20260717b';
+import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
 
 const _dummy = new THREE.Object3D();
 const _color = new THREE.Color();
 const PRECIPITATION_PASSTHROUGH_IDS = new Set([0, 4, 8]);
+
+export function getPrecipitationVisualProfile(type, painterly = graphicsPrototype.usesPainterlyTextures) {
+    if (type === 'rain') {
+        return painterly
+            ? { width: 0.035, height: 0.42, opacity: 0.42, colors: [0x9aadb5, 0xb7c7c7, 0x8198a4], scaleMin: 0.72, scaleRange: 0.58 }
+            : { width: 0.05, height: 0.3, opacity: 0.5, colors: [0x8899cc], scaleMin: 1, scaleRange: 0 };
+    }
+    return painterly
+        ? { width: 0.1, height: 0.1, opacity: 0.82, colors: [0xfff4dc, 0xe9f1e8, 0xdde9ec], scaleMin: 0.68, scaleRange: 0.72 }
+        : { width: 0.08, height: 0.08, opacity: 0.75, colors: [0xffffff], scaleMin: 1, scaleRange: 0 };
+}
+
+function stableVariation(index, salt) {
+    const value = Math.sin((index + 1) * 12.9898 + salt * 78.233) * 43758.5453;
+    return value - Math.floor(value);
+}
 
 export function blocksPrecipitation(blockType) {
     return blockType > 0 && !PRECIPITATION_PASSTHROUGH_IDS.has(blockType);
@@ -42,6 +59,9 @@ export class ParticleSystem {
         this.scene = scene;
         this.type = type;
         this.world = world;
+        this.painterly = graphicsPrototype.usesPainterlyTextures;
+        this.visualProfile = getPrecipitationVisualProfile(type, this.painterly);
+        this.elapsed = 0;
         const mobile = isTouchDevice();
         this.count = mobile ? Math.floor(maxCount * 0.5) : maxCount;
         this.spawnRadius = 20;  // Partikel-Radius um Spieler
@@ -49,16 +69,16 @@ export class ParticleSystem {
         // Geometrie je nach Typ
         let geo;
         if (type === 'rain') {
-            geo = new THREE.PlaneGeometry(0.05, 0.3);
+            geo = new THREE.PlaneGeometry(this.visualProfile.width, this.visualProfile.height);
         } else {
-            geo = new THREE.PlaneGeometry(0.08, 0.08);
+            geo = new THREE.PlaneGeometry(this.visualProfile.width, this.visualProfile.height);
         }
 
         // Material
         const mat = new THREE.MeshBasicMaterial({
-            color: type === 'rain' ? 0x8899CC : 0xFFFFFF,
+            color: 0xffffff,
             transparent: true,
-            opacity: type === 'rain' ? 0.5 : 0.75,
+            opacity: this.visualProfile.opacity,
             side: THREE.DoubleSide,
             depthWrite: false
         });
@@ -71,8 +91,10 @@ export class ParticleSystem {
             _dummy.scale.set(0, 0, 0);
             _dummy.updateMatrix();
             this.mesh.setMatrixAt(i, _dummy.matrix);
+            this.mesh.setColorAt(i, _color.set(this.visualProfile.colors[i % this.visualProfile.colors.length]));
         }
         this.mesh.instanceMatrix.needsUpdate = true;
+        if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
         scene.add(this.mesh);
 
         // Partikel-State
@@ -81,6 +103,9 @@ export class ParticleSystem {
             this.particles[i] = {
                 x: 0, y: -1000, z: 0,
                 vx: 0, vy: 0, vz: 0,
+                scale: this.visualProfile.scaleMin + stableVariation(i, 1) * this.visualProfile.scaleRange,
+                phase: stableVariation(i, 2) * Math.PI * 2,
+                driftRate: 0.55 + stableVariation(i, 3) * 0.65,
                 alive: false
             };
         }
@@ -96,6 +121,7 @@ export class ParticleSystem {
      */
     update(delta, playerPos, intensity) {
         this.intensity = intensity;
+        this.elapsed += delta;
         const activeCount = Math.floor(this.count * intensity);
         const r = this.spawnRadius;
 
@@ -124,8 +150,8 @@ export class ParticleSystem {
                     p.vz = (Math.random() - 0.5) * 1.5;
                 } else {
                     p.vy = -(1 + Math.random() * 1);
-                    p.vx = (Math.random() - 0.5) * 2;
-                    p.vz = (Math.random() - 0.5) * 2;
+                    p.vx = this.painterly ? 0 : (Math.random() - 0.5) * 2;
+                    p.vz = this.painterly ? 0 : (Math.random() - 0.5) * 2;
                 }
             }
 
@@ -142,10 +168,15 @@ export class ParticleSystem {
 
             // Schneeflocken: leichtes Driften
             if (this.type === 'snow') {
-                p.vx += (Math.random() - 0.5) * 3 * delta;
-                p.vz += (Math.random() - 0.5) * 3 * delta;
-                p.vx = Math.max(-2, Math.min(2, p.vx));
-                p.vz = Math.max(-2, Math.min(2, p.vz));
+                if (this.painterly) {
+                    p.vx = Math.sin(this.elapsed * p.driftRate + p.phase) * (0.35 + p.scale * 0.28);
+                    p.vz = Math.cos(this.elapsed * p.driftRate * 0.83 + p.phase) * (0.3 + p.scale * 0.24);
+                } else {
+                    p.vx += (Math.random() - 0.5) * 3 * delta;
+                    p.vz += (Math.random() - 0.5) * 3 * delta;
+                    p.vx = Math.max(-2, Math.min(2, p.vx));
+                    p.vz = Math.max(-2, Math.min(2, p.vz));
+                }
             }
 
             // Recycling: unter Spieler oder zu weit weg
@@ -160,12 +191,12 @@ export class ParticleSystem {
 
             // Matrix aktualisieren
             _dummy.position.set(p.x, p.y, p.z);
-            _dummy.scale.set(1, 1, 1);
             if (this.type === 'rain') {
-                _dummy.rotation.set(0, 0, 0);
+                _dummy.scale.set(this.painterly ? 0.82 + p.scale * 0.18 : 1, p.scale, 1);
+                _dummy.rotation.set(0, this.painterly ? p.phase * 0.08 : 0, this.painterly ? p.vx * -0.035 : 0);
             } else {
-                // Schneeflocken drehen sich leicht
-                _dummy.rotation.z = performance.now() * 0.001 + i;
+                _dummy.scale.setScalar(p.scale);
+                _dummy.rotation.set(0, this.painterly ? p.phase : 0, (this.painterly ? this.elapsed * 0.55 : performance.now() * 0.001) + p.phase);
             }
             _dummy.updateMatrix();
             this.mesh.setMatrixAt(i, _dummy.matrix);

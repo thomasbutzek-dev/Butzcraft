@@ -5,10 +5,11 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName, inventorySlots, tryExchangeInventory } from './inventory.js?v=20260716l';
+import { createBlockHTML, getItemName, inventorySlots, tryExchangeInventory } from './inventory.js?v=20260719b';
 import { getQuestProgress } from './quests.js?v=20260515b';
 import { Game } from './Game.js?v=20260716b';
-import { STORY_EVENTS } from './storyProgress.js?v=20260716a';
+import { STORY_EVENTS } from './storyProgress.js?v=20260718b';
+import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 let currentNPC = null;
 
@@ -77,6 +78,7 @@ export function openTradeUI(npc, controls) {
     });
 
     overlay.style.display = 'flex';
+    activateDialog(overlay, '.trade-btn:not(:disabled), .panel-close-button');
     window.dispatchEvent(new CustomEvent(STORY_EVENTS.VILLAGER_MET));
     if (controls) controls.unlock();
 }
@@ -177,6 +179,7 @@ function showTradeMessage(text, color) {
  */
 export function closeTradeUI(controls) {
     const overlay = document.getElementById('trade-overlay');
+    deactivateDialog(overlay);
     if (overlay) overlay.style.display = 'none';
     currentNPC = null;
     if (controls && !Game.touchActive) {

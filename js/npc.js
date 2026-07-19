@@ -11,7 +11,8 @@
 
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
-import { Physics } from './Physics.js?v=20260507b';
+import { Physics } from './Physics.js?v=20260717a';
+import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260719a';
 
 const NPC_CFG = CONFIG.NPC;
 const NAME_TAG_VISIBLE_DISTANCE = 8;
@@ -20,6 +21,8 @@ const NPC_HALF_WIDTH = 0.28;
 const NPC_FEET_OFFSET = 0.05;
 const NPC_HEAD_OFFSET = 1.85;
 const WATER_BLOCKS = new Set([4]);
+const VILLAGER_SKIN_TILE = 11;
+const PROFESSION_TEXTURE_TILES = [12, 13, 14, 15];
 
 // NPC-Typen mit unterschiedlichen Farben und Handels-Angeboten
 const NPC_PROFESSIONS = [
@@ -84,6 +87,7 @@ export class NPC {
         this.homeZ = z;
         this.professionIdx = professionIdx % NPC_PROFESSIONS.length;
         this.profession = NPC_PROFESSIONS[this.professionIdx];
+        this.visualVariant = selectEntityTextureVariant(x, z, this.professionIdx + 31);
 
         this.isDead = false;
         this.health = 20;
@@ -107,9 +111,14 @@ export class NPC {
 
     _buildMesh() {
         const prof = this.profession;
-        const bodyMat = new THREE.MeshPhongMaterial({ color: prof.color });
-        const skinMat = new THREE.MeshPhongMaterial({ color: 0xFFD5B8 }); // Hautfarbe
-        const apronMat = new THREE.MeshPhongMaterial({ color: prof.apronColor });
+        const createMaterial = (color, tile, fallbackColor = color) => {
+            const texture = getPainterlyEntityTexture(tile, this.visualVariant);
+            return new THREE.MeshPhongMaterial({ color: texture ? color : fallbackColor, map: texture });
+        };
+        const professionTile = PROFESSION_TEXTURE_TILES[this.professionIdx];
+        const bodyMat = createMaterial(0xffffff, professionTile, prof.color);
+        const skinMat = createMaterial(0xffffff, VILLAGER_SKIN_TILE, 0xFFD5B8);
+        const apronMat = createMaterial(prof.apronColor, professionTile);
 
         // Kopf (0.5×0.5×0.5)
         const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
@@ -153,11 +162,12 @@ export class NPC {
         this.group.add(this.rightArm);
 
         // Beine
-        this.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, 0.25), new THREE.MeshPhongMaterial({ color: 0x3B2F2F }));
+        const legMat = createMaterial(0x5b4639, professionTile);
+        this.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, 0.25), legMat);
         this.leftLeg.position.set(-0.13, 0.3, 0);
         this.group.add(this.leftLeg);
 
-        this.rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, 0.25), new THREE.MeshPhongMaterial({ color: 0x3B2F2F }));
+        this.rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.6, 0.25), legMat);
         this.rightLeg.position.set(0.13, 0.3, 0);
         this.group.add(this.rightLeg);
 

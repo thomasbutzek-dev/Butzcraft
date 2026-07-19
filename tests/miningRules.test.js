@@ -44,6 +44,14 @@ describe('mining progression rules', () => {
         expect(isToolType(63)).toBe(true);
         expect(isToolType(74)).toBe(true);
         expect(isToolType(5)).toBe(false);
-        expect(getMiningPlan(20, 66).canBreak).toBe(false);
+        expect(getMiningPlan(20, 66)).toMatchObject({
+            canBreak: false,
+            hint: 'Diesen Block kannst du nicht abbauen.'
+        });
+    });
+
+    it('silently stops mining stale air and water hits', () => {
+        expect(getMiningPlan(0, 0)).toMatchObject({ canBreak: false, hint: '' });
+        expect(getMiningPlan(4, 0)).toMatchObject({ canBreak: false, hint: '' });
     });
 });

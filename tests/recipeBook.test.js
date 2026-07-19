@@ -29,7 +29,9 @@ describe('recipe book initialization', () => {
         );
 
         expect(document.getElementById('recipe-book')).not.toBeNull();
+        expect(document.getElementById('recipe-search').getAttribute('aria-label')).toBe('Rezepte suchen');
         expect(document.querySelectorAll('.recipe-entry')).toHaveLength(1);
+        expect(document.querySelector('.recipe-entry').tagName).toBe('BUTTON');
         expect(document.querySelector('.recipe-name').textContent).toBe('Holzbretter');
         expect(window.updateRecipeList).toBeUndefined();
     });
@@ -54,5 +56,47 @@ describe('recipe book initialization', () => {
         ]);
         expect(document.querySelectorAll('.recipe-entry.locked')).toHaveLength(1);
         expect(document.querySelector('.recipe-lock-reason').textContent).toBe('Werkbank erforderlich.');
+
+        const search = document.getElementById('recipe-search');
+        search.value = 'Spitzhacke';
+        search.dispatchEvent(new Event('input'));
+        const entries = [...document.querySelectorAll('.recipe-entry')];
+        expect(entries.map(entry => entry.hidden)).toEqual([true, false]);
+        expect([...document.querySelectorAll('.recipe-section-title')].map(title => title.hidden)).toEqual([true, false]);
+    });
+
+    it('refreshes recipe availability without rebuilding every recipe card', () => {
+        const recipes = [
+            { pattern: [5, 0, 0, 0], result: { type: 26, count: 4 } }
+        ];
+        const blockTypes = { WOOD: 5, PLANKS: 26 };
+        const translations = { WOOD: 'Holz', PLANKS: 'Holzbretter' };
+        let lockReason = 'Fehlt: 1× Holz.';
+
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 5: 1, 26: 2 },
+            recipes,
+            blockTypes,
+            translations,
+            vi.fn(),
+            { getLockReason: () => lockReason }
+        );
+        const firstEntry = document.querySelector('.recipe-entry');
+
+        lockReason = '';
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 5: 1, 26: 2 },
+            recipes,
+            blockTypes,
+            translations,
+            vi.fn(),
+            { getLockReason: () => lockReason }
+        );
+
+        expect(document.querySelector('.recipe-entry')).toBe(firstEntry);
+        expect(firstEntry.classList.contains('locked')).toBe(false);
+        expect(firstEntry.querySelector('.recipe-lock-reason')).toBeNull();
     });
 });

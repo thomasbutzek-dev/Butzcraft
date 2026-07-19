@@ -18,9 +18,8 @@ describe('dungeon generation', () => {
             .toBeLessThan(source.indexOf('spawnDungeonEntrance(data, lx, dungeonY, lz, surfaceY)'));
     });
 
-    it('garantiert einen groesseren Dungeon-Hub', () => {
-        expect(source).toContain('Gemeinsamer Hub');
-        expect(source).toContain('for (let dx = -5; dx <= 5; dx++)');
-        expect(source).toContain('for (let dy = 0; dy <= 5; dy++)');
+    it('verwendet modulare Raumplaene statt eines vereinheitlichenden Hubs', () => {
+        expect(source).toContain('function createDungeonPlan');
+        expect(source).not.toContain('Gemeinsamer Hub');
     });
 });

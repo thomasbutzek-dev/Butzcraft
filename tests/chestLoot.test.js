@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../js/structures.js', () => ({
+    classifyChestLoot: () => 'mine_timber',
+    getLootDiscoveryMessage: () => 'Minenfund entdeckt!',
     rollLoot: () => [{ type: 60, count: 2 }]
 }));
 

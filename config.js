@@ -49,7 +49,7 @@ export const CONFIG = {
         ZOMBIE_DAMAGE: 8,           // Schaden pro Sekunde bei Kontakt
         SPIDER_DETECTION_RANGE: 12,
         SPIDER_SPEED: 1.2,
-        SPIDER_DAMAGE: 2,           // Kleiner Dungeon-Einstieg: wenig Schaden pro Sekunde
+        SPIDER_DAMAGE: 4,           // Kleiner Dungeon-Einstieg: spürbarer Schaden trotz Regeneration
         WANDER_SPEED: 1.0,
         MOB_JUMP_FORCE: 5,
         CHICKEN_EGG_TIME_MIN: 15000, // ms

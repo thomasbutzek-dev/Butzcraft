@@ -27,6 +27,21 @@ describe('first-day objective HUD', () => {
         expect(objective.querySelectorAll('#first-objective-progress i')).toHaveLength(11);
         expect(document.querySelectorAll('#first-objective')).toHaveLength(1);
     });
+
+    it('keeps the current objective available while crafting in the inventory', () => {
+        const html = readFileSync('index.html', 'utf8');
+        const source = readFileSync('js/GameMain.js', 'utf8');
+        const styles = readFileSync('style.css', 'utf8');
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        const objective = document.getElementById('inventory-objective');
+
+        expect(objective.getAttribute('role')).toBe('status');
+        expect(objective.getAttribute('aria-live')).toBe('polite');
+        expect(objective.getAttribute('aria-atomic')).toBe('true');
+        expect(source).toContain('updateInventoryObjective();');
+        expect(source).toContain('if (!isInventoryOpened() || !objective)');
+        expect(styles).toContain('#inventory-objective.visible');
+    });
 });
 
 describe('pause menu focus', () => {
@@ -38,5 +53,28 @@ describe('pause menu focus', () => {
         expect(source).toContain("document.body.classList.remove('game-paused')");
         expect(styles).toContain('body.game-paused #bottom-ui');
         expect(styles).toContain('body.game-paused #top-ui');
+    });
+
+    it('explains camera switching and third-person zoom', () => {
+        const html = readFileSync('index.html', 'utf8');
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        const pauseMenu = document.getElementById('instructions');
+
+        expect(pauseMenu.textContent).toContain('V = Kamera wechseln');
+        expect(pauseMenu.textContent).toContain('MAUSRAD = Third-Person-Zoom');
+    });
+});
+
+describe('time and performance HUD', () => {
+    it('keeps current, minimum and maximum FPS inside the top-right time panel', () => {
+        const html = readFileSync('index.html', 'utf8');
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        const timePanel = document.getElementById('time-info');
+        const fpsSummary = document.getElementById('fps-summary');
+
+        expect(timePanel.contains(fpsSummary)).toBe(true);
+        expect(fpsSummary.textContent).toContain('Aktuell');
+        expect(fpsSummary.textContent).toContain('Min');
+        expect(fpsSummary.textContent).toContain('Max');
     });
 });

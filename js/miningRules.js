@@ -75,6 +75,15 @@ export function isToolType(type) {
 }
 
 export function getMiningPlan(blockType, toolType = 0) {
+    if (blockType === 0 || blockType === 4) {
+        return {
+            canBreak: false,
+            duration: Infinity,
+            usesDurability: false,
+            hint: ''
+        };
+    }
+
     if (UNBREAKABLE_BLOCKS.has(blockType)) {
         return {
             canBreak: false,

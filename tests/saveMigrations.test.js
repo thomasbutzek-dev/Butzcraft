@@ -128,6 +128,34 @@ describe('migrateSave – Edge Cases', () => {
         expect(migrated.respawnBed).toBeNull();
     });
 
+    it('ergaenzt ab Version 10 Charakterprofil und Third-Person-Abstand', () => {
+        const migrated = migrateSave({ version: 9, inventory: [] });
+
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.characterProfile).toBeNull();
+        expect(migrated.thirdPersonCamera).toEqual({ distance: 4.2 });
+    });
+
+    it('ergaenzt ab Version 11 eine leere Lorenliste', () => {
+        const migrated = migrateSave({ version: 10, inventory: [] });
+
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.minecarts).toEqual([]);
+    });
+
+    it('normalisiert Profil und Kameraabstand in aktuellen Saves', () => {
+        const migrated = migrateSave({
+            version: CURRENT_SAVE_VERSION,
+            inventory: [],
+            characterProfile: { displayName: '  Mira  ', gender: 'female' },
+            thirdPersonCamera: { distance: 99 }
+        });
+
+        expect(migrated.characterProfile.displayName).toBe('Mira');
+        expect(migrated.characterProfile.gender).toBe('female');
+        expect(migrated.thirdPersonCamera.distance).toBe(6);
+    });
+
     it('pads short current inventories so loading replaces all 64 slots', () => {
         const data = {
             version: CURRENT_SAVE_VERSION,

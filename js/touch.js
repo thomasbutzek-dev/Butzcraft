@@ -32,6 +32,10 @@ export function isTouchDevice() {
 }
 
 export function applyTouchLookDelta(ctx, dx, dy) {
+    if (ctx?.player?.cameraMode === 'third' && typeof ctx.player.adjustThirdPersonOrbit === 'function') {
+        ctx.player.adjustThirdPersonOrbit(-dx * LOOK_SENSITIVITY, -dy * LOOK_SENSITIVITY);
+        return;
+    }
     const camera = ctx && ctx.camera;
     if (!camera || !camera.rotation) return;
 
@@ -296,11 +300,38 @@ function _bindLookArea(ctx) {
     let moved = false;
     let miningStarted = false;
     let miningTimer = null;
+    let pinching = false;
+    let pinchDistance = 0;
+
+    const distanceBetween = (touches) => Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY
+    );
+
+    const stopMining = () => {
+        if (miningTimer) {
+            clearTimeout(miningTimer);
+            miningTimer = null;
+        }
+        if (miningStarted) {
+            _dispatchInteraction(0, 'mouseup');
+            miningStarted = false;
+        }
+    };
 
     area.addEventListener('touchstart', (e) => {
         // Ignorieren, wenn Inventar offen
         if (ctx.isInventoryOpenedProvider && ctx.isInventoryOpenedProvider()) return;
-        if (activeId !== null) return;
+        if (activeId !== null) {
+            if (e.touches.length >= 2) {
+                e.preventDefault();
+                pinching = true;
+                moved = true;
+                pinchDistance = distanceBetween(e.touches);
+                stopMining();
+            }
+            return;
+        }
         const t = e.changedTouches[0];
         activeId = t.identifier;
         lastX = startX = t.clientX;
@@ -315,11 +346,20 @@ function _bindLookArea(ctx) {
             miningStarted = true;
             _dispatchInteraction(0, 'mousedown');
         }, MINE_HOLD_DELAY_MS);
-    }, { passive: true });
+    }, { passive: false });
 
     area.addEventListener('touchmove', (e) => {
         if (activeId === null) return;
         e.preventDefault();
+        if (pinching && e.touches.length >= 2) {
+            const nextDistance = distanceBetween(e.touches);
+            const delta = nextDistance - pinchDistance;
+            pinchDistance = nextDistance;
+            if (typeof ctx.player?.setThirdPersonCameraDistance === 'function') {
+                ctx.player.setThirdPersonCameraDistance(ctx.player.getThirdPersonCameraDistance() - delta * 0.015);
+            }
+            return;
+        }
         for (const t of e.touches) {
             if (t.identifier !== activeId) continue;
             const dx = t.clientX - lastX;
@@ -341,6 +381,13 @@ function _bindLookArea(ctx) {
     }, { passive: false });
 
     const endHandler = (e) => {
+        if (pinching) {
+            stopMining();
+            moved = true;
+            if (e.touches.length < 2) pinching = false;
+            if (e.touches.length === 0) activeId = null;
+            return;
+        }
         for (const t of e.changedTouches) {
             if (t.identifier === activeId) {
                 const elapsed = performance.now() - startTime;
@@ -361,16 +408,10 @@ function _bindLookArea(ctx) {
         }
     };
     const cancelHandler = (e) => {
+        pinching = false;
         for (const t of e.changedTouches) {
             if (t.identifier !== activeId) continue;
-            if (miningTimer) {
-                clearTimeout(miningTimer);
-                miningTimer = null;
-            }
-            if (miningStarted) {
-                _dispatchInteraction(0, 'mouseup');
-                miningStarted = false;
-            }
+            stopMining();
             activeId = null;
             break;
         }
@@ -423,13 +464,18 @@ function _bindActionButtons(ctx) {
         pauseBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const inst = document.getElementById('instructions');
-            if (!inst) return;
-            const isPaused = inst.style.display === 'block';
+            const isPaused = ctx.isPausedProvider
+                ? ctx.isPausedProvider()
+                : inst?.style.display === 'block';
             if (isPaused) {
-                inst.style.display = 'none';
+                if (typeof ctx.resumeGame === 'function') ctx.resumeGame();
+                else if (inst) inst.style.display = 'none';
             } else {
-                inst.style.display = 'block';
-                if (typeof window.loadGamesList === 'function') window.loadGamesList();
+                if (typeof ctx.pauseGame === 'function') ctx.pauseGame();
+                else if (inst) {
+                    inst.style.display = 'block';
+                    if (typeof window.loadGamesList === 'function') window.loadGamesList();
+                }
             }
         }, { passive: false });
     }

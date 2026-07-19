@@ -63,6 +63,19 @@ describe('onboarding progress', () => {
         });
     });
 
+    it('guides crafting through the recipe book', () => {
+        expect(getOnboardingProgress([{ type: 5, count: 1 }], 0)).toEqual({
+            index: 1,
+            objective: expect.objectContaining({
+                text: 'Stelle Holzbretter her',
+                hint: 'Öffne mit E das Inventar und wähle Holzbretter im Rezeptbuch.'
+            })
+        });
+
+        expect(getOnboardingProgress([{ type: 26, count: 1 }], 0).objective.hint)
+            .toBe('Wähle Stock im Rezeptbuch und stelle das Rezept her.');
+    });
+
     it('never regresses below restored save progress', () => {
         expect(getOnboardingProgress([], 6)).toEqual({
             index: 6,

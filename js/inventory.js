@@ -1,13 +1,14 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260716c';
-import { craftingRecipes } from './recipes.js?v=20260716d';
-import { initRecipeBook } from './recipe_book.js?v=20260716e';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260716e';
+import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260717a';
+import { craftingRecipes } from './recipes.js?v=20260717a';
+import { initRecipeBook } from './recipe_book.js?v=20260718b';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717y';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
 import { getFoodInfo } from './foodRules.js?v=20260716a';
+import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 function getDurableItemInfo(type) {
     return getToolInfo(type) || getSwordInfo(type) || getBowInfo(type);
@@ -92,7 +93,8 @@ const TRANSLATIONS = {
     'WOOD_SWORD': 'Holzschwert', 'STONE_SWORD': 'Steinschwert', 'IRON_SWORD': 'Eisenschwert', 'GOLD_SWORD': 'Goldschwert',
     'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil',
     'COOKED_FISH': 'Gebratener Fisch', 'COOKED_MEAT': 'Gebratenes Fleisch', 'COOKED_CHICKEN': 'Gebratenes Hähnchen',
-    'COOKED_MUTTON': 'Gebratenes Hammelfleisch', 'COOKED_TURTLE_MEAT': 'Gebratenes Schildkrötenfleisch'
+    'COOKED_MUTTON': 'Gebratenes Hammelfleisch', 'COOKED_TURTLE_MEAT': 'Gebratenes Schildkrötenfleisch',
+    'TORCH': 'Fackel'
 };
 
 
@@ -232,14 +234,8 @@ export function addItemToInventory(type, count) {
 
 // Erzeugt HTML für ein Block-/Item-Icon (2D flat oder 3D Cube)
 export function createBlockHTML(type) {
-    if (type === 21) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🐟</div>`;
-    if (type === 22) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🥩</div>`;
-    if (type === 23) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍗</div>`;
-    if (type === 24) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🧟</div>`;
-    if (type === 25) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍖</div>`;
-
     const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
-        || (type >= 60 && type <= 74) || (type >= 89 && type <= 100)); // Kohle, Barren, Werkzeuge, Waffen und Nahrung als 2D-Icons
+        || (type >= 60 && type <= 74) || (type >= 89 && type <= 101)); // Kohle, Barren, Werkzeuge, Waffen, Nahrung und Fackel als 2D-Icons
     let texIdx = 0;
     if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
     const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
@@ -305,7 +301,11 @@ export function updateInventoryUI() {
         if (item && item.count > 0) {
             const durable = updateDurabilityBar(slot, item);
             icon.style.display = 'flex'; count.style.display = durable ? 'none' : 'block'; name.style.display = 'block';
-            icon.innerHTML = createBlockHTML(item.type); icon.style.background = 'none'; icon.style.backgroundColor = 'transparent';
+            if (icon.dataset.itemType !== String(item.type) || !icon.firstElementChild) {
+                icon.innerHTML = createBlockHTML(item.type);
+                icon.dataset.itemType = String(item.type);
+            }
+            icon.style.background = 'none'; icon.style.backgroundColor = 'transparent';
             if (count.textContent !== String(item.count)) count.textContent = item.count;
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
             const translatedName = TRANSLATIONS[bName] ? TRANSLATIONS[bName].toUpperCase() : bName.toUpperCase();
@@ -351,14 +351,19 @@ export function updateInventoryUI() {
         if (item && item.count > 0) {
             const durable = updateDurabilityBar(slot, item);
             icon.style.display = 'flex'; count.style.display = durable ? 'none' : 'block';
-            icon.innerHTML = createBlockHTML(item.type);
+            if (icon.dataset.itemType !== String(item.type) || !icon.firstElementChild) {
+                icon.innerHTML = createBlockHTML(item.type);
+                icon.dataset.itemType = String(item.type);
+            }
             if (count.textContent !== String(item.count)) count.textContent = item.count;
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
             slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
             updateDurabilityBar(slot, null);
             icon.style.display = 'none'; count.style.display = 'none';
-            icon.innerHTML = ''; slot.title = buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item);
+            icon.innerHTML = '';
+            delete icon.dataset.itemType;
+            slot.title = buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item);
         }
         slot.setAttribute('aria-label', buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item));
     });
@@ -543,13 +548,19 @@ export function createSlotElement(i, sType = 'inventory') {
 
 export function initInventoryGrid() {
     const grid = document.getElementById('inventory-grid');
-    grid.innerHTML = '';
-    
     const cGrid = document.getElementById('crafting-grid');
     const cResult = document.getElementById('crafting-result');
+    const isWorkbench = craftingStation === 'workbench';
+    const expectedCraftingSlots = isWorkbench ? 9 : 4;
+    const gridReady = grid.dataset.craftingStation === craftingStation
+        && grid.querySelectorAll('.inv-slot').length === 56
+        && cGrid.querySelectorAll('.inv-slot').length === expectedCraftingSlots
+        && cResult.querySelectorAll('.inv-slot').length === 1;
+    if (gridReady) return;
+
+    grid.innerHTML = '';
     cGrid.innerHTML = ''; cResult.innerHTML = '';
 
-    const isWorkbench = craftingStation === 'workbench';
     setCraftingGridSize(isWorkbench ? 3 : 2);
     cGrid.classList.toggle('inventory-crafting', !isWorkbench);
     cGrid.classList.toggle('workbench-crafting', isWorkbench);
@@ -581,6 +592,7 @@ export function initInventoryGrid() {
     for (let i = 16; i < 64; i++) {
         grid.appendChild(createSlotElement(i, 'inventory'));
     }
+    grid.dataset.craftingStation = craftingStation;
 }
 
 function getRecipeGrid(recipe) {
@@ -778,12 +790,21 @@ function renderRecipeBook() {
     );
 }
 
+export function prepareInventoryUI() {
+    if (!document.getElementById('inventory-overlay')) return;
+    initInventoryGrid();
+    renderRecipeBook();
+    updateInventoryUI();
+}
+
 function openCraftingOverlay(station, gameStarted, spawning, controls) {
     if (!gameStarted || spawning) return false;
     craftingStation = station;
     inventoryOpened = true;
     setCraftingGridSize(station === 'workbench' ? 3 : 2);
-    document.getElementById('inventory-overlay').style.display = 'flex';
+    const overlay = document.getElementById('inventory-overlay');
+    overlay.style.display = 'flex';
+    activateDialog(overlay, '#inventory-close-btn');
     if (!Game.touchActive) controls.unlock();
     initInventoryGrid();
     setCraftingStatus(
@@ -810,7 +831,9 @@ export function toggleInventory(gameStarted, spawning, controls) {
     }
     inventoryOpened = false;
     craftingStation = 'inventory';
-    document.getElementById('inventory-overlay').style.display = 'none';
+    const overlay = document.getElementById('inventory-overlay');
+    deactivateDialog(overlay);
+    overlay.style.display = 'none';
     if (!Game.touchActive) {
         if (typeof window.resumeGame === 'function') window.resumeGame();
         else controls.lock();

@@ -24,7 +24,7 @@ vi.mock('../js/sound.js', () => ({
     }
 }));
 
-const { WeatherSystem } = await import('../js/weather.js');
+const { WeatherSystem, getWeatherVisualProfile } = await import('../js/weather.js');
 const { BIOMES } = await import('../js/world.js');
 
 function createWeather() {
@@ -124,5 +124,26 @@ describe('WeatherSystem transitions', () => {
         restored.deserialize(weather.serialize());
 
         expect(restored.rainCyclesWithoutStorm).toBe(2);
+    });
+
+    it('keeps painterly precipitation brighter and less foggy', () => {
+        const original = getWeatherVisualProfile(false);
+        const painterly = getWeatherVisualProfile(true);
+
+        expect(painterly.rainSkyDarkening).toBeLessThan(original.rainSkyDarkening);
+        expect(painterly.stormSkyDarkening).toBeLessThan(original.stormSkyDarkening);
+        expect(painterly.rainFog).toBeLessThan(original.rainFog);
+        expect(painterly.snowFog).toBeLessThan(original.snowFog);
+    });
+
+    it('adds small branches to painterly lightning', () => {
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        const added = [];
+        const weather = new WeatherSystem({ add: obj => added.push(obj), remove() {} }, { fireBlocks: new Map() });
+
+        weather._showLightningBolt(1, 20, 2);
+
+        expect(added[0].isLineSegments).toBe(true);
+        expect(added[0].geometry.attributes.position.count).toBeGreaterThan(18);
     });
 });

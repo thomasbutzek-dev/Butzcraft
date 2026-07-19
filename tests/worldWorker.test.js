@@ -36,6 +36,32 @@ beforeAll(() => {
 });
 
 describe('World worker buffer recycling', () => {
+    it('forwards generated minecart data to the game thread', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+        const generated = [];
+        const onGenerated = event => generated.push(event.detail);
+        window.addEventListener('minecartGenerated', onGenerated);
+
+        world.viewCenterX = 0;
+        world.viewCenterZ = 0;
+        world.viewRenderDistance = 0;
+        worker.onmessage({
+            data: {
+                type: 'terrain',
+                cx: 0,
+                cz: 0,
+                epoch: world.meshEpoch,
+                data: new Uint8Array(16 * 64 * 16),
+                minecartInfos: [{ id: 'minecart:test', x: 2, y: 20, z: 3 }]
+            }
+        });
+
+        window.removeEventListener('minecartGenerated', onGenerated);
+        expect(generated).toEqual([{ id: 'minecart:test', x: 2, y: 20, z: 3 }]);
+    }, 15000);
+
     it('reuses a late terrain response as a transferable buffer', async () => {
         const { World } = await import('../js/world.js');
         const world = new World(new THREE.Scene());
@@ -86,6 +112,39 @@ describe('World worker buffer recycling', () => {
 });
 
 describe('World mesh result scheduling', () => {
+    it('waits for active-view neighbors before the first mesh build', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+        world.viewCenterX = 0;
+        world.viewCenterZ = 0;
+        world.viewRenderDistance = 1;
+
+        const sendTerrain = (cx, cz) => worker.onmessage({
+            data: {
+                type: 'terrain',
+                cx,
+                cz,
+                epoch: world.meshEpoch,
+                data: new Uint8Array(16 * 64 * 16)
+            }
+        });
+
+        sendTerrain(0, 0);
+        expect(worker.messages.filter(entry => entry.message.type === 'mesh')).toHaveLength(0);
+
+        for (let cx = -1; cx <= 1; cx++) {
+            for (let cz = -1; cz <= 1; cz++) {
+                if (cx !== 0 || cz !== 0) sendTerrain(cx, cz);
+            }
+        }
+
+        const meshMessages = worker.messages.filter(entry => entry.message.type === 'mesh');
+        expect(meshMessages).toHaveLength(9);
+        expect(new Set(meshMessages.map(entry => `${entry.message.cx},${entry.message.cz}`))).toHaveLength(9);
+        expect(world.dirtyMeshes.size).toBe(0);
+    }, 15000);
+
     it('applies at most the requested number of mesh results per frame', async () => {
         const { World } = await import('../js/world.js');
         const world = new World(new THREE.Scene());

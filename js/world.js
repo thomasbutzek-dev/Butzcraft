@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260716e';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260717y';
+import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
 
 // RENDER_DIST wird NICHT destrukturiert, damit Laufzeit-Änderungen via Settings sofort wirken.
 // CHUNK_SIZE/HEIGHT etc. sind hingegen statisch und werden beim Welt-Load fest verdrahtet.
@@ -44,6 +45,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 this.fireBlocks = new Map();    // "x,y,z" → { remaining: seconds } — aktive Feuer-Blöcke
                 this.spawnerMeta = {};           // "x,y,z" → { lastSpawn, mobCount } — Spawner-Zustand
                 this.spawnerKeys = new Set();    // bekannte Spawner-Positionen, damit Runtime-Ticks nicht den Raum scannen
+                this.fireLightKeys = new Set();  // geladene Feuer-Blöcke für den gepoolten Lichtschein
                 this.villages = [];              // [{cx,cz,x,y,z}] — erkannte Dörfer für NPC-Spawn
                 this.uTime = { value: 0 };
                 this.pendingMeshes = new Set(); // Verhindert doppelte Mesh-Requests
@@ -59,13 +61,25 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 //                       16×16-Atlas-Zelle bei aAtlasUV gemappt. So kann ein
                 //                       greedy-merged Quad die Tile-Textur N×M-fach wiederholen,
                 //                       ohne benachbarte Atlas-Zellen anzuschneiden.
-                this.opaqueMaterial = new THREE.MeshPhongMaterial({ vertexColors: true, map: textureAtlas, shininess: 10, alphaTest: 0.5 });
+                this.opaqueMaterial = new THREE.MeshPhongMaterial({
+                    vertexColors: true,
+                    map: textureAtlas,
+                    shininess: graphicsPrototype.usesPainterlyTextures ? 3 : 10,
+                    specular: graphicsPrototype.usesPainterlyTextures ? 0x2c241b : 0x111111,
+                    alphaTest: 0.5
+                });
                 const windTime = this.uTime;
+                const windScale = {
+                    value: graphicsPrototype.usesHybridGeometry
+                        ? (graphicsPrototype.reducedDetail ? 0.45 : 0.8)
+                        : 1
+                };
                 this.opaqueMaterial.onBeforeCompile = (shader) => {
                     shader.uniforms.uTime = windTime;
+                    shader.uniforms.uWindScale = windScale;
                     shader.vertexShader = shader.vertexShader.replace(
                         'void main() {',
-                        'attribute float aSway;\nattribute vec2 aAtlasUV;\nuniform float uTime;\nvarying vec2 vAtlasUV;\nvoid main() {\n  vAtlasUV = aAtlasUV;'
+                        'attribute float aSway;\nattribute vec2 aAtlasUV;\nuniform float uTime;\nuniform float uWindScale;\nvarying vec2 vAtlasUV;\nvoid main() {\n  vAtlasUV = aAtlasUV;'
                     );
                     shader.vertexShader = shader.vertexShader.replace(
                         '#include <begin_vertex>',
@@ -73,8 +87,8 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                         if (aSway > 0.5) {
                             float windStr = sin(uTime * 1.8 + position.x * 0.7 + position.z * 0.9) * 0.08;
                             float windStr2 = cos(uTime * 1.3 + position.x * 0.5 + position.z * 1.1) * 0.05;
-                            transformed.x += windStr * aSway;
-                            transformed.z += windStr2 * aSway;
+                            transformed.x += windStr * aSway * uWindScale;
+                            transformed.z += windStr2 * aSway * uWindScale;
                         }`
                     );
                     // Fragment: Atlas-Tiling für Greedy-Quads. Inset um eps gegen
@@ -99,7 +113,14 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 };
                 
                 // Water Material mit Wellen-Shader
-                this.waterMaterial = new THREE.MeshPhongMaterial({ vertexColors: true, transparent: true, opacity: 0.6, shininess: 100, depthWrite: false });
+                this.waterMaterial = new THREE.MeshPhongMaterial({
+                    vertexColors: true,
+                    map: graphicsPrototype.usesPainterlyTextures ? textureAtlas : null,
+                    transparent: true,
+                    opacity: graphicsPrototype.usesPainterlyTextures ? 0.72 : 0.6,
+                    shininess: graphicsPrototype.usesPainterlyTextures ? 48 : 100,
+                    depthWrite: false
+                });
                 this.waterMaterial.onBeforeCompile = (shader) => {
                     shader.uniforms.uTime = windTime;
                     shader.vertexShader = shader.vertexShader.replace(
@@ -118,14 +139,16 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 // URL statt String-Pfad: Vite kann den Worker so in dist/ mitnehmen.
                 // Im Dev/Express-Modus bleibt er weiterhin relativ zu world.js auflösbar.
                 const workerUrl = new URL('./chunkWorker.js', import.meta.url);
-                workerUrl.search = import.meta.env?.DEV ? 'v=' + Date.now() : 'v=20260507c';
+                workerUrl.search = import.meta.env?.DEV ? 'v=' + Date.now() : 'v=20260719a';
                 this.worker = new Worker(workerUrl);
                 // Init: Sende Config + Block-Daten an Worker
                 this.worker.postMessage({
                     type: 'init',
                     config: CONFIG.WORLD,
                     blockColors: this._flattenColors(),
-                    blockTex: Object.assign({}, BLOCK_TEX)
+                    blockTex: Object.assign({}, BLOCK_TEX),
+                    graphicsVariant: graphicsPrototype.variant,
+                    reducedGraphicsDetail: graphicsPrototype.reducedDetail
                 });
                 this.queuedChunks = new Set();
                 this.chunkPool = [];
@@ -174,22 +197,15 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                             }
                         }
 
-                        const chunk = { cx, cz, data: new Uint8Array(data), mesh: null, waterMesh: null, spawnerKeys: new Set() };
+                        const chunk = { cx, cz, data: new Uint8Array(data), mesh: null, waterMesh: null, spawnerKeys: new Set(), fireLightKeys: new Set() };
                         this.indexChunkSpawners(chunk);
+                        this.indexChunkFireLights(chunk);
                         this.chunks.set(this.getChunkKey(cx, cz), chunk);
 
                         // Mesh für diesen und ALLE 8 angrenzenden Chunks anfordern
                         // (inkl. Diagonalen — die brauchen die Daten dieses Chunks
                         //  für ihre Eckblock-AO-Berechnung).
-                        this.requestMesh(cx, cz);
-                        this.requestMesh(cx - 1, cz);
-                        this.requestMesh(cx + 1, cz);
-                        this.requestMesh(cx, cz - 1);
-                        this.requestMesh(cx, cz + 1);
-                        this.requestMesh(cx - 1, cz - 1);
-                        this.requestMesh(cx + 1, cz - 1);
-                        this.requestMesh(cx - 1, cz + 1);
-                        this.requestMesh(cx + 1, cz + 1);
+                        this.requestReadyMeshesAround(cx, cz);
 
                         // Tier 3: Village-Infos an Main-Thread weiterleiten
                         if (msg.villageInfos && msg.villageInfos.length > 0) {
@@ -197,6 +213,11 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                                 this.villages.push(vInfo);
                                 // Custom-Event für NPC-Spawning
                                 window.dispatchEvent(new CustomEvent('villageGenerated', { detail: vInfo }));
+                            }
+                        }
+                        if (msg.minecartInfos && msg.minecartInfos.length > 0) {
+                            for (const minecartInfo of msg.minecartInfos) {
+                                window.dispatchEvent(new CustomEvent('minecartGenerated', { detail: minecartInfo }));
                             }
                         }
                         return;
@@ -384,6 +405,31 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 chunk.spawnerKeys.clear();
             }
 
+            indexChunkFireLights(chunk) {
+                if (!chunk || !chunk.data) return;
+                if (!chunk.fireLightKeys) chunk.fireLightKeys = new Set();
+                chunk.fireLightKeys.clear();
+                const baseX = chunk.cx * CHUNK_SIZE;
+                const baseZ = chunk.cz * CHUNK_SIZE;
+                for (let y = 0; y < CHUNK_HEIGHT; y++) {
+                    for (let z = 0; z < CHUNK_SIZE; z++) {
+                        for (let x = 0; x < CHUNK_SIZE; x++) {
+                            const idx = (y * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x;
+                            if (chunk.data[idx] !== 86) continue;
+                            const key = this.getBlockKey(baseX + x, y, baseZ + z);
+                            chunk.fireLightKeys.add(key);
+                            this.fireLightKeys.add(key);
+                        }
+                    }
+                }
+            }
+
+            unindexChunkFireLights(chunk) {
+                if (!chunk?.fireLightKeys) return;
+                for (const key of chunk.fireLightKeys) this.fireLightKeys.delete(key);
+                chunk.fireLightKeys.clear();
+            }
+
             generateChunk(cx, cz) {
                 const key = this.getChunkKey(cx, cz);
                 if (this.chunks.has(key) || this.queuedChunks.has(key)) return;
@@ -401,6 +447,32 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 if (this.viewCenterX === null || this.viewCenterZ === null) return true;
                 const rd = this.viewRenderDistance + margin;
                 return Math.abs(cx - this.viewCenterX) <= rd && Math.abs(cz - this.viewCenterZ) <= rd;
+            }
+
+            hasAllActiveViewNeighbors(cx, cz) {
+                if (this.viewCenterX === null || this.viewCenterZ === null) return true;
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dz = -1; dz <= 1; dz++) {
+                        if (dx === 0 && dz === 0) continue;
+                        const nx = cx + dx;
+                        const nz = cz + dz;
+                        if (!this.isChunkInsideActiveView(nx, nz)) continue;
+                        if (!this.chunks.has(this.getChunkKey(nx, nz))) return false;
+                    }
+                }
+                return true;
+            }
+
+            requestReadyMeshesAround(cx, cz) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dz = -1; dz <= 1; dz++) {
+                        const meshX = cx + dx;
+                        const meshZ = cz + dz;
+                        if (!this.isChunkInsideActiveView(meshX, meshZ)) continue;
+                        if (!this.chunks.has(this.getChunkKey(meshX, meshZ))) continue;
+                        if (this.hasAllActiveViewNeighbors(meshX, meshZ)) this.requestMesh(meshX, meshZ);
+                    }
+                }
             }
 
             // Fordert ein Mesh-Update beim Worker an (mit Nachbar-Chunk-Daten)
@@ -470,6 +542,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 }
                 this.chunks.clear();
                 this.spawnerKeys.clear();
+                this.fireLightKeys.clear();
                 this.queuedChunks.clear();
                 this.pendingMeshes.clear();
                 this.dirtyMeshes.clear();
@@ -507,6 +580,14 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     chunk.spawnerKeys.add(blockKey);
                     this.spawnerKeys.add(blockKey);
                 }
+                if (!chunk.fireLightKeys) chunk.fireLightKeys = new Set();
+                if (previous === 86 && t !== 86) {
+                    chunk.fireLightKeys.delete(blockKey);
+                    this.fireLightKeys.delete(blockKey);
+                } else if (previous !== 86 && t === 86) {
+                    chunk.fireLightKeys.add(blockKey);
+                    this.fireLightKeys.add(blockKey);
+                }
                 if (updateMesh) {
                     this.requestMesh(cx, cz);
                     if (lx === 0) this.requestMesh(cx - 1, cz); if (lx === CHUNK_SIZE - 1) this.requestMesh(cx + 1, cz);
@@ -528,6 +609,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                     if (Math.abs(chunk.cx - pcx) > RD + 1 || Math.abs(chunk.cz - pcz) > RD + 1) {
                         this.disposeChunkMeshes(chunk);
                         this.unindexChunkSpawners(chunk);
+                        this.unindexChunkFireLights(chunk);
                         if (chunk.data) this.chunkPool.push(chunk.data.buffer);
                         this.chunks.delete(key);
                     }

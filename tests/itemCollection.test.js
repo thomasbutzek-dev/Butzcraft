@@ -18,7 +18,7 @@ HTMLCanvasElement.prototype.getContext = () => canvasContext;
 HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,';
 
 const inventory = await import('../js/inventory.js');
-const { addItemOrCreateDrop, tryCollectDroppedItem } = await import('../js/itemCollection.js');
+const { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } = await import('../js/itemCollection.js');
 
 beforeEach(() => {
     document.body.innerHTML = '';
@@ -64,5 +64,49 @@ describe('dropped item collection', () => {
         expect(collected).toBe(true);
         expect(inventory.inventorySlots[0]).toEqual({ type: 3, count: 5 });
         expect(drops).toEqual([]);
+    });
+
+    it('does not rebuild unchanged inventory icons when collecting an item', () => {
+        document.body.innerHTML = `
+            <div id="inventory">
+                <div class="slot"></div>
+                <div class="slot"></div>
+            </div>
+        `;
+        inventory.inventorySlots[0] = { type: 1, count: 1 };
+        inventory.inventorySlots[1] = { type: 3, count: 1 };
+        inventory.updateInventoryUI();
+        const unchangedIcon = document.querySelectorAll('.slot-color-preview')[1].firstElementChild;
+        const drops = [{ blockType: 1 }];
+
+        tryCollectDroppedItem(drops, 0, () => {});
+
+        expect(document.querySelectorAll('.slot-color-preview')[1].firstElementChild).toBe(unchangedIcon);
+    });
+
+    it('gives painterly drops a restrained individual motion', () => {
+        const drop = {
+            blockType: 22,
+            age: 1,
+            mesh: { rotation: { x: 0, y: 0, z: 0 } }
+        };
+
+        updateDroppedItemVisual(drop, 0.25, true);
+
+        expect(drop.mesh.rotation.y).toBeGreaterThan(0);
+        expect(Math.abs(drop.mesh.rotation.z)).toBeLessThanOrEqual(0.09);
+        expect(drop.visualPhase).toBeTypeOf('number');
+    });
+
+    it('does not alter drop motion in the original graphics variant', () => {
+        const drop = {
+            blockType: 22,
+            age: 1,
+            mesh: { rotation: { x: 0, y: 0, z: 0 } }
+        };
+
+        updateDroppedItemVisual(drop, 0.25, false);
+
+        expect(drop.mesh.rotation).toEqual({ x: 0, y: 0, z: 0 });
     });
 });

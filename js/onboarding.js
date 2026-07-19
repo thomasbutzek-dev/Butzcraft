@@ -1,4 +1,4 @@
-import { BLOCK_TYPES } from './blocks.js?v=20260716e';
+import { BLOCK_TYPES } from './blocks.js?v=20260717y';
 
 const STAGES = [
     [BLOCK_TYPES.WOOD, BLOCK_TYPES.JUNGLE_WOOD, BLOCK_TYPES.PALM_WOOD],
@@ -25,18 +25,18 @@ const OBJECTIVES = [
     },
     {
         label: 'Erster Tag', text: 'Stelle Holzbretter her',
-        hint: 'Öffne mit E das Inventar und lege Holz ins Bastelfeld.',
-        touchHint: 'Öffne das Inventar und lege Holz ins Bastelfeld.'
+        hint: 'Öffne mit E das Inventar und wähle Holzbretter im Rezeptbuch.',
+        touchHint: 'Öffne das Inventar und wähle Holzbretter im Rezeptbuch.'
     },
     {
         label: 'Erster Tag', text: 'Mache Stöcke',
-        hint: 'Lege zwei Holzbretter übereinander ins Bastelfeld.',
-        touchHint: 'Lege zwei Holzbretter übereinander ins Bastelfeld.'
+        hint: 'Wähle Stock im Rezeptbuch und stelle das Rezept her.',
+        touchHint: 'Wähle Stock im Rezeptbuch und stelle das Rezept her.'
     },
     {
         label: 'Erster Tag', text: 'Baue eine Werkbank',
-        hint: 'Fülle das 2×2-Bastelfeld mit vier Holzbrettern.',
-        touchHint: 'Fülle das 2×2-Bastelfeld mit vier Holzbrettern.'
+        hint: 'Wähle Werkbank im Rezeptbuch und stelle das Rezept her.',
+        touchHint: 'Wähle Werkbank im Rezeptbuch und stelle das Rezept her.'
     },
     {
         label: 'Überleben', text: 'Baue dein erstes Schwert',

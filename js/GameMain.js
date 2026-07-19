@@ -2,30 +2,40 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260716e';
-        import { World, getBiomeAt, BIOMES } from './world.js?v=20260716c';
-        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260716e';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717y';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260719a';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260719d';
 
         import { Input } from './Input.js?v=20260507b';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260716d';
-        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260716g';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260717b';
+        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260719a';
         import { Game } from './Game.js?v=20260716b'; // Central state container
-        import { Player } from './Player.js?v=20260716b';
-        import { createCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260716p';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260716l';
-        import { addItemOrCreateDrop, tryCollectDroppedItem } from './itemCollection.js?v=20260716j';
-        import { getOnboardingProgress } from './onboarding.js?v=20260716d';
-        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260716a';
-        import { findNewGameSpawn } from './newGameSpawn.js?v=20260716b';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260717l';
-        import { WeatherSystem } from './weather.js?v=20260716c';
-        import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260716k';
-        import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
-        import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
+        import { Player } from './Player.js?v=20260718d';
+        import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
+        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260719b';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260719b';
+        import { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } from './itemCollection.js?v=20260718c';
+        import { getOnboardingProgress } from './onboarding.js?v=20260718f';
+        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260718b';
+        import { findNewGameSpawn } from './newGameSpawn.js?v=20260718a';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260719a';
+        import { WeatherSystem } from './weather.js?v=20260718b';
+        import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
+        import { NPC } from './npc.js?v=20260719a';
+        import { preloadEntityMaterials } from './entityMaterials.js?v=20260719a';
+        import { Minecart } from './minecart.js?v=20260719a';
+        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260718d';
+        import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260718b';
+        import { SaveRepository } from './saveRepository.js?v=20260718a';
+        import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260719a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
         import { findSafeBedRespawn, normalizeRespawnBed } from './respawn.js?v=20260716a';
+        import { TorchLightSystem, TORCH_TYPE } from './torchLights.js?v=20260718b';
+        import { DamageFeedback } from './damageFeedback.js?v=20260718a';
+        import { FrameRateTracker } from './frameRateTracker.js?v=20260718a';
+        import { calculateRenderPixelRatio } from './renderResolution.js?v=20260718a';
+        import { resolveUiInputCommand } from './inputCommand.js?v=20260718a';
+        import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
         window.updateInventoryUI = updateInventoryUI;
@@ -47,7 +57,7 @@
         const MOB_JUMP_FORCE = 5.5; // Konstante für das Springen von Tieren/Zombies (ca. 1.5 Blöcke hoch bei g=9.8)
 
         // --- GAME STATE ---
-        let camera, scene, renderer, controls, world, sun, sunGroup;
+        let camera, scene, renderer, controls, world, sun, sunGroup, ambient;
         let skyUniforms, skyMesh;
         // Spielstart auf Mittag setzen
         let time = DAY_DURATION * 0.45, prevTime = performance.now(), spawnTimer = 0;
@@ -61,8 +71,14 @@
         Game.droppedItems = [];
         const droppedItems = Game.droppedItems;
         let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
+        let torchLightSystem = null;
+        let damageFeedback = null;
         const npcs = [];            // Tier 3: NPC-Array
         window.npcs = npcs;
+        const minecarts = [];
+        const spawnedMinecartKeys = new Set();
+        let activeMinecart = null;
+        window.minecarts = minecarts;
         // Tier 3: Spawner-Tick-Timer auf Modul-Scope. WICHTIG nicht `this._spawnerTickTimer`
         // verwenden — `this` ist in einer Top-Level-Funktion innerhalb eines ES-Moduls `undefined`
         // (strict mode), und `this.x = 0` wirft TypeError. Das war der Grund, warum nach dem
@@ -77,6 +93,8 @@
         let currentSaveName = null;
         let respawnBed = null;
         const CHARACTER_PROFILE_STORAGE_KEY = 'butzcraft.characterProfile';
+        const legacyCharacterProfile = readLegacyCharacterProfile();
+        let activeCharacterProfile = legacyCharacterProfile;
 
         // Schwert & Animation
 
@@ -92,7 +110,7 @@
             return Boolean(Game.touchActive) || isTouchDevice();
         }
 
-        function loadLocalCharacterProfile() {
+        function readLegacyCharacterProfile() {
             try {
                 const saved = localStorage.getItem(CHARACTER_PROFILE_STORAGE_KEY);
                 return saved ? parseCharacterProfile(saved) : createCharacterProfile();
@@ -109,41 +127,58 @@
             setTimeout(() => msg.remove(), 900);
         }
 
-        function applyLocalCharacterProfile() {
-            const profile = loadLocalCharacterProfile();
-            if (Game.player?.setCharacterProfile) Game.player.setCharacterProfile(profile);
-            return profile;
+        function setActiveCharacterProfile(profile) {
+            activeCharacterProfile = normalizeCharacterProfile(profile);
+            if (Game.player?.setCharacterProfile) Game.player.setCharacterProfile(activeCharacterProfile);
+            return activeCharacterProfile;
         }
 
         function initStartCharacterEditor() {
-            const openBtn = document.getElementById('character-editor-button');
+            const openButtons = document.querySelectorAll('[data-open-character-editor]');
             const overlay = document.getElementById('character-editor-overlay');
             const frame = document.getElementById('character-editor-frame');
             const applyBtn = document.getElementById('character-editor-apply');
             const closeBtn = document.getElementById('character-editor-close');
-            if (!openBtn || !overlay || !frame || !applyBtn || !closeBtn) return;
+            if (!openButtons.length || !overlay || !frame || !applyBtn || !closeBtn) return;
 
+            const send = (type, extra = {}) => {
+                frame.contentWindow?.postMessage({ type, ...extra }, window.location.origin);
+            };
             const close = () => {
+                send('cancel');
                 overlay.classList.remove('open');
-                overlay.setAttribute('aria-hidden', 'true');
+                deactivateDialog(overlay);
             };
             const open = () => {
-                if (!frame.src) frame.src = 'character-editor.html';
                 overlay.classList.add('open');
-                overlay.setAttribute('aria-hidden', 'false');
+                activateDialog(overlay, '#character-editor-close');
+                if (frame.dataset.ready === 'true') send('load-profile', { profile: activeCharacterProfile });
             };
             const apply = () => {
-                const saveButton = frame.contentDocument?.getElementById('save-button');
-                if (saveButton) saveButton.click();
-                applyLocalCharacterProfile();
-                close();
+                send('apply-profile');
             };
 
-            bindPress(openBtn, open);
+            frame.addEventListener('load', () => {
+                frame.dataset.ready = 'true';
+                if (overlay.classList.contains('open')) send('load-profile', { profile: activeCharacterProfile });
+            });
+            openButtons.forEach((button) => bindPress(button, open));
             bindPress(applyBtn, apply);
             bindPress(closeBtn, close);
             overlay.addEventListener('click', (event) => {
                 if (event.target === overlay) close();
+            });
+            window.addEventListener('message', (event) => {
+                if (event.origin !== window.location.origin || event.source !== frame.contentWindow || !event.data) return;
+                if (event.data.type === 'editor-ready') {
+                    frame.dataset.ready = 'true';
+                    if (overlay.classList.contains('open')) send('load-profile', { profile: activeCharacterProfile });
+                }
+                if (event.data.type === 'apply-profile') {
+                    setActiveCharacterProfile(event.data.profile);
+                    overlay.classList.remove('open');
+                    deactivateDialog(overlay);
+                }
             });
             window.openCharacterEditor = open;
             if (window.__butzcraftCharacterEditorRequested) {
@@ -196,7 +231,7 @@
                     e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD' ||
                     e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' ||
                     e.code === 'ControlLeft' || e.code === 'ControlRight' ||
-                    e.code === 'KeyE' || e.code === 'Tab' ||
+                    e.code === 'KeyE' || e.code === 'KeyQ' || e.code === 'Tab' ||
                     (e.key >= '1' && e.key <= '8')
                 )
             );
@@ -231,14 +266,13 @@
         }
 
         window.butzcraftCanInteract = function() {
-            return Boolean(
-                gameStarted &&
-                gameActive &&
-                !spawning &&
-                !manuallyPaused &&
-                !isBlockingOverlayOpen() &&
-                (controls?.isLocked || Game.touchActive || window.butzcraftPointerLockUnavailable)
-            );
+            return canUseMouseInteraction({
+                gameStarted,
+                gameActive,
+                spawning,
+                manuallyPaused,
+                blockingOverlayOpen: isBlockingOverlayOpen()
+            });
         };
 
         function showPauseMenu() {
@@ -246,13 +280,17 @@
             if (!inst) return;
             document.body.classList.add('game-paused');
             inst.style.display = 'block';
+            activateDialog(inst, '[data-resume-game]');
             if (typeof window.loadGamesList === 'function') window.loadGamesList();
         }
 
         function hidePauseMenu() {
             const inst = document.getElementById('instructions');
             document.body.classList.remove('game-paused');
-            if (inst) inst.style.display = 'none';
+            if (inst) {
+                deactivateDialog(inst);
+                inst.style.display = 'none';
+            }
         }
 
         const CONTROLS_HINT_HIDE_MS = 8500;
@@ -325,13 +363,16 @@
             if (!el || !label || !step || !text || !hint || !objective) return;
             const objectiveSource = currentMiniObjective ? 'onboarding' : 'story';
             const objectiveKey = `${objectiveSource}-${objective.step}`;
-            const needsRender = el.dataset.objectiveKey !== objectiveKey || el.classList.contains('complete');
+            const objectiveHint = shouldUseTouchMode() ? objective.touchHint : objective.hint;
+            const needsRender = el.dataset.objectiveKey !== objectiveKey
+                || el.classList.contains('complete')
+                || hint.textContent !== objectiveHint;
             el.classList.remove('complete');
             if (needsRender) {
                 label.textContent = objective.label;
                 step.textContent = `Schritt ${objective.step} von ${objective.total}`;
                 text.textContent = objective.text;
-                hint.textContent = shouldUseTouchMode() ? objective.touchHint : objective.hint;
+                hint.textContent = objectiveHint;
                 updateObjectiveProgress(objective.step, objective.total);
                 el.dataset.objectiveKey = objectiveKey;
             }
@@ -345,6 +386,35 @@
                 segment.classList.toggle('unused', index >= totalSteps);
                 segment.classList.toggle('active', index < completedSteps);
             });
+        }
+
+        function updateInventoryObjective() {
+            const el = document.getElementById('inventory-objective');
+            const label = document.getElementById('inventory-objective-label');
+            const step = document.getElementById('inventory-objective-step');
+            const text = document.getElementById('inventory-objective-text');
+            const hint = document.getElementById('inventory-objective-hint');
+            const objective = currentMiniObjective || currentStoryObjective;
+            if (!el || !label || !step || !text || !hint) return;
+
+            if (!isInventoryOpened() || !objective) {
+                el.classList.remove('visible');
+                el.setAttribute('aria-hidden', 'true');
+                return;
+            }
+
+            const objectiveSource = currentMiniObjective ? 'onboarding' : 'story';
+            const objectiveKey = `${objectiveSource}-${objective.step}`;
+            const objectiveHint = shouldUseTouchMode() ? objective.touchHint : objective.hint;
+            if (el.dataset.objectiveKey !== objectiveKey || hint.textContent !== objectiveHint) {
+                label.textContent = objective.label;
+                step.textContent = `Schritt ${objective.step} von ${objective.total}`;
+                text.textContent = objective.text;
+                hint.textContent = objectiveHint;
+                el.dataset.objectiveKey = objectiveKey;
+            }
+            el.classList.add('visible');
+            el.setAttribute('aria-hidden', 'false');
         }
 
         function showObjectiveCompletion(objective) {
@@ -373,6 +443,7 @@
         function updateFirstObjective() {
             const { advanced, completedObjective } = advanceMiniObjective();
             updateStoryObjectiveFromTime();
+            updateInventoryObjective();
             const controlsHint = document.getElementById('controls-hint');
             const controlsHintVisible = controlsHint && controlsHint.classList.contains('visible');
             if (!gameStarted || spawning || manuallyPaused || isBlockingOverlayOpen() || controlsHintVisible) {
@@ -392,8 +463,11 @@
         }
 
         function updateStoryObjectiveFromTime() {
+            const playerPosition = controls?.getObject?.()?.position || null;
             const progress = getStoryProgress(storyObjectiveIndex, {
-                dayCount: Math.floor(time / DAY_DURATION)
+                dayCount: Math.floor(time / DAY_DURATION),
+                playerPosition,
+                villages: world?.villages || []
             });
             storyObjectiveIndex = progress.index;
             currentStoryObjective = progress.objective;
@@ -473,41 +547,20 @@
             return new URL(path.replace(/^\/+/, ''), window.location.href).toString();
         }
 
-        async function loadSaveData(name) {
-            try {
-                const browserSave = await loadBrowserSave(name);
-                if (browserSave) return browserSave;
-            } catch (err) {
-                if (err && err.message === 'Invalid name') throw err;
-                console.warn('[Save] Browser-Save nicht lesbar, versuche Server-Fallback:', err);
-            }
-
-            const res = await fetch(apiUrl(`api/load?name=${encodeURIComponent(name)}`));
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            return data;
+        async function fetchSaveJson(path) {
+            const res = await fetch(apiUrl(path));
+            return res.json();
         }
 
-        async function listServerSaves() {
-            try {
-                const res = await fetch(apiUrl('api/saves'));
-                const saves = await res.json();
-                return Array.isArray(saves) ? saves : [];
-            } catch (err) {
-                return [];
-            }
-        }
-
-        async function listAllSaveNames() {
-            let browserSaves = [];
-            try {
-                browserSaves = await listBrowserSaves();
-            } catch (err) {
-                console.warn('[Save] Browser-Save-Liste nicht lesbar:', err);
-            }
-            const serverSaves = await listServerSaves();
-            return [...new Set([...browserSaves, ...serverSaves])];
-        }
+        const saveRepository = new SaveRepository({
+            browserStore: {
+                list: listBrowserSaves,
+                load: loadBrowserSave,
+                save: saveBrowserSave
+            },
+            fetchJson: fetchSaveJson,
+            warn: (...args) => console.warn(...args)
+        });
 
         function showSaveMessage(text, color = '#4caf50') {
             const msg = document.getElementById('save-msg');
@@ -572,6 +625,62 @@
             return addItemOrCreateDrop(type, count, createOverflowDrop);
         }
 
+        function spawnMinecart(data) {
+            if (!data?.id || spawnedMinecartKeys.has(data.id)) return null;
+            const minecart = new Minecart(scene, data);
+            minecarts.push(minecart);
+            spawnedMinecartKeys.add(data.id);
+            return minecart;
+        }
+
+        function disposeMinecarts() {
+            activeMinecart = null;
+            while (minecarts.length > 0) minecarts.pop().dispose(scene);
+            spawnedMinecartKeys.clear();
+        }
+
+        function exitActiveMinecart() {
+            if (!activeMinecart) return false;
+            const cart = activeMinecart;
+            cart.hasRider = false;
+            activeMinecart = null;
+
+            const playerPosition = controls.getObject().position;
+            const sideX = cart.direction.z;
+            const sideZ = -cart.direction.x;
+            playerPosition.set(
+                cart.group.position.x + sideX * 1.15,
+                cart.group.position.y + 1.58,
+                cart.group.position.z + sideZ * 1.15
+            );
+            Game.player.velocity.set(0, 0, 0);
+            window.playerInteraction?.showMessage('Lore verlassen.', '#ffe066', 18);
+            return true;
+        }
+
+        function tryToggleMinecart() {
+            if (activeMinecart) return exitActiveMinecart();
+            if (!controls || !Game.player) return false;
+            const playerPosition = controls.getObject().position;
+            let nearest = null;
+            let nearestDistance = 2.6;
+            for (const minecart of minecarts) {
+                const distance = minecart.group.position.distanceTo(playerPosition);
+                if (distance < nearestDistance) {
+                    nearest = minecart;
+                    nearestDistance = distance;
+                }
+            }
+            if (!nearest) return false;
+
+            activeMinecart = nearest;
+            nearest.hasRider = true;
+            nearest.syncRider(playerPosition);
+            Game.player.velocity.set(0, 0, 0);
+            window.playerInteraction?.showMessage('Lore: W fahren, S bremsen, A/D Weiche, Q aussteigen.', '#ffe066', 18);
+            return true;
+        }
+
         function resetRuntimeForLoadedGame() {
             while (mobs.length > 0) {
                 const mob = mobs.pop();
@@ -583,6 +692,7 @@
                 const projectile = projectiles.pop();
                 if (projectile && typeof projectile.dispose === 'function') projectile.dispose();
             }
+            disposeMinecarts();
             world.fireBlocks.clear();
             world.spawnerMeta = {};
             world.villages = [];
@@ -590,8 +700,7 @@
 
         window.startNewGame = function() {
             if (gameStarted) return;
-            console.log("DEBUG: startNewGame starting...");
-            applyLocalCharacterProfile();
+            setActiveCharacterProfile(activeCharacterProfile);
             document.getElementById('start-menu').style.display = 'none';
             document.body.classList.add('game-started');
             currentSaveName = null;
@@ -601,9 +710,9 @@
             lockControlsForDesktop();
             hidePauseMenu();
             gameStarted = true;
+            fpsTracker.reset(performance.now());
             resetControlsHintForRun();
             window.__butzcraftStartRequested = false;
-            console.log("DEBUG: startNewGame finished, gameStarted set to true");
         };
         window.__butzcraftStartFunctionReady = true;
         if (window.__butzcraftStartRequested && window.__butzcraftRefreshStartStatus) {
@@ -611,15 +720,15 @@
         }
 
         window.loadGame = function(name) {
-            console.log("DEBUG: loadGame starting for", name);
             SoundManager.init();
-            loadSaveData(name)
+            saveRepository.load(name)
                 .then(rawData => {
                     const data = prepareSaveForLoad(rawData);
                     document.getElementById('start-menu').style.display = 'none';
                     document.body.classList.add('game-started');
                     lockControlsForDesktop();
                     gameStarted = true;
+                    fpsTracker.reset(performance.now());
                     currentSaveName = name;
                     document.getElementById('save-input').value = name;
 
@@ -629,6 +738,8 @@
                     playerPos.set(data.pos.x, data.pos.y, data.pos.z);
                     Game.player.health = data.health;
                     Game.player.hunger = data.hunger;
+                    setActiveCharacterProfile(data.characterProfile || legacyCharacterProfile || createCharacterProfile());
+                    Game.player.setThirdPersonCameraDistance(data.thirdPersonCamera?.distance);
                     time = data.time;
                     respawnBed = normalizeRespawnBed(data.respawnBed);
                     spawning = false;
@@ -672,6 +783,9 @@
                                 }
                             }
                         }
+                        if (Array.isArray(data.minecarts)) {
+                            for (const minecartData of data.minecarts) spawnMinecart(minecartData);
+                        }
 
                         world.disposeAllChunks({ reuseBuffers: true });
                         updateVisibleChunksIfNeeded(playerPos, true);
@@ -687,27 +801,23 @@
         const DOM = {
             healthFill: document.getElementById('health-fill'),
             hungerFill: document.getElementById('hunger-fill'),
-            timeInfo: document.getElementById('time-info'),
+            worldTimeInfo: document.getElementById('world-time-info'),
+            fpsSummary: document.getElementById('fps-summary'),
             stats: document.getElementById('stats'),
-            fpsCounter: document.getElementById('fps-counter'),
             gameOver: document.getElementById('game-over')
         };
         const UI_UPDATE_INTERVAL_MS = 100;
         const STATS_UPDATE_INTERVAL_MS = 250;
-        const FPS_UPDATE_INTERVAL_MS = 500;
         let lastUiUpdateAt = 0;
         let lastStatsUpdateAt = 0;
         let lastStatsText = '';
-        let fpsFrameCount = 0;
-        let fpsWindowStartedAt = performance.now();
+        const fpsTracker = new FrameRateTracker(500);
         let debugHudVisible = false;
 
         function setDebugHudVisible(visible) {
             debugHudVisible = Boolean(visible);
             DOM.stats.classList.toggle('debug-visible', debugHudVisible);
-            DOM.fpsCounter.classList.toggle('debug-visible', debugHudVisible);
             DOM.stats.setAttribute('aria-hidden', debugHudVisible ? 'false' : 'true');
-            DOM.fpsCounter.setAttribute('aria-hidden', debugHudVisible ? 'false' : 'true');
         }
 
         function toggleDebugHud() {
@@ -718,14 +828,14 @@
 
         // --- SKY-COLOR CACHE (statt 8x new THREE.Color pro Frame) ---
         const SKY = {
-            nightH: new THREE.Color().setHSL(0.64, 0.4, 0.1),
-            nightZ: new THREE.Color().setHSL(0.64, 0.6, 0.03),
+            nightH: new THREE.Color().setHSL(0.64, 0.4, 0.18),
+            nightZ: new THREE.Color().setHSL(0.64, 0.55, 0.08),
             sunriseH: new THREE.Color().setHSL(0.08, 0.8, 0.4),
             sunriseZ: new THREE.Color().setHSL(0.6, 0.5, 0.25),
             dayH: new THREE.Color().setHSL(0.55, 0.5, 0.7),
             dayZ: new THREE.Color().setHSL(0.58, 0.8, 0.45),
-            bloodMoonH: new THREE.Color().setHSL(0.0, 0.8, 0.15),   // Blutmond-Horizont: dunkelrot
-            bloodMoonZ: new THREE.Color().setHSL(0.02, 0.6, 0.05),  // Blutmond-Zenit: schwarz-rot
+            bloodMoonH: new THREE.Color().setHSL(0.0, 0.8, 0.2),    // Blutmond-Horizont: dunkelrot
+            bloodMoonZ: new THREE.Color().setHSL(0.02, 0.6, 0.08),  // Blutmond-Zenit: schwarz-rot
             hColor: new THREE.Color(),
             zColor: new THREE.Color(),
             weatherColor: new THREE.Color(),
@@ -814,83 +924,26 @@
             return true;
         }
 
-        // ============================================================
-        // Damage-Feedback (Sprint 5)
-        // ============================================================
-        // Visuelles + akustisches Feedback bei Player-Schaden:
-        //   - Roter Vignette-Flash (fadet 250ms)
-        //   - Subtiler Pain-Sound (water_splash bei tieferem Pitch)
-        //   - Camera-Shake (kurze Pitch/Yaw-Pertubation, 150ms)
-        // Cooldown 250ms verhindert Visual-Spam bei kontinuierlichem Zombie-Damage.
-        //
-        // WICHTIG: State + Funktionen MÜSSEN vor `animate()`-Aufruf deklariert sein,
-        // sonst TDZ — animate() ruft applyCameraShake() bereits im ersten Tick.
-        const _damageFx = { lastAt: 0, flashEl: null, shakeUntil: 0, shakeMag: 0 };
-        function ensureDamageFlashDOM() {
-            if (_damageFx.flashEl) return _damageFx.flashEl;
-            const el = document.createElement('div');
-            el.id = 'damage-flash';
-            el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:200;opacity:0;background:radial-gradient(ellipse at center, transparent 35%, rgba(180,0,0,0.55) 100%);transition:opacity 250ms ease-out;';
-            document.body.appendChild(el);
-            _damageFx.flashEl = el;
-            return el;
-        }
-        function triggerDamageFeedback(amount) {
-            const now = performance.now();
-            if (now - _damageFx.lastAt < 250) return;
-            _damageFx.lastAt = now;
-            const el = ensureDamageFlashDOM();
-            const intensity = Math.min(1, amount / 8);
-            el.style.opacity = String(0.4 + 0.5 * intensity);
-            requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = '0'; }));
+        async function startGame() {
             try {
-                if (SoundManager && SoundManager.playSound) {
-                    SoundManager.playSound('water_splash', 0.5, 0.6 + Math.random() * 0.15, { skipCooldown: true });
+                await preloadEntityMaterials();
+                Input.init(isInventoryOpened);
+                setupInventoryEvents();
+                prepareInventoryUI();
+                init();
+                window.__butzcraftGameMainReady = true;
+                window.__butzcraftGameMainEvaluating = false;
+                animate();
+            } catch (err) {
+                window.__butzcraftGameMainError = err && (err.stack || err.message || String(err));
+                window.__butzcraftGameMainEvaluating = false;
+                if (window.__butzcraftShowStartError) {
+                    window.__butzcraftShowStartError('GameMain Fehler: ' + (err && err.message ? err.message : String(err)));
                 }
-            } catch (e) { /* sound-system optional */ }
-            _damageFx.shakeUntil = now + 150;
-            _damageFx.shakeMag = 0.025 * intensity;
-        }
-        function applyCameraShake() {
-            // Shake wird über CSS-Transform am Canvas gemacht, NICHT über Three.js-Camera-Rotation.
-            //
-            // WARUM CSS statt camera.rotation.z?
-            //   PointerLockControls nutzt intern Euler-Order 'YXZ' und überschreibt bei jedem
-            //   Mausbewegen `camera.quaternion` via `setFromEuler(setFromQuaternion(...))`.
-            //   Der Z-Anteil (Roll) wird dabei aus der Quaternion extrahiert und wieder
-            //   zurückgeschrieben — d.h. ein einmal gesetzter Roll WÄCHST mit jeder Mausbewegung
-            //   weiter, weil die XYZ↔YXZ-Konvertierung nicht winkeltreu ist.
-            //   Resultat: Welt verdreht sich beim Mausbewegen.
-            //   Mit CSS-Transform am Canvas-Element passiert das alles außerhalb von Three.js
-            //   und kann sauber via leerem `transform`-String zurückgesetzt werden.
-            const canvas = renderer && renderer.domElement;
-            if (!canvas) return;
-            const now = performance.now();
-            if (now >= _damageFx.shakeUntil || _damageFx.shakeMag <= 0) {
-                if (canvas.style.transform) canvas.style.transform = '';
-                return;
+                throw err;
             }
-            const remain = (_damageFx.shakeUntil - now) / 150;
-            const m = _damageFx.shakeMag * remain;
-            const angle = Math.sin(now * 0.05) * m * 0.5; // rad
-            canvas.style.transform = `rotate(${angle}rad)`;
         }
-
-        try {
-            Input.init(isInventoryOpened);
-            setupInventoryEvents();
-            init();
-            window.__butzcraftGameMainReady = true;
-            window.__butzcraftGameMainEvaluating = false;
-            animate();
-        } catch (err) {
-            window.__butzcraftGameMainError = err && (err.stack || err.message || String(err));
-            window.__butzcraftGameMainEvaluating = false;
-            if (window.__butzcraftShowStartError) {
-                window.__butzcraftShowStartError('GameMain Fehler: ' + (err && err.message ? err.message : String(err)));
-            }
-            throw err;
-        }
+        startGame();
 
         function init() {
             scene = new THREE.Scene();
@@ -942,7 +995,7 @@
             const spawn = findNewGameSpawn();
             camera.position.set(spawn.x, spawn.height + 5, spawn.z); // Näher am Boden spawnen
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambient);
+            ambient = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambient);
             sunGroup = new THREE.Group(); scene.add(sunGroup);
             sun = new THREE.DirectionalLight(0xffffff, 1.0); sun.position.set(0, 50, 0); sunGroup.add(sun);
 
@@ -976,9 +1029,18 @@
             renderer.domElement.id = 'game-canvas';
             const DEFAULT_RENDER_SCALE = 1;
             let renderScale = DEFAULT_RENDER_SCALE;
-            renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            const applyRendererResolution = () => {
+                renderer.setPixelRatio(calculateRenderPixelRatio(
+                    window.innerWidth,
+                    window.innerHeight,
+                    window.devicePixelRatio || 1,
+                    renderScale
+                ));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            };
+            applyRendererResolution();
             document.body.appendChild(renderer.domElement);
+            damageFeedback = new DamageFeedback(renderer.domElement);
 
             // WebGL Context-Loss Handling: tritt auf bei Tab-Wechsel auf Mobile, GPU-Reset, oder
             // wenn der Browser den Context wegen Inaktivität freigibt. Ohne preventDefault wird
@@ -1019,7 +1081,7 @@
             }, false);
             document.addEventListener('pointerdown', relockControlsFromPointer, true);
 
-            Game.player = new Player(scene, camera, document.body, CONFIG, loadLocalCharacterProfile());
+            Game.player = new Player(scene, camera, document.body, CONFIG, activeCharacterProfile, renderer.domElement);
             controls = Game.player.controls;
 
             // Sicherheits-Reset: Falls aus einem früheren Sprint-5-Bug-Run noch ein roll-Drift
@@ -1028,19 +1090,9 @@
             // Quaternion-Roundtrip beim ersten Mausbewegen reaktivieren.
             camera.rotation.set(0, 0, 0);
             camera.quaternion.setFromEuler(camera.rotation);
-            // Empfindlichkeit anpassen: Wir verstärken die Drehung durch einen Multiplikator
-            // Three.js PointerLockControls nutzt intern camera.rotation. 
-            // Ein einfacher Weg: Wir hängen uns an den PointerLock-Mechanismus.
-            const sensitivity = 1.8; 
-            const originalOnMouseMove = document.onmousemove;
-            // Wir können hier nicht einfach onmousemove überschreiben, da Three.js Event-Listener nutzt.
-            // Aber wir können in der animate-Schleife die Drehung verstärken, 
-            // indem wir die Differenz zur vorherigen Rotation skalieren.
-            
             // Start-Button Event-Listener
             const startBtn = document.getElementById('start-button');
             bindPress(startBtn, () => {
-                console.log("DEBUG: Start Button Press Event (ID-based)");
                 if (typeof window.startNewGame === 'function') {
                     window.startNewGame();
                 } else {
@@ -1074,7 +1126,6 @@
 
             const inst = document.getElementById('instructions');
             inst.addEventListener('click', () => { 
-                console.log("DEBUG: Instructions clicked -> Locking mouse");
                 if (gameActive && manuallyPaused) window.resumeGame();
             });
             controls.addEventListener('lock', () => {
@@ -1098,6 +1149,7 @@
 
             world = new World(scene);
             Game.world = world;
+            torchLightSystem = new TorchLightSystem(scene);
 
             // Tier 3: Wetter-System initialisieren
             weatherSystem = new WeatherSystem(scene, world);
@@ -1114,6 +1166,10 @@
                     const npc = new NPC(scene, house.x, house.y, house.z, house.professionIdx);
                     npcs.push(npc);
                 }
+            });
+
+            window.addEventListener('minecartGenerated', (e) => {
+                spawnMinecart(e.detail);
             });
 
             // Trade-UI globale Schließ-Funktion
@@ -1140,8 +1196,7 @@
                 const n = parseFloat(value);
                 if (!RS_ALLOWED.includes(n)) return;
                 renderScale = n;
-                renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
-                renderer.setSize(window.innerWidth, window.innerHeight);
+                applyRendererResolution();
                 try { localStorage.setItem(RS_STORAGE_KEY, String(n)); } catch (e) { /* QuotaExceeded etc. ignorieren */ }
             };
             window.applyRenderDistance = applyRenderDistance;
@@ -1184,7 +1239,11 @@
             initTouchControls({
                 camera,
                 controls,
-                isInventoryOpenedProvider: isInventoryOpened
+                player: Game.player,
+                isInventoryOpenedProvider: isInventoryOpened,
+                isPausedProvider: () => manuallyPaused,
+                pauseGame: window.pauseGame,
+                resumeGame: window.resumeGame
             });
             window.addEventListener('keydown', e => {
                 // Wenn ein Textfeld fokussiert ist, keine Spielsteuerung auslösen
@@ -1201,43 +1260,47 @@
                 }
                 if (isGameplayKey(e) && e.cancelable) e.preventDefault();
 
-                if (e.code === 'Tab') {
-                    const furnaceOverlay = document.getElementById('furnace-overlay');
-                    const chestOverlay = document.getElementById('chest-overlay');
-                    const tradeOverlay = document.getElementById('trade-overlay');
-                    if (isInventoryOpened()) { toggleInventory(gameStarted, spawning, controls); return; }
-                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
-                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
-                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
-                    if (manuallyPaused) window.resumeGame(); else window.pauseGame();
+                const furnaceOverlay = document.getElementById('furnace-overlay');
+                const chestOverlay = document.getElementById('chest-overlay');
+                const tradeOverlay = document.getElementById('trade-overlay');
+                const stationOverlayOpen =
+                    Boolean(furnaceOverlay && furnaceOverlay.style.display !== 'none') ||
+                    Boolean(chestOverlay && chestOverlay.style.display !== 'none') ||
+                    Boolean(tradeOverlay && tradeOverlay.style.display !== 'none');
+                if (
+                    e.code === 'KeyQ' && !e.repeat && !manuallyPaused &&
+                    !isInventoryOpened() && !stationOverlayOpen && tryToggleMinecart()
+                ) {
+                    if (e.cancelable) e.preventDefault();
                     return;
                 }
-
-                if (e.code === 'Escape') {
-                    const furnaceOverlay = document.getElementById('furnace-overlay');
-                    const chestOverlay = document.getElementById('chest-overlay');
-                    const tradeOverlay = document.getElementById('trade-overlay');
-                    if (isInventoryOpened()) { toggleInventory(gameStarted, spawning, controls); return; }
-                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
-                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
-                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
-                    if (manuallyPaused) window.resumeGame(); else window.pauseGame();
+                const uiCommand = resolveUiInputCommand({
+                    code: e.code,
+                    inventoryOpen: isInventoryOpened(),
+                    furnaceOpen: Boolean(furnaceOverlay && furnaceOverlay.style.display !== 'none'),
+                    chestOpen: Boolean(chestOverlay && chestOverlay.style.display !== 'none'),
+                    tradeOpen: Boolean(tradeOverlay && tradeOverlay.style.display !== 'none'),
+                    paused: manuallyPaused
+                });
+                if (uiCommand) {
+                    if (uiCommand === 'close-inventory' || uiCommand === 'toggle-inventory') {
+                        if (window.playerInteraction) window.playerInteraction.cancelMining();
+                        toggleInventory(gameStarted, spawning, controls);
+                    } else if (uiCommand === 'close-furnace') {
+                        window.closeFurnace && window.closeFurnace();
+                    } else if (uiCommand === 'close-chest') {
+                        window.closeChest && window.closeChest();
+                    } else if (uiCommand === 'close-trade') {
+                        closeTradeUI(controls);
+                    } else if (uiCommand === 'resume') {
+                        window.resumeGame();
+                    } else if (uiCommand === 'pause') {
+                        window.pauseGame();
+                    }
                     return;
                 }
 
                 relockControlsFromInput(e);
-
-                if (e.code === 'KeyE') {
-                    // Ofen/Truhe/Handel zuerst schließen
-                    const furnaceOverlay = document.getElementById('furnace-overlay');
-                    const chestOverlay = document.getElementById('chest-overlay');
-                    const tradeOverlay = document.getElementById('trade-overlay');
-                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
-                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
-                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
-                    if (window.playerInteraction) window.playerInteraction.cancelMining();
-                    toggleInventory(gameStarted, spawning, controls); return;
-                }
                 if (isInventoryOpened()) return;
 
                 // Space logik in Input.js
@@ -1251,8 +1314,7 @@
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
-                renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
-                renderer.setSize(window.innerWidth, window.innerHeight);
+                applyRendererResolution();
             });
             Game.world = world;
             Game.renderer = renderer;
@@ -1270,13 +1332,11 @@
         }
 
         function updateFpsCounter(now) {
-            fpsFrameCount++;
-            const elapsed = now - fpsWindowStartedAt;
-            if (elapsed < FPS_UPDATE_INTERVAL_MS) return;
-            const fps = Math.round((fpsFrameCount * 1000) / elapsed);
-            DOM.fpsCounter.textContent = `FPS: ${fps}`;
-            fpsFrameCount = 0;
-            fpsWindowStartedAt = now;
+            const active = gameStarted && gameActive && !manuallyPaused && !spawning;
+            const sample = fpsTracker.record(now, active);
+            if (!sample) return;
+            DOM.fpsSummary.textContent = `FPS · Aktuell ${sample.current} · Min ${sample.min} · Max ${sample.max}`;
+            DOM.fpsSummary.setAttribute('aria-label', `FPS: Aktuell ${sample.current}, Minimum ${sample.min}, Maximum ${sample.max}`);
         }
 
         function updateUI(force = true, now = performance.now()) {
@@ -1290,7 +1350,7 @@
                 const isBloodMoonUI = dayCountUI % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1);
                 const bloodMoonWarning = isBloodMoonUI && dayRatioUI > 0.65 && dayRatioUI <= 0.80 ? ' | \u{1F534} Blutmond!' : '';
                 const bloodMoonActive = isBloodMoonUI && (dayRatioUI > 0.80 || dayRatioUI < 0.20) ? ' | \u{1F7E5} BLUTMOND' : '';
-                DOM.timeInfo.textContent = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}${bloodMoonWarning}${bloodMoonActive}`;
+                DOM.worldTimeInfo.textContent = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}${bloodMoonWarning}${bloodMoonActive}`;
             }
             if (Game.player.health <= 0 && gameActive && !spawning) {
                 gameActive = false;
@@ -1316,7 +1376,7 @@
             const list = document.getElementById('game-over-save-list');
             if (!section || !list) return;
             list.innerHTML = '';
-            listAllSaveNames()
+            saveRepository.list()
                 .then(names => {
                     if (!Array.isArray(names) || names.length === 0) {
                         section.style.display = 'none';
@@ -1359,7 +1419,7 @@
             SoundManager.updateListener(camera);
 
             // Camera-Shake bei aktivem Damage-Feedback (Sprint 5).
-            applyCameraShake();
+            damageFeedback.update();
 
             // 1. VOID PROTECTION (Immer aktiv)
             Game.player.updateWaterAndVoid(world, SoundManager, delta);
@@ -1374,19 +1434,26 @@
             const nightZ = isBloodMoon ? SKY.bloodMoonZ : SKY.nightZ;
 
             // Sky-Colors: Wiederverwendung gecachter Color-Objekte (0 Allokationen pro Frame)
-            let skyInty = 1.0;
+            const skyInty = getSkyLightIntensity(dayRatio);
             if (dayRatio >= 0.20 && dayRatio < 0.25) {
-                const f = (dayRatio - 0.20) / 0.05; SKY.hColor.lerpColors(nightH, SKY.sunriseH, f); SKY.zColor.lerpColors(nightZ, SKY.sunriseZ, f); skyInty = 0.05 + f * 0.35;
+                const f = (dayRatio - 0.20) / 0.05; SKY.hColor.lerpColors(nightH, SKY.sunriseH, f); SKY.zColor.lerpColors(nightZ, SKY.sunriseZ, f);
             } else if (dayRatio >= 0.25 && dayRatio < 0.30) {
-                const f = (dayRatio - 0.25) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, SKY.dayH, f); SKY.zColor.lerpColors(SKY.sunriseZ, SKY.dayZ, f); skyInty = 0.4 + f * 0.6;
+                const f = (dayRatio - 0.25) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, SKY.dayH, f); SKY.zColor.lerpColors(SKY.sunriseZ, SKY.dayZ, f);
             } else if (dayRatio >= 0.30 && dayRatio <= 0.70) {
-                SKY.hColor.copy(SKY.dayH); SKY.zColor.copy(SKY.dayZ); skyInty = 1.0;
+                SKY.hColor.copy(SKY.dayH); SKY.zColor.copy(SKY.dayZ);
             } else if (dayRatio > 0.70 && dayRatio <= 0.75) {
-                const f = (dayRatio - 0.70) / 0.05; SKY.hColor.lerpColors(SKY.dayH, SKY.sunriseH, f); SKY.zColor.lerpColors(SKY.dayZ, SKY.sunriseZ, f); skyInty = 1.0 - f * 0.6;
+                const f = (dayRatio - 0.70) / 0.05; SKY.hColor.lerpColors(SKY.dayH, SKY.sunriseH, f); SKY.zColor.lerpColors(SKY.dayZ, SKY.sunriseZ, f);
             } else if (dayRatio > 0.75 && dayRatio <= 0.80) {
-                const f = (dayRatio - 0.75) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, nightH, f); SKY.zColor.lerpColors(SKY.sunriseZ, nightZ, f); skyInty = 0.4 - f * 0.35;
-            } else { SKY.hColor.copy(nightH); SKY.zColor.copy(nightZ); skyInty = 0.05; }
+                const f = (dayRatio - 0.75) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, nightH, f); SKY.zColor.lerpColors(SKY.sunriseZ, nightZ, f);
+            } else { SKY.hColor.copy(nightH); SKY.zColor.copy(nightZ); }
             sun.intensity = skyInty;
+            if (ambient?.userData.painterlyDayIntensity !== undefined) {
+                ambient.intensity = getAmbientLightIntensity(
+                    skyInty,
+                    ambient.userData.painterlyNightIntensity,
+                    ambient.userData.painterlyDayIntensity
+                );
+            }
 
             if (Game.player.inWater) {
                 scene.background = SKY.underwaterColor;
@@ -1432,7 +1499,7 @@
             const isPaused = !gameStarted || manuallyPaused || (!spawning && isBlockingOverlayOpen());
             if (!isPaused) {
                 const previousDayCount = Math.floor(time / DAY_DURATION);
-                time += delta;
+                time += delta * getDayCycleSpeed(dayRatio);
                 const currentDayCount = Math.floor(time / DAY_DURATION);
                 if (currentDayCount > previousDayCount) grantBloodMoonReward(previousDayCount);
                 if (pendingBloodMoonRewardDay >= 0 && now - lastBloodMoonRewardRetry >= 1000) {
@@ -1462,12 +1529,11 @@
                 }
                 showControlsHintOnceReady();
 
-                // Wrapped onDamage: appliziert Schaden UND triggert Feedback (Flash + Pain-Sound + Shake).
-                // _lastPainAt verhindert Sound-Spam bei kontinuierlichem Zombie-Damage (≤ 1 Sound/300ms).
+                // Wrapped onDamage: appliziert Schaden UND triggert Feedback (Flash + Shake).
                 const onPlayerDamage = (d) => {
                     if (d <= 0) return;
                     Game.player.health -= d;
-                    triggerDamageFeedback(d);
+                    damageFeedback.trigger(d);
                 };
                 mobs.forEach(m => {
                     if ((dayRatio < 0.25 || dayRatio > 0.75) === false && (m.type === 'zombie' || m.type === 'skeleton')) m.isDead = true;
@@ -1660,6 +1726,7 @@
                         item.velocityY -= 9.8 * delta; ip.y += item.velocityY * delta;
                         const bB = world.getBlock(Math.floor(ip.x), Math.floor(ip.y - 0.1), Math.floor(ip.z));
                         if (bB !== 0 && bB !== 4 && bB !== 8 && bB !== 9 && item.velocityY < 0) { ip.y = Math.floor(ip.y - 0.1) + 1.0; item.velocityY = 0; }
+                        updateDroppedItemVisual(item, delta, graphicsPrototype.usesPainterlyTextures);
                         if (Math.hypot(ip.x - playerPos.x, ip.z - playerPos.z) < 2.0 && Math.abs(ip.y - playerPos.y) < 2.5) {
                             tryCollectDroppedItem(items, i, disposeDrop);
                         }
@@ -1667,8 +1734,14 @@
                 };
                 updateItems(droppedItems);
 
-                // PLAYER PHYSICS
-                Game.player.updatePhysics(delta, Input, world, SoundManager);
+                // PLAYER PHYSICS / MINECART
+                for (const minecart of minecarts) minecart.update(delta, Input, world);
+                if (activeMinecart) {
+                    activeMinecart.syncRider(playerPos);
+                    Game.player.velocity.set(0, 0, 0);
+                } else {
+                    Game.player.updatePhysics(delta, Input, world, SoundManager);
+                }
                 Game.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (Game.player.hunger <= 0) { Game.player.hunger = 0; Game.player.health -= 2 * delta; }
                 if (Game.player.hunger > REGEN_THRESHOLD && Game.player.health < MAX_HEALTH) Game.player.health += REGEN_RATE * delta;
 
@@ -1684,7 +1757,11 @@
 
             updateVisibleChunksIfNeeded(playerPos);
             world.processPendingMeshResults();
+            const selectedItem = inventorySlots[getSelectedSlot()];
+            Game.player.updateHeldTorch(Boolean(selectedItem && selectedItem.count > 0 && selectedItem.type === TORCH_TYPE));
+            torchLightSystem.update(delta, world.modifiedBlocks, world.fireLightKeys, playerPos);
             Game.player.updateSword(delta);
+            Game.player.updateCharacterModel(delta);
 
 
             const cameraRestoreState = Game.player.prepareCameraForRender(world);
@@ -1738,7 +1815,7 @@
             setStatus(startList, 'Lade...', '#aaa');
             setStatus(pauseList, 'Lade...', '#aaa');
 
-            listAllSaveNames()
+            saveRepository.list()
                 .then(saves => {
                     if (startList) startList.textContent = '';
                     if (pauseList) pauseList.textContent = '';
@@ -1787,7 +1864,10 @@
                 weather: weatherSystem ? weatherSystem.serialize() : null,
                 fireBlocks: weatherSystem ? weatherSystem.saveFireBlocks() : {},
                 villages: world.villages || [],
-                npcs: npcs.filter(n => !n.isDead).map(n => n.serialize())
+                npcs: npcs.filter(n => !n.isDead).map(n => n.serialize()),
+                minecarts: minecarts.map(minecart => minecart.serialize()),
+                characterProfile: normalizeCharacterProfile(activeCharacterProfile),
+                thirdPersonCamera: { distance: Game.player.getThirdPersonCameraDistance() }
             });
             
             if (!isValidSaveName(name)) {
@@ -1795,7 +1875,7 @@
                 return;
             }
 
-            saveBrowserSave(name, gameData)
+            saveRepository.save(name, gameData)
                 .then(() => {
                     currentSaveName = name;
                     showSaveMessage('Spiel gespeichert!');
@@ -1811,7 +1891,7 @@
                 alert("Bitte erst einen Spielstand speichern oder einen Namen eingeben.");
                 return;
             }
-            loadSaveData(name)
+            saveRepository.load(name)
                 .then(gameData => {
                     const blob = new Blob([serializeSaveFile(name, gameData)], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
@@ -1842,7 +1922,7 @@
                 try {
                     const raw = JSON.parse(reader.result);
                     const save = normalizeImportedSave(raw, file.name);
-                    saveBrowserSave(save.name, save.gameData)
+                    saveRepository.save(save.name, save.gameData)
                         .then(() => {
                             currentSaveName = save.name;
                             const nameInput = document.getElementById('save-input');

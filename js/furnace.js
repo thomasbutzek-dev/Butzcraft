@@ -1,7 +1,8 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260716e';
-import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260716l';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717y';
+import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260719b';
 import { Game } from './Game.js?v=20260716b';
+import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 // Schmelz-Rezepte: Input-Block → Output-Item
 const SMELT_RECIPES = {
@@ -73,7 +74,10 @@ export function openFurnace(x, y, z, controls) {
     activeTarget = 'input';
     renderedInventorySignature = '';
     const overlay = document.getElementById('furnace-overlay');
-    if (overlay) overlay.style.display = 'flex';
+    if (overlay) {
+        overlay.style.display = 'flex';
+        activateDialog(overlay, '.panel-close-button');
+    }
     if (controls && controls.isLocked) controls.unlock();
     renderFurnaceUI();
 }
@@ -82,6 +86,7 @@ export function closeFurnace(controls) {
     furnaceOpen = false;
     if (furnaceState) furnaceState.smeltActive = false;
     const overlay = document.getElementById('furnace-overlay');
+    deactivateDialog(overlay);
     if (overlay) overlay.style.display = 'none';
     if (controls && !Game.touchActive) {
         if (typeof window.resumeGame === 'function') window.resumeGame();
@@ -134,6 +139,12 @@ function renderFurnaceInventory() {
     if (!grid || !furnaceState) return;
 
     const targetSlot = furnaceState[activeTarget];
+    const selectionTitle = document.getElementById('furnace-selection-title');
+    if (selectionTitle) {
+        selectionTitle.textContent = activeTarget === 'input'
+            ? 'Schmelzen / Garen: geeigneten Gegenstand wählen'
+            : 'Brennstoff: geeigneten Gegenstand wählen';
+    }
     const signature = `${activeTarget}:${targetSlot.type}:${targetSlot.count}|` +
         inventorySlots.map(item => `${item?.type || 0}:${item?.count || 0}`).join('|');
     if (signature === renderedInventorySignature) return;
@@ -142,17 +153,22 @@ function renderFurnaceInventory() {
 
     let itemCount = 0;
     inventorySlots.forEach((item, index) => {
+        if (index >= 8 && index <= 15) return;
         if (!item || item.count <= 0) return;
-        itemCount++;
         const acceptsType = activeTarget === 'input' ? Boolean(SMELT_RECIPES[item.type]) : getFuelValue(item.type) > 0;
+        if (!acceptsType) return;
+        itemCount++;
         const canStack = targetSlot.count === 0 || targetSlot.type === item.type;
+        const optionDescription = activeTarget === 'input'
+            ? `${getItemName(item.type)} → ${getItemName(SMELT_RECIPES[item.type].type)}`
+            : `${getItemName(item.type)} · ${getFuelValue(item.type)} Ladungen`;
         const button = document.createElement('button');
         button.type = 'button';
         button.className = 'inv-slot furnace-inventory-item';
         button.dataset.furnaceInventoryIndex = String(index);
-        button.disabled = !acceptsType || !canStack || targetSlot.count >= 64;
-        button.setAttribute('aria-label', `${getItemName(item.type)}, ${item.count} Stück`);
-        button.title = button.disabled ? `${getItemName(item.type)} passt nicht in diesen Slot` : getItemName(item.type);
+        button.disabled = !canStack || targetSlot.count >= 64;
+        button.setAttribute('aria-label', `${optionDescription}, ${item.count} Stück`);
+        button.title = button.disabled ? `${optionDescription} · zuerst belegten Slot leeren` : optionDescription;
         button.innerHTML = createBlockHTML(item.type);
         const count = document.createElement('span');
         count.className = 'slot-count';
@@ -165,7 +181,9 @@ function renderFurnaceInventory() {
     if (itemCount === 0) {
         const empty = document.createElement('div');
         empty.className = 'furnace-inventory-empty';
-        empty.textContent = 'Inventar ist leer';
+        empty.textContent = activeTarget === 'input'
+            ? 'Kein schmelz- oder garbarer Gegenstand im Inventar'
+            : 'Kein Brennstoff im Inventar';
         grid.appendChild(empty);
     }
 }

@@ -1,7 +1,15 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { isValidSaveName, normalizeImportedSave, serializeSaveFile } from '../js/saveStore.js';
 
 describe('saveStore names', () => {
+    it('clears legacy browser saves during the one-time database upgrade', () => {
+        const source = readFileSync('js/saveStore.js', 'utf8');
+
+        expect(source).toContain("const DB_VERSION = 2;");
+        expect(source).toContain("request.transaction.objectStore(STORE_NAME).clear();");
+    });
+
     it('accepts the same safe save names as the server', () => {
         expect(isValidSaveName('Emy Test')).toBe(true);
         expect(isValidSaveName('World_1-2')).toBe(true);

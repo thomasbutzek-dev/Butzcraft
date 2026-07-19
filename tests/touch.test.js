@@ -17,6 +17,13 @@ function dispatchTouchEvent(el, type, touch) {
     el.dispatchEvent(event);
 }
 
+function dispatchTouches(el, type, touches, changedTouches = touches) {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'changedTouches', { value: changedTouches });
+    Object.defineProperty(event, 'touches', { value: touches });
+    el.dispatchEvent(event);
+}
+
 beforeEach(() => {
     Object.defineProperty(navigator, 'maxTouchPoints', { value: 0, configurable: true });
     delete window.ontouchstart;
@@ -103,6 +110,30 @@ describe('isTouchDevice', () => {
         expect(buttons).toEqual([2]);
     });
 
+    it('Touch-Pause verwendet den zentralen Pause- und Fortsetzen-Pfad', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const pauseGame = vi.fn();
+        const resumeGame = vi.fn();
+        let paused = false;
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false,
+            isPausedProvider: () => paused,
+            pauseGame,
+            resumeGame
+        });
+
+        const pauseButton = document.getElementById('touch-btn-pause');
+        dispatchTouchEvent(pauseButton, 'touchstart', { identifier: 2, clientX: 10, clientY: 10 });
+        expect(pauseGame).toHaveBeenCalledOnce();
+
+        paused = true;
+        dispatchTouchEvent(pauseButton, 'touchstart', { identifier: 3, clientX: 10, clientY: 10 });
+        expect(resumeGame).toHaveBeenCalledOnce();
+    });
+
     it('kurzer Tap im Look-Bereich feuert eine Linksklick-Interaktion', () => {
         Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
         const buttons = [];
@@ -171,6 +202,37 @@ describe('isTouchDevice', () => {
 
         document.removeEventListener('mousedown', onMouseDown);
         expect(buttons).toEqual([]);
+    });
+
+    it('Pinch-Zoom veraendert den Abstand ohne Angriff', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const attacks = [];
+        const onAttack = (event) => attacks.push(event.button);
+        document.addEventListener('mousedown', onAttack);
+        let distance = 4.2;
+        const player = {
+            cameraMode: 'third',
+            getThirdPersonCameraDistance: () => distance,
+            setThirdPersonCameraDistance: (value) => { distance = value; }
+        };
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            player,
+            isInventoryOpenedProvider: () => false
+        });
+
+        const area = document.getElementById('touch-look-area');
+        const first = { identifier: 10, clientX: 100, clientY: 100 };
+        const second = { identifier: 11, clientX: 200, clientY: 100 };
+        dispatchTouches(area, 'touchstart', [first], [first]);
+        dispatchTouches(area, 'touchstart', [first, second], [second]);
+        dispatchTouches(area, 'touchmove', [first, { ...second, clientX: 230 }]);
+        dispatchTouches(area, 'touchend', [], [first, second]);
+        document.removeEventListener('mousedown', onAttack);
+
+        expect(distance).toBeLessThan(4.2);
+        expect(attacks).toEqual([]);
     });
 
     it('Touch-Look erzeugt keinen Roll/Seitwaerts-Kippwinkel', () => {

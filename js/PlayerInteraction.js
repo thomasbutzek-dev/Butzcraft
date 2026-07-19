@@ -1,19 +1,46 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
-import { rollLoot } from './structures.js?v=20260507b';
-import { openFurnace } from './furnace.js?v=20260717l';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260716l';
-import { BLOCK_COLORS } from './blocks.js?v=20260716e';
+import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260719a';
+import { openFurnace } from './furnace.js?v=20260719a';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260719b';
+        import { BLOCK_COLORS } from './blocks.js?v=20260717y';
 import { Game } from './Game.js?v=20260716b';
-import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260716a';
+import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260718b';
 import { getAttackProfile, getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
 import { PlayerArrowProjectile } from './playerArrow.js?v=20260716a';
 import { getFoodInfo } from './foodRules.js?v=20260716a';
+import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260718b';
+import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
+import { openTradeUI } from './tradeUI.js?v=20260718d';
+import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 const { MAX_HUNGER, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
 const WOOD_BLOCKS = new Set([5, 13, 15]);
+const TORCH_NON_SUPPORT_BLOCKS = new Set([0, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80, 86, TORCH_TYPE]);
 const MINING_HINT_COOLDOWN_MS = 1800;
+
+export function getBlockBreakParticleProfile(painterly = graphicsPrototype.usesPainterlyTextures, reducedDetail = graphicsPrototype.reducedDetail) {
+    return painterly
+        ? { count: reducedDetail ? 6 : 9, size: 0.08, opacity: 0.78, lifetimeMs: 480, gravity: 4.8 }
+        : { count: 10, size: 0.09, opacity: 0.9, lifetimeMs: 360, gravity: 5.5 };
+}
+
+export function canUseMouseInteraction({
+    gameStarted,
+    gameActive,
+    spawning,
+    manuallyPaused,
+    blockingOverlayOpen
+}) {
+    return Boolean(
+        gameStarted &&
+        gameActive &&
+        !spawning &&
+        !manuallyPaused &&
+        !blockingOverlayOpen
+    );
+}
 
 export class PlayerInteraction {
     constructor(camera, scene, world, mobs, SoundManager, context) {
@@ -25,6 +52,8 @@ export class PlayerInteraction {
         this.context = context; 
         
         this.raycaster = new THREE.Raycaster();
+        this._aimOrigin = new THREE.Vector3();
+        this._aimDirection = new THREE.Vector3();
         this.lastMiningHintAt = 0;
         this.miningHeld = false;
         this.miningTarget = null;
@@ -33,25 +62,36 @@ export class PlayerInteraction {
         this.attackReadyAt = 0;
         this.lastAttackCooldown = 0.8;
         this.rangedProjectiles = [];
+        this.activePressurePlateKey = null;
     }
 
     spawnBlockBreakParticles(x, y, z, blockType, normal) {
-        const color = BLOCK_COLORS[blockType] || 0xaaaaaa;
-        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9 });
-        const geometry = new THREE.BoxGeometry(0.09, 0.09, 0.09);
+        const painterly = graphicsPrototype.usesPainterlyTextures;
+        const profile = getBlockBreakParticleProfile(painterly, graphicsPrototype.reducedDetail);
+        const color = new THREE.Color(BLOCK_COLORS[blockType] || 0xaaaaaa);
+        if (painterly) color.offsetHSL(0, -0.06, 0.035);
+        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: profile.opacity, depthWrite: !painterly });
+        const geometry = new THREE.BoxGeometry(profile.size, profile.size, profile.size);
         const particles = [];
         const baseNormal = normal ? normal.clone() : new THREE.Vector3(0, 1, 0);
 
-        for (let i = 0; i < 10; i++) {
+        for (let i = 0; i < profile.count; i++) {
             const mesh = new THREE.Mesh(geometry, material);
             mesh.position.set(
                 x + 0.5 + (Math.random() - 0.5) * 0.55,
                 y + 0.5 + (Math.random() - 0.5) * 0.55,
                 z + 0.5 + (Math.random() - 0.5) * 0.55
             );
+            const baseScale = painterly
+                ? new THREE.Vector3(0.58 + Math.random() * 0.64, 0.42 + Math.random() * 0.76, 0.55 + Math.random() * 0.7)
+                : new THREE.Vector3(1, 1, 1);
+            mesh.scale.copy(baseScale);
             this.scene.add(mesh);
             particles.push({
                 mesh,
+                baseScale,
+                spinX: painterly ? 3.5 + Math.random() * 5 : 8,
+                spinY: painterly ? 2.5 + Math.random() * 5 : 6,
                 velocity: baseNormal.clone().multiplyScalar(1.6 + Math.random() * 1.4).add(new THREE.Vector3(
                     (Math.random() - 0.5) * 2.2,
                     Math.random() * 1.6,
@@ -61,22 +101,22 @@ export class PlayerInteraction {
         }
 
         const startedAt = performance.now();
-        const lifetimeMs = 360;
+        const lifetimeMs = profile.lifetimeMs;
         let lastAt = startedAt;
         const tick = (now) => {
             const delta = Math.min((now - lastAt) / 1000, 0.04);
             lastAt = now;
             const age = now - startedAt;
             const alpha = Math.max(0, 1 - age / lifetimeMs);
-            material.opacity = alpha * 0.9;
+            material.opacity = alpha * profile.opacity;
 
             for (const particle of particles) {
-                particle.velocity.y -= 5.5 * delta;
+                particle.velocity.y -= profile.gravity * delta;
                 particle.mesh.position.addScaledVector(particle.velocity, delta);
-                particle.mesh.rotation.x += delta * 8;
-                particle.mesh.rotation.y += delta * 6;
+                particle.mesh.rotation.x += delta * particle.spinX;
+                particle.mesh.rotation.y += delta * particle.spinY;
                 const scale = 0.65 + alpha * 0.35;
-                particle.mesh.scale.setScalar(scale);
+                particle.mesh.scale.copy(particle.baseScale).multiplyScalar(scale);
             }
 
             if (age < lifetimeMs) {
@@ -101,7 +141,7 @@ export class PlayerInteraction {
             // PointerLock ist auf Touch-Geräten nicht verfügbar → bei aktivem Touch-Mode
             // wird die isLocked-Check übersprungen (Touch-Buttons feuern synthetische mousedowns).
             const lockOk = typeof window.butzcraftCanInteract === 'function'
-                ? window.butzcraftCanInteract()
+                ? window.butzcraftCanInteract(e)
                 : (controls.isLocked || Game.touchActive);
             if (!lockOk || !getGameActive() || getSpawning()) return;
             this.handleInteraction(e);
@@ -143,7 +183,7 @@ export class PlayerInteraction {
     }
 
     _getBlockHit() {
-        this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+        this._setAimRay();
         const chunkMeshes = [];
         this.world.chunks.forEach(chunk => {
             if (chunk.mesh) chunkMeshes.push(chunk.mesh);
@@ -159,6 +199,23 @@ export class PlayerInteraction {
             z: Math.floor(point.z),
             normal: hit.face.normal.clone()
         };
+    }
+
+    _setAimRay() {
+        if (typeof Game.player?.getAimRay === 'function') {
+            const ray = Game.player.getAimRay(this._aimOrigin, this._aimDirection);
+            this.raycaster.set(ray.origin, ray.direction);
+            this.raycaster.camera = this.camera;
+            return;
+        }
+        this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+    }
+
+    _getAimDirection(target) {
+        if (typeof Game.player?.getAimRay === 'function') {
+            return Game.player.getAimRay(this._aimOrigin, target).direction;
+        }
+        return this.camera.getWorldDirection(target).normalize();
     }
 
     _setMiningProgress(progress) {
@@ -229,9 +286,8 @@ export class PlayerInteraction {
             arrowSlot.type = 0;
             arrowSlot.count = 0;
         }
-        const direction = new THREE.Vector3();
-        this.camera.getWorldDirection(direction).normalize();
-        const start = this.camera.position.clone().addScaledVector(direction, 0.6);
+        const direction = this._getAimDirection(new THREE.Vector3());
+        const start = this._aimOrigin.clone().addScaledVector(direction, 0.6);
         if (this.rangedProjectiles.length >= 64) this.rangedProjectiles.shift().dispose();
         this.rangedProjectiles.push(new PlayerArrowProjectile(this.scene, start, direction, bowInfo.damage));
         this.attackReadyAt = now + bowInfo.cooldown * 1000;
@@ -263,6 +319,7 @@ export class PlayerInteraction {
 
     updateMining(delta) {
         if (!this.miningHeld) return;
+        Game.player?.setActionCamera?.(220);
         const hit = this._getBlockHit();
         if (!hit) {
             this.cancelMining();
@@ -313,6 +370,7 @@ export class PlayerInteraction {
         );
 
         this.world.setBlock(bx, by, bz, isNextToWater ? 4 : 0);
+        if (brokenType === TORCH_TYPE) this.world.deleteBlockMeta(bx, by, bz);
         this.SoundManager.playDig(brokenType);
         this.spawnBlockBreakParticles(bx, by, bz, brokenType, target.normal);
 
@@ -341,9 +399,11 @@ export class PlayerInteraction {
                     const neighbor = this.world.getBlock(x, by, z);
                     if ((brokenType === 28 && neighbor === 36) || (brokenType === 36 && neighbor === 28)) {
                         this.world.setBlock(x, by, z, 0);
+                        this.world.deleteBlockMeta(x, by, z);
                     }
                 }
             }
+            this.world.deleteBlockMeta(bx, by, bz);
             this.context.addItemToInventory(28, 1);
         } else if (brokenType === 33 || brokenType === 34) {
             const partnerY = brokenType === 33 ? by + 1 : by - 1;
@@ -363,9 +423,11 @@ export class PlayerInteraction {
                     const neighbor = this.world.getBlock(x, by, z);
                     if ((brokenType === 38 && neighbor === 39) || (brokenType === 39 && neighbor === 38)) {
                         this.world.setBlock(x, by, z, 0);
+                        this.world.deleteBlockMeta(x, by, z);
                     }
                 }
             }
+            this.world.deleteBlockMeta(bx, by, bz);
             this.context.addItemToInventory(38, 1);
         } else if (brokenType === 56) {
             const dropCount = 1 + Math.floor(Math.random() * 2);
@@ -427,6 +489,7 @@ export class PlayerInteraction {
     }
 
     async handleInteraction(e) {
+        Game.player?.setActionCamera?.(500);
         const currentItem = this._getCurrentItem();
         const heldType = currentItem && currentItem.count > 0 ? currentItem.type : 0;
         const swordInfo = getSwordInfo(heldType);
@@ -448,7 +511,7 @@ export class PlayerInteraction {
             if (swordInfo) this.SoundManager.playSword();
         }
 
-        this.raycaster.setFromCamera(new THREE.Vector2(0, 0), this.camera);
+        this._setAimRay();
 
         // 0. NPCs prüfen (Tier 3: Handel)
         const activeNpcs = (window.npcs || []).filter(n => !n.isDead);
@@ -464,7 +527,6 @@ export class PlayerInteraction {
                 if (hitNpc) {
                     if (e.button === 2) {
                         // Rechtsklick: Handels-UI öffnen
-                        const { openTradeUI } = await import('./tradeUI.js?v=20260716k');
                         openTradeUI(hitNpc, this._controls);
                         return;
                     } else if (e.button === 0) {
@@ -634,7 +696,8 @@ export class PlayerInteraction {
                 
                 // Kollisions-Check
                 const pPos = this.camera.position;
-                if (pPos.x + 0.3 > px && pPos.x - 0.3 < px + 1 &&
+                if (currentItem.type !== TORCH_TYPE &&
+                    pPos.x + 0.3 > px && pPos.x - 0.3 < px + 1 &&
                     pPos.y + 0.1 > py && pPos.y - 1.6 < py + 1 &&
                     pPos.z + 0.3 > pz && pPos.z - 0.3 < pz + 1) {
                     return; 
@@ -644,17 +707,23 @@ export class PlayerInteraction {
                 if (currentItem.type === 28) {
                     // Prüfen, welche Seite frei ist (quer zur Blickrichtung)
                     const fwd = new THREE.Vector3();
-                    this.camera.getWorldDirection(fwd);
+                    this._getAimDirection(fwd);
                     let sx = 0, sz = 0;
                     if (Math.abs(fwd.x) > Math.abs(fwd.z)) { sz = 1; } else { sx = 1; }
                     
                     if (this.world.getBlock(px + sx, py, pz + sz) === 0) {
+                        const direction = sx > 0 ? 0 : sz > 0 ? 2 : sx < 0 ? 1 : 3;
                         this.world.setBlock(px, py, pz, 28);
+                        this.world.setBlockMeta(px, py, pz, direction);
                         this.world.setBlock(px + sx, py, pz + sz, 36);
+                        this.world.setBlockMeta(px + sx, py, pz + sz, direction);
                         currentItem.count--;
                     } else if (this.world.getBlock(px - sx, py, pz - sz) === 0) {
+                        const direction = sx > 0 ? 1 : sz > 0 ? 3 : sx < 0 ? 0 : 2;
                         this.world.setBlock(px, py, pz, 28);
+                        this.world.setBlockMeta(px, py, pz, direction);
                         this.world.setBlock(px - sx, py, pz - sz, 36);
+                        this.world.setBlockMeta(px - sx, py, pz - sz, direction);
                         currentItem.count--;
                     } else {
                         this.showMessage("Kein Platz für breite Werkbank!", "#ff9800", 20);
@@ -663,7 +732,7 @@ export class PlayerInteraction {
                 // TÜR platzieren: Unten + Oben setzen
                 } else if (currentItem.type === 33) {
                     const fwd = new THREE.Vector3();
-                    this.camera.getWorldDirection(fwd);
+                    this._getAimDirection(fwd);
                     const rotation = Math.abs(fwd.x) > Math.abs(fwd.z) ? 1 : 0;
 
                     if (this.world.getBlock(px, py + 1, pz) === 0) {
@@ -679,22 +748,41 @@ export class PlayerInteraction {
                 // BETT platzieren: Kopfteil + Fußteil nebeneinander
                 } else if (currentItem.type === 38) {
                     const fwd = new THREE.Vector3();
-                    this.camera.getWorldDirection(fwd);
+                    this._getAimDirection(fwd);
                     let sx = 0, sz = 0;
                     if (Math.abs(fwd.x) > Math.abs(fwd.z)) { sz = 1; } else { sx = 1; }
                     
                     if (this.world.getBlock(px + sx, py, pz + sz) === 0) {
+                        const direction = sx > 0 ? 0 : sz > 0 ? 2 : sx < 0 ? 1 : 3;
                         this.world.setBlock(px, py, pz, 38);
+                        this.world.setBlockMeta(px, py, pz, direction);
                         this.world.setBlock(px + sx, py, pz + sz, 39);
+                        this.world.setBlockMeta(px + sx, py, pz + sz, direction);
                         currentItem.count--;
                     } else if (this.world.getBlock(px - sx, py, pz - sz) === 0) {
+                        const direction = sx > 0 ? 1 : sz > 0 ? 3 : sx < 0 ? 0 : 2;
                         this.world.setBlock(px, py, pz, 38);
+                        this.world.setBlockMeta(px, py, pz, direction);
                         this.world.setBlock(px - sx, py, pz - sz, 39);
+                        this.world.setBlockMeta(px - sx, py, pz - sz, direction);
                         currentItem.count--;
                     } else {
                         this.showMessage("Kein Platz für das Bett!", "#ff9800", 20);
                         return;
                     }
+                } else if (currentItem.type === TORCH_TYPE) {
+                    const mount = getTorchMount(h.face.normal);
+                    if (mount === null) {
+                        this.showMessage('Fackeln können nicht an Decken hängen.', '#ff9800', 18);
+                        return;
+                    }
+                    if (TORCH_NON_SUPPORT_BLOCKS.has(harvestBlock) || this.world.getBlock(px, py, pz) !== 0) {
+                        this.showMessage('Hier kann keine Fackel befestigt werden.', '#ff9800', 18);
+                        return;
+                    }
+                    this.world.setBlockMeta(px, py, pz, mount);
+                    this.world.setBlock(px, py, pz, TORCH_TYPE);
+                    currentItem.count--;
                 } else {
                     this.world.setBlock(px, py, pz, currentItem.type);
                     currentItem.count--;
@@ -715,24 +803,18 @@ export class PlayerInteraction {
         // Loot nur einmal generieren: lootedChests merkt sich alle je geöffneten Kisten.
         // Auch nach Save/Load wird kein Loot mehr nachgefüllt.
         if (!this.world.lootedChests.has(key)) {
-            // Biom-Typ bestimmen — Dungeon-Erkennung über Y-Level + umgebende Blöcke
-            let biomeType;
-            if (y <= 18) {
-                // Tief unterirdisch: prüfe ob Dungeon-Blöcke in der Nähe
-                let dungeonBlocks = 0;
-                for (let dx = -2; dx <= 2; dx++) {
-                    for (let dz = -2; dz <= 2; dz++) {
-                        const nb = this.world.getBlock(x + dx, y, z + dz);
-                        if (nb === 84 || nb === 85 || nb === 83) dungeonBlocks++;
-                    }
-                }
-                biomeType = dungeonBlocks >= 3 ? 'dungeon' : 'mine';
-            } else {
-                const biome = window.getBiomeAt ? window.getBiomeAt(x, z) : 'Grasland';
-                biomeType = (biome === 'Wüste') ? 'temple' : (biome === 'Schneefeld') ? 'igloo' : 'mine';
-            }
+            const biome = window.getBiomeAt ? window.getBiomeAt(x, z) : 'Grasland';
+            const biomeType = classifyChestLoot({
+                x,
+                y,
+                z,
+                biome,
+                villages: this.world.villages || [],
+                getBlock: (bx, by, bz) => this.world.getBlock(bx, by, bz)
+            });
             this.world.chestContents[key] = rollLoot(biomeType, x * 7013 + y * 3517 + z * 1223);
             this.world.lootedChests.add(key);
+            this.showMessage(getLootDiscoveryMessage(biomeType), '#ffe066', 18);
         }
         if (!this.world.chestContents[key]) this.world.chestContents[key] = [];
         const contents = this.world.chestContents[key];
@@ -786,10 +868,14 @@ export class PlayerInteraction {
         }
 
         const overlay = document.getElementById('chest-overlay');
-        if (overlay) overlay.style.display = 'flex';
+        if (overlay) {
+            overlay.style.display = 'flex';
+            activateDialog(overlay, '.panel-close-button');
+        }
         if (this._controls) this._controls.unlock();
 
         window.closeChest = () => {
+            deactivateDialog(overlay);
             if (overlay) overlay.style.display = 'none';
             if (this._controls && !Game.touchActive) {
                 if (typeof window.resumeGame === 'function') window.resumeGame();
@@ -801,11 +887,18 @@ export class PlayerInteraction {
     // Druckplatten-Schaden prüfen — wird aus dem Game-Loop aufgerufen
     checkPressurePlates(playerX, playerY, playerZ) {
         const bx = Math.floor(playerX), by = Math.floor(playerY - 0.1), bz = Math.floor(playerZ);
-        if (this.world.getBlock(bx, by, bz) === 79) {
-            Game.player.health = Math.max(0, Game.player.health - 2);
-            this.SoundManager.playSound('damage', 0.8, 1.0);
-            this.showMessage('Falle! -2 HP', '#ff0000', 18);
+        const plateKey = `${bx},${by},${bz}`;
+        if (this.world.getBlock(bx, by, bz) !== 79) {
+            this.activePressurePlateKey = null;
+            return false;
         }
+        if (this.activePressurePlateKey === plateKey) return false;
+
+        this.activePressurePlateKey = plateKey;
+        Game.player.health = Math.max(0, Game.player.health - 2);
+        this.SoundManager.playSound('damage', 0.8, 1.0);
+        this.showMessage('Falle! -2 HP', '#ff0000', 18);
+        return true;
     }
 
     showMessage(text, color, fontSize = 32) {
@@ -817,6 +910,7 @@ export class PlayerInteraction {
     }
 
     showMiningHint(text) {
+        if (!text) return;
         const now = Date.now();
         if (now - this.lastMiningHintAt < MINING_HINT_COOLDOWN_MS) return;
         this.lastMiningHintAt = now;

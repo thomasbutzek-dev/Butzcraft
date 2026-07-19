@@ -59,6 +59,53 @@ body {
             transform: translateX(-50%);
         }
 
+        #character-editor-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 5000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 3vh 3vw;
+            box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.82);
+        }
+
+        #character-editor-overlay.open {
+            display: flex;
+        }
+
+        .character-editor-dialog {
+            width: min(1180px, 94vw);
+            height: min(820px, 90vh);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            border-radius: 10px;
+            background: #151a18;
+        }
+
+        #character-editor-frame {
+            width: 100%;
+            min-height: 0;
+            flex: 1;
+            border: 0;
+        }
+
+        .character-editor-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            padding: 10px 14px;
+            background: #101311;
+        }
+
+        @media (max-width: 680px), (max-height: 520px) {
+            #character-editor-overlay { padding: 0; }
+            .character-editor-dialog { width: 100vw; height: 100vh; border: 0; border-radius: 0; }
+        }
+
         #mining-progress {
             --mining-progress: 0;
             position: absolute;
@@ -107,19 +154,16 @@ body {
             display: none;
         }
 
-        #fps-counter {
-            background: rgba(0, 0, 0, 0.4);
-            padding: 5px 8px;
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 12px;
-            color: #7CFF7A;
+        #fps-summary {
             margin-top: 4px;
-            display: none;
+            padding-top: 4px;
+            border-top: 1px solid rgba(255, 255, 255, 0.18);
+            font-size: 10px;
+            color: #7CFF7A;
+            white-space: nowrap;
         }
 
-        #stats.debug-visible,
-        #fps-counter.debug-visible {
+        #stats.debug-visible {
             display: block;
         }
 
@@ -257,7 +301,7 @@ body {
         .slot.active {
             border-color: #ffe066;
             background: rgba(255, 220, 80, 0.15);
-            transform: translateY(-6px);
+            transform: none;
             box-shadow: 0 8px 20px rgba(255, 200, 0, 0.3);
         }
 
@@ -287,14 +331,16 @@ body {
             left: 50%;
             transform: translate(-50%, -50%);
             background: rgba(20, 20, 20, 0.95);
-            padding: 30px;
+            padding: 40px;
             border-radius: 20px;
             border: 2px solid rgba(255, 255, 255, 0.2);
             box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
             display: none;
             z-index: 2000;
-            flex-direction: column;
-            align-items: center;
+            flex-direction: row;
+            align-items: flex-start;
+            justify-content: center;
+            gap: 40px;
             /* backdrop-filter entfernt, da es 3D-Elemente flachdrückt */
             background: rgba(40, 40, 40, 0.98);
         }
@@ -439,18 +485,26 @@ body {
             color: #ffe066;
             font-size: 24px;
             font-weight: bold;
-            margin-bottom: 10px;
+            margin: 0;
             text-transform: uppercase;
             letter-spacing: 2px;
+        }
+
+        #inventory-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            width: 100%;
+            margin-bottom: 10px;
         }
 
         #inventory-close-btn {
             display: flex;
             align-items: center;
             justify-content: center;
-            position: absolute;
-            top: 10px;
-            right: 10px;
+            position: static;
+            flex: 0 0 auto;
             min-width: 86px;
             height: 36px;
             padding: 0 12px;
@@ -464,6 +518,49 @@ body {
             cursor: pointer;
             z-index: 3;
             touch-action: manipulation;
+        }
+
+        #inventory-objective {
+            display: none;
+            width: min(100%, 520px);
+            margin: 0 0 12px;
+            padding: 9px 11px;
+            box-sizing: border-box;
+            border: 1px solid rgba(255, 224, 102, 0.35);
+            border-left: 4px solid #ffd84d;
+            border-radius: 7px;
+            background: rgba(255, 224, 102, 0.07);
+            color: #fff;
+            text-align: left;
+        }
+
+        #inventory-objective.visible {
+            display: block;
+        }
+
+        .inventory-objective-kicker {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 3px;
+            color: #ffe066;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        #inventory-objective strong {
+            display: block;
+            font-size: 14px;
+            line-height: 1.3;
+        }
+
+        #inventory-objective-hint {
+            margin-top: 2px;
+            color: #d8ddd9;
+            font-size: 11px;
+            line-height: 1.35;
         }
 
         #inventory-close-btn:hover {
@@ -645,12 +742,13 @@ body {
         }
 
         @media (prefers-reduced-motion: reduce) {
-            #controls-hint {
-                transition: none;
-            }
-
-            #first-objective {
-                transition: none;
+            *,
+            *::before,
+            *::after {
+                scroll-behavior: auto !important;
+                animation-duration: 0.01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: 0.01ms !important;
             }
         }
 
@@ -1116,6 +1214,10 @@ body { user-select: none; -webkit-user-select: none; }
 /* --- REZEPTBUCH STYLES --- */
 #recipe-book {
     width: 320px;
+    height: auto;
+    max-height: calc(100svh - 80px);
+    align-self: stretch;
+    contain: size;
     background: transparent;
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
@@ -1125,13 +1227,43 @@ body { user-select: none; -webkit-user-select: none; }
     flex-direction: column;
 }
 
+#recipe-book-title {
+    margin-bottom: 15px;
+    color: #ffe066;
+    font-size: 18px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+}
+
+#recipe-search {
+    width: 100%;
+    margin-bottom: 10px;
+    padding: 8px 10px;
+    box-sizing: border-box;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #fff;
+    font: inherit;
+}
+
+#recipe-search::placeholder {
+    color: rgba(255, 255, 255, 0.55);
+}
+
 #recipe-list-container {
     flex: 1;
     overflow-y: auto;
     padding-right: 10px;
 }
 
+#recipe-list-container > [hidden] {
+    display: none;
+}
+
 .recipe-entry {
+    width: 100%;
     display: flex;
     align-items: center;
     background: rgba(255, 255, 255, 0.03);
@@ -1141,6 +1273,9 @@ body { user-select: none; -webkit-user-select: none; }
     border: 1px solid rgba(255, 255, 255, 0.05);
     transition: all 0.2s ease;
     cursor: pointer;
+    color: inherit;
+    font: inherit;
+    text-align: left;
 }
 
 .recipe-entry:hover {
@@ -1427,7 +1562,6 @@ html.touch-device body {
     }
 
     #stats,
-    #fps-counter,
     #time-info {
         max-width: 46vw;
         font-size: 10px;
@@ -1725,6 +1859,7 @@ html.touch-device body {
     }
 
     #inventory-main-content {
+        order: 1;
         width: 100% !important;
         max-width: 320px !important;
         box-sizing: border-box !important;
@@ -1795,6 +1930,9 @@ html.touch-device body {
     }
 
     #recipe-book {
+        order: 2;
+        flex-shrink: 0;
+        height: auto;
         width: min(100%, 320px) !important;
         max-width: 100% !important;
         box-sizing: border-box !important;
@@ -1934,4 +2072,400 @@ html.touch-device body {
     #instructions h1 {
         font-size: 22px;
     }
+}
+
+@media (min-width: 901px) and (max-height: 820px) {
+    #instructions {
+        max-height: calc(100svh - 24px);
+        box-sizing: border-box;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #inventory-overlay {
+        max-height: calc(100svh - 24px);
+        padding: 20px !important;
+        gap: 24px !important;
+        box-sizing: border-box;
+        overflow: hidden;
+    }
+
+    #inventory-main-content,
+    #recipe-book {
+        min-height: 0;
+        max-height: calc(100svh - 64px);
+        overflow-y: auto;
+    }
+
+    #inventory-main-content {
+        overflow-x: hidden;
+    }
+
+    #recipe-book {
+        align-self: stretch;
+        height: calc(100svh - 64px) !important;
+        margin-top: 0 !important;
+    }
+}
+
+/* ===== PAINTERLY INTERFACE (GRAPHICS VARIANTS B/C) ===== */
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) {
+    --painter-ui-ink: #221c15;
+    --painter-ui-deep: rgba(37, 42, 31, 0.96);
+    --painter-ui-panel: rgba(54, 60, 43, 0.96);
+    --painter-ui-panel-soft: rgba(75, 76, 54, 0.88);
+    --painter-ui-parchment: #f2dfb7;
+    --painter-ui-muted: #c8b993;
+    --painter-ui-wood: #8a6240;
+    --painter-ui-edge: rgba(224, 195, 137, 0.58);
+    --painter-ui-gold: #e1bd55;
+    --painter-ui-shadow: rgba(20, 17, 12, 0.62);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #top-ui {
+    color: var(--painter-ui-parchment);
+    text-shadow: 0 2px 3px rgba(27, 22, 15, 0.85);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #time-info,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #stats {
+    border: 1px solid var(--painter-ui-edge);
+    border-radius: 9px 7px 10px 6px;
+    background:
+        linear-gradient(105deg, rgba(110, 91, 59, 0.24), transparent 52%),
+        var(--painter-ui-deep);
+    box-shadow:
+        inset 0 1px rgba(255, 244, 209, 0.12),
+        0 4px 12px var(--painter-ui-shadow);
+    color: var(--painter-ui-parchment);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crosshair {
+    border-color: rgba(255, 240, 197, 0.9);
+    box-shadow: 0 0 0 1px rgba(52, 39, 25, 0.5), 0 0 8px rgba(255, 232, 170, 0.28);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crosshair::before,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crosshair::after {
+    background: rgba(255, 240, 197, 0.92);
+    box-shadow: 0 1px 2px rgba(33, 25, 17, 0.8);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #mining-progress {
+    background: conic-gradient(var(--painter-ui-gold) calc(var(--mining-progress) * 1turn), rgba(238, 220, 177, 0.16) 0);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #controls-hint {
+    border-color: var(--painter-ui-edge);
+    border-radius: 12px 9px 13px 8px;
+    background:
+        radial-gradient(circle at 18% 10%, rgba(231, 203, 143, 0.1), transparent 38%),
+        linear-gradient(118deg, var(--painter-ui-deep), rgba(53, 61, 42, 0.94));
+    box-shadow:
+        inset 0 1px rgba(255, 242, 204, 0.12),
+        inset 0 -8px 20px rgba(30, 26, 18, 0.17),
+        0 8px 24px var(--painter-ui-shadow);
+    color: var(--painter-ui-parchment);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective {
+    border-left-color: var(--painter-ui-gold);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective span,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .controls-hint-title {
+    color: var(--painter-ui-gold);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective-hint,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #controls-hint-text {
+    color: var(--painter-ui-muted);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective-progress i {
+    background: rgba(241, 222, 179, 0.16);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective-progress i.active {
+    background: linear-gradient(90deg, #c89538, #efd071);
+    box-shadow: 0 0 5px rgba(230, 188, 79, 0.35);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective.complete {
+    border-color: rgba(129, 191, 117, 0.62);
+    border-left-color: #82bd70;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective.complete span {
+    color: #a9d294;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective.complete #first-objective-progress i.active {
+    background: linear-gradient(90deg, #6b9d5d, #a9d294);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #bottom-ui {
+    color: var(--painter-ui-parchment);
+    text-shadow: 0 1px 2px rgba(27, 20, 13, 0.9);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .bar-label {
+    color: var(--painter-ui-parchment);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .bar,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .attack-cooldown-track {
+    border-color: rgba(204, 164, 101, 0.72);
+    background: #2c251b;
+    box-shadow: inset 0 2px 5px rgba(12, 10, 7, 0.72), 0 1px rgba(255, 236, 190, 0.12);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #health-fill {
+    background: linear-gradient(90deg, #a83f38, #dc6a57 62%, #ec8d6e);
+    box-shadow: inset 0 2px rgba(255, 218, 181, 0.22);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #hunger-fill,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #attack-cooldown-fill {
+    background: linear-gradient(90deg, #bd7b2f, #e2b84f 62%, #f1d57a);
+    box-shadow: inset 0 2px rgba(255, 239, 190, 0.25);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory {
+    border-color: var(--painter-ui-edge);
+    border-radius: 13px 10px 14px 9px;
+    background:
+        linear-gradient(112deg, rgba(146, 103, 61, 0.18), transparent 38%),
+        var(--painter-ui-deep);
+    box-shadow:
+        inset 0 1px rgba(255, 240, 199, 0.13),
+        inset 0 -9px 18px rgba(20, 17, 12, 0.18),
+        0 7px 22px var(--painter-ui-shadow);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .slot,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .inv-slot,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .mini-slot {
+    border-color: rgba(190, 155, 102, 0.5);
+    border-radius: 8px 6px 9px 5px;
+    background:
+        radial-gradient(circle at 28% 20%, rgba(246, 222, 169, 0.09), transparent 40%),
+        linear-gradient(145deg, rgba(73, 70, 49, 0.96), rgba(43, 43, 32, 0.98));
+    box-shadow: inset 1px 1px rgba(255, 236, 190, 0.09), inset -2px -3px rgba(24, 21, 15, 0.26);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .slot:hover,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .inv-slot:hover {
+    border-color: rgba(239, 211, 150, 0.88);
+    background:
+        radial-gradient(circle at 28% 20%, rgba(247, 224, 172, 0.16), transparent 43%),
+        linear-gradient(145deg, rgba(88, 83, 57, 0.98), rgba(51, 50, 36, 0.98));
+    box-shadow: inset 1px 1px rgba(255, 239, 199, 0.12), 0 6px 14px rgba(24, 19, 13, 0.38);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .slot.active {
+    border-color: var(--painter-ui-gold);
+    background:
+        radial-gradient(circle at 28% 20%, rgba(255, 230, 161, 0.22), transparent 43%),
+        linear-gradient(145deg, rgba(100, 87, 49, 0.98), rgba(55, 52, 33, 0.98));
+    box-shadow: inset 0 0 0 1px rgba(255, 229, 151, 0.24), 0 7px 18px rgba(93, 68, 23, 0.48);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory .slot-name {
+    position: absolute;
+    right: 2px;
+    bottom: 3px;
+    left: 2px;
+    z-index: 4;
+    overflow: hidden;
+    padding: 2px 2px 1px;
+    border-radius: 3px;
+    background: linear-gradient(90deg, transparent, rgba(28, 23, 16, 0.82) 18%, rgba(28, 23, 16, 0.82) 82%, transparent);
+    color: #f3e3bd;
+    font-size: 7px;
+    letter-spacing: 0.02em;
+    text-align: center;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory .slot-count {
+    position: absolute;
+    top: 19px;
+    right: 2px;
+    z-index: 4;
+    min-width: 12px;
+    border-radius: 8px;
+    background: rgba(39, 31, 21, 0.84);
+    color: #fff0c8;
+    text-align: center;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory .slot-count.low {
+    color: #ff9b85;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .key-hint {
+    color: rgba(240, 218, 170, 0.74);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-overlay,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .furnace-panel,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .chest-panel,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-panel,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #instructions,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #start-menu-content {
+    border-color: var(--painter-ui-edge) !important;
+    border-radius: 17px 12px 18px 11px !important;
+    background:
+        radial-gradient(circle at 18% 8%, rgba(239, 211, 151, 0.11), transparent 35%),
+        linear-gradient(132deg, var(--painter-ui-panel), var(--painter-ui-deep)) !important;
+    box-shadow:
+        inset 0 1px rgba(255, 239, 199, 0.14),
+        inset 0 -18px 34px rgba(24, 20, 14, 0.17),
+        0 18px 45px var(--painter-ui-shadow) !important;
+    color: var(--painter-ui-parchment) !important;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-overlay,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #chest-overlay,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #trade-overlay {
+    background: rgba(25, 23, 17, 0.7) !important;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-title,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-title,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #instructions h1 {
+    color: var(--painter-ui-gold) !important;
+    font-family: Georgia, 'Times New Roman', serif;
+    letter-spacing: 0.08em;
+    text-shadow: 0 2px 2px rgba(37, 28, 17, 0.8);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-label,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .inv-section-title,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .recipe-section-title,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-slot-label {
+    color: var(--painter-ui-muted) !important;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-divider {
+    background: linear-gradient(90deg, transparent, var(--painter-ui-edge), transparent);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #recipe-book,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-inventory-grid {
+    border-color: rgba(195, 158, 102, 0.38);
+    background: rgba(29, 29, 22, 0.3);
+    box-shadow: inset 0 3px 10px rgba(18, 16, 11, 0.26);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .recipe-entry,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-row {
+    border-color: rgba(196, 160, 103, 0.3);
+    background: rgba(239, 214, 164, 0.045);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .recipe-entry:hover,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-row:hover {
+    border-color: rgba(226, 190, 111, 0.56);
+    background: rgba(226, 187, 100, 0.09);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .recipe-name,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-label,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-status,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .furnace-selection-help,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .furnace-return-help,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-fuel-reserve {
+    color: var(--painter-ui-muted);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-status.success {
+    color: #a9d294;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-status.error {
+    color: #ffb09d;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-flow-arrow,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-arrow {
+    color: var(--painter-ui-gold) !important;
+    text-shadow: 0 2px 4px rgba(39, 29, 16, 0.7);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-progress {
+    border: 1px solid rgba(194, 151, 88, 0.58);
+    background: #2b241a !important;
+    box-shadow: inset 0 2px 5px rgba(15, 12, 8, 0.65);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-progress-bar {
+    background: linear-gradient(90deg, #a94f2f, #dd8c3f 62%, #f0c45f) !important;
+    box-shadow: inset 0 2px rgba(255, 228, 175, 0.23);
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-create-btn,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-close-btn,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-close-button,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-btn,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .save-btn,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .menu-btn {
+    border: 1px solid rgba(218, 182, 111, 0.62) !important;
+    border-radius: 8px 6px 9px 5px !important;
+    background: linear-gradient(145deg, #6f704b, #4b513b) !important;
+    box-shadow: inset 0 1px rgba(255, 238, 193, 0.15), 0 3px 8px rgba(25, 20, 14, 0.32);
+    color: #f6e5bd !important;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-create-btn:hover,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-close-btn:hover,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-close-button:hover,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-btn:hover,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .save-btn:hover,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .menu-btn:hover {
+    border-color: rgba(244, 215, 151, 0.9) !important;
+    background: linear-gradient(145deg, #838159, #596047) !important;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-create-btn:disabled,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-btn:disabled {
+    border-color: rgba(152, 140, 110, 0.34) !important;
+    background: linear-gradient(145deg, #555749, #41433a) !important;
+    box-shadow: none;
+    color: rgba(231, 218, 188, 0.5) !important;
+    opacity: 0.62;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .danger-button,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .danger-button:hover {
+    border-color: rgba(221, 139, 111, 0.68) !important;
+    background: linear-gradient(145deg, #8c4f3f, #643b32) !important;
+    color: #ffe2d2 !important;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) :is(button, .slot, .inv-slot, .recipe-entry):focus-visible {
+    outline: 2px solid #f2d77f;
+    outline-offset: 2px;
+}
+
+:is(button, input, select, textarea, a[href], [tabindex]:not([tabindex="-1"])):focus-visible {
+    outline: 3px solid #ffe066;
+    outline-offset: 3px;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #save-input,
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #instructions select {
+    border: 1px solid rgba(211, 174, 111, 0.54) !important;
+    background: rgba(36, 38, 29, 0.9) !important;
+    color: var(--painter-ui-parchment) !important;
+}
+
+:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #damage-flash {
+    background: radial-gradient(ellipse at center, transparent 38%, rgba(145, 52, 40, 0.46) 78%, rgba(94, 35, 29, 0.64) 100%) !important;
+    mix-blend-mode: soft-light;
 }

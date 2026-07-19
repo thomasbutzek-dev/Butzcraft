@@ -50,6 +50,7 @@ function setFurnaceDom() {
         <div id="furnace-progress-bar"></div>
         <div id="furnace-fuel-reserve"></div>
         <div id="furnace-status"></div>
+        <div id="furnace-selection-title"></div>
         <div id="furnace-inventory-grid"></div>
     `;
 }
@@ -90,6 +91,29 @@ describe('furnace inventory transfer', () => {
 
         expect(document.getElementById('furnace-input-slot').title).toBe('Item 58');
         expect(inventoryMock.slots[0]).toEqual({ type: 57, count: 1 });
+    });
+
+    it('shows only items allowed for the explicitly selected furnace slot', async () => {
+        const furnace = await loadFurnace();
+        inventoryMock.slots[0] = { type: 1, count: 1 };
+        inventoryMock.slots[1] = { type: 57, count: 1 };
+        inventoryMock.slots[2] = { type: 60, count: 1 };
+        inventoryMock.slots[10] = { type: 58, count: 1 };
+
+        furnace.openFurnace(0, 0, 0, null);
+
+        expect(document.getElementById('furnace-selection-title').textContent).toBe('Schmelzen / Garen: geeigneten Gegenstand wählen');
+        expect(document.querySelector('[data-furnace-inventory-index="0"]')).toBeNull();
+        expect(document.querySelector('[data-furnace-inventory-index="1"]')).not.toBeNull();
+        expect(document.querySelector('[data-furnace-inventory-index="2"]')).toBeNull();
+        expect(document.querySelector('[data-furnace-inventory-index="10"]')).toBeNull();
+
+        document.getElementById('furnace-fuel-slot').click();
+
+        expect(document.getElementById('furnace-selection-title').textContent).toBe('Brennstoff: geeigneten Gegenstand wählen');
+        expect(document.querySelector('[data-furnace-inventory-index="0"]')).toBeNull();
+        expect(document.querySelector('[data-furnace-inventory-index="1"]')).toBeNull();
+        expect(document.querySelector('[data-furnace-inventory-index="2"]')).not.toBeNull();
     });
 
     it('shows consumed fuel as an active reserve', async () => {
