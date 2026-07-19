@@ -141,6 +141,7 @@ app.post('/api/tester/log', (req, res) => {
 });
 
 const distDir = path.join(__dirname, 'dist');
+const distAssetsDir = path.join(distDir, 'assets');
 const soundsDir = path.join(__dirname, 'sounds');
 const isProduction = process.env.NODE_ENV === 'production';
 const hasDistIndex = fs.existsSync(path.join(distDir, 'index.html'));
@@ -160,6 +161,12 @@ if (staticRoots.length === 0) {
 // Statisches Routing: Einstiegspunkte nicht cachen, damit neue Deploys sofort sichtbar sind.
 const staticOptions = {
     setHeaders: (res, filePath) => {
+        const resolvedPath = path.resolve(filePath);
+        const isFingerprintedAsset = isProduction && resolvedPath.startsWith(path.resolve(distAssetsDir) + path.sep);
+        if (isFingerprintedAsset) {
+            res.set('Cache-Control', 'public, max-age=31536000, immutable');
+            return;
+        }
         if (filePath.endsWith('.html') || filePath.endsWith('.css') || filePath.endsWith('.js')) {
             res.set('Cache-Control', 'no-store, no-cache, must-revalidate');
             res.set('Pragma', 'no-cache');

@@ -128,4 +128,23 @@ describe('matchRecipe – Smoke-Test mit echten Spiel-Rezepten', () => {
     it('leeres Grid liefert null (kein Phantom-Recipe)', () => {
         expect(matchRecipe([0, 0, 0, 0], 2, craftingRecipes)).toBeNull();
     });
+
+    it('Schwerter benoetigen die 3x3-Werkbank und passende Materialien', () => {
+        expect(matchRecipe([0,26,0, 0,26,0, 0,27,0], 3, craftingRecipes)).toEqual({ type: 89, count: 1 });
+        expect(matchRecipe([0,3,0, 0,3,0, 0,27,0], 3, craftingRecipes)).toEqual({ type: 90, count: 1 });
+        expect(matchRecipe([0,61,0, 0,61,0, 0,27,0], 3, craftingRecipes)).toEqual({ type: 91, count: 1 });
+        expect(matchRecipe([0,62,0, 0,62,0, 0,27,0], 3, craftingRecipes)).toEqual({ type: 92, count: 1 });
+        expect(matchRecipe([26,26,27,0], 2, craftingRecipes)).toBeNull();
+    });
+
+    it('Bogen benoetigt die Werkbank, Pfeile sind unterwegs herstellbar', () => {
+        expect(matchRecipe([27,93,0, 27,0,93, 27,93,0], 3, craftingRecipes)).toEqual({ type: 94, count: 1 });
+        expect(matchRecipe([27,93,27,93], 2, craftingRecipes)).toBeNull();
+        expect(matchRecipe([3,27,0,0], 2, craftingRecipes)).toEqual({ type: 95, count: 4 });
+    });
+
+    it('Kohle und Stock ergeben vier Fackeln im Inventar-Grid', () => {
+        expect(matchRecipe([60, 27, 0, 0], 2, craftingRecipes)).toEqual({ type: 101, count: 4 });
+        expect(matchRecipe([0, 27, 60, 0], 2, craftingRecipes)).toEqual({ type: 101, count: 4 });
+    });
 });

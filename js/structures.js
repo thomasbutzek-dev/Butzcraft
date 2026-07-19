@@ -41,6 +41,114 @@ const LOOT_TABLES = {
     ]
 };
 
+Object.assign(LOOT_TABLES, {
+    mine_timber: [
+        ...LOOT_TABLES.mine,
+        { type: 81, minCount: 2, maxCount: 6, weight: 18 },
+        { type: 61, minCount: 1, maxCount: 2, weight: 8 }
+    ],
+    mine_overgrown: [
+        ...LOOT_TABLES.mine,
+        { type: 13, minCount: 2, maxCount: 6, weight: 16 },
+        { type: 14, minCount: 2, maxCount: 5, weight: 14 },
+        { type: 51, minCount: 2, maxCount: 5, weight: 12 }
+    ],
+    mine_frozen: [
+        ...LOOT_TABLES.mine,
+        { type: 12, minCount: 1, maxCount: 3, weight: 15 },
+        { type: 11, minCount: 3, maxCount: 8, weight: 14 },
+        { type: 19, minCount: 1, maxCount: 3, weight: 10 }
+    ],
+    dungeon_catacomb: [
+        ...LOOT_TABLES.dungeon,
+        { type: 31, minCount: 3, maxCount: 7, weight: 22 },
+        { type: 61, minCount: 2, maxCount: 4, weight: 14 }
+    ],
+    dungeon_ruins: [
+        ...LOOT_TABLES.dungeon,
+        { type: 82, minCount: 2, maxCount: 5, weight: 18 },
+        { type: 14, minCount: 2, maxCount: 5, weight: 14 },
+        { type: 62, minCount: 1, maxCount: 3, weight: 12 }
+    ],
+    dungeon_frozen: [
+        ...LOOT_TABLES.dungeon,
+        { type: 12, minCount: 2, maxCount: 5, weight: 18 },
+        { type: 77, minCount: 2, maxCount: 6, weight: 14 },
+        { type: 19, minCount: 2, maxCount: 4, weight: 12 }
+    ],
+    village_farmstead: [
+        { type: 51, minCount: 3, maxCount: 8, weight: 24 },
+        { type: 88, minCount: 2, maxCount: 6, weight: 20 },
+        { type: 26, minCount: 3, maxCount: 8, weight: 18 },
+        { type: 22, minCount: 1, maxCount: 3, weight: 12 }
+    ],
+    village_courtyard: [
+        { type: 30, minCount: 3, maxCount: 8, weight: 22 },
+        { type: 82, minCount: 1, maxCount: 4, weight: 16 },
+        { type: 19, minCount: 2, maxCount: 5, weight: 16 },
+        { type: 62, minCount: 1, maxCount: 2, weight: 8 }
+    ],
+    village_shelteredLine: [
+        { type: 11, minCount: 3, maxCount: 8, weight: 22 },
+        { type: 19, minCount: 2, maxCount: 5, weight: 18 },
+        { type: 60, minCount: 2, maxCount: 6, weight: 16 },
+        { type: 22, minCount: 1, maxCount: 3, weight: 12 }
+    ]
+});
+
+const DUNGEON_BLOCKS = new Set([29, 83, 84, 85]);
+
+export function classifyChestLoot({ x, y, z, biome = 'Grasland', villages = [], getBlock = () => 0 }) {
+    const village = villages.find(candidate =>
+        Array.isArray(candidate?.houses) && candidate.houses.some(house =>
+            Math.abs(x - house.x) <= 5 &&
+            Math.abs(y - house.y) <= 4 &&
+            Math.abs(z - house.z) <= 5
+        )
+    );
+    if (village?.layout && LOOT_TABLES[`village_${village.layout}`]) {
+        return `village_${village.layout}`;
+    }
+
+    let dungeonBlocks = 0;
+    let pressurePlateNearby = false;
+    let railNearby = false;
+    for (let dx = -4; dx <= 4; dx++) {
+        for (let dz = -4; dz <= 4; dz++) {
+            const block = getBlock(x + dx, y, z + dz);
+            if (Math.abs(dx) <= 2 && Math.abs(dz) <= 2 && DUNGEON_BLOCKS.has(block)) dungeonBlocks++;
+            if (block === 79) pressurePlateNearby = true;
+            for (let dy = -1; dy <= 1; dy++) {
+                if (getBlock(x + dx, y + dy, z + dz) === 80) railNearby = true;
+            }
+        }
+    }
+
+    if (biome === 'Wüste' && pressurePlateNearby) return 'temple';
+    if (dungeonBlocks >= 3) {
+        if (biome === 'Urwald') return 'dungeon_ruins';
+        if (biome === 'Schneefeld') return 'dungeon_frozen';
+        return 'dungeon_catacomb';
+    }
+    if (railNearby) {
+        if (biome === 'Urwald') return 'mine_overgrown';
+        if (biome === 'Schneefeld') return 'mine_frozen';
+        return 'mine_timber';
+    }
+    if (biome === 'Wüste') return 'temple';
+    if (biome === 'Schneefeld') return 'igloo';
+    return biome === 'Urwald' ? 'mine_overgrown' : 'mine_timber';
+}
+
+export function getLootDiscoveryMessage(structureType) {
+    if (structureType.startsWith('dungeon_')) return 'Dungeon-Schatz entdeckt!';
+    if (structureType.startsWith('mine_')) return 'Minenfund entdeckt!';
+    if (structureType.startsWith('village_')) return 'Dorfvorrat gefunden.';
+    if (structureType === 'temple') return 'Tempelschatz entdeckt!';
+    if (structureType === 'igloo') return 'Iglu-Vorrat gefunden.';
+    return 'Vorrat gefunden.';
+}
+
 function weightedPick(items, rng) {
     const total = items.reduce((s, i) => s + i.weight, 0);
     let r = rng() * total;

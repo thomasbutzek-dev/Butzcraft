@@ -2,8 +2,9 @@
  *
  * Tests fuer die Touch-Detection-Heuristik in touch.js.
  */
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { applyTouchLookDelta, initTouchControls, isTouchDevice } from '../js/touch.js';
+import { Game } from '../js/Game.js';
 
 const origMaxTouchPoints = navigator.maxTouchPoints;
 const origMatchMedia = window.matchMedia;
@@ -13,6 +14,13 @@ function dispatchTouchEvent(el, type, touch) {
     const event = new Event(type, { bubbles: true, cancelable: true });
     Object.defineProperty(event, 'changedTouches', { value: [touch] });
     Object.defineProperty(event, 'touches', { value: type === 'touchend' || type === 'touchcancel' ? [] : [touch] });
+    el.dispatchEvent(event);
+}
+
+function dispatchTouches(el, type, touches, changedTouches = touches) {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, 'changedTouches', { value: changedTouches });
+    Object.defineProperty(event, 'touches', { value: touches });
     el.dispatchEvent(event);
 }
 
@@ -30,6 +38,7 @@ afterEach(() => {
     document.getElementById('touch-controls-styles')?.remove();
     document.documentElement.classList.remove('touch-device');
     document.body.classList.remove('touch-device');
+    Game.touchActive = false;
 });
 
 describe('isTouchDevice', () => {
@@ -69,6 +78,7 @@ describe('isTouchDevice', () => {
         expect(document.getElementById('touch-overlay')).not.toBeNull();
         expect(document.documentElement.classList.contains('touch-device')).toBe(true);
         expect(document.body.classList.contains('touch-device')).toBe(true);
+        expect(Game.touchActive).toBe(true);
         expect(document.getElementById('touch-btn-jump')).not.toBeNull();
         expect(document.getElementById('touch-btn-place')).not.toBeNull();
         expect(document.getElementById('touch-btn-inv')).not.toBeNull();
@@ -100,6 +110,30 @@ describe('isTouchDevice', () => {
         expect(buttons).toEqual([2]);
     });
 
+    it('Touch-Pause verwendet den zentralen Pause- und Fortsetzen-Pfad', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const pauseGame = vi.fn();
+        const resumeGame = vi.fn();
+        let paused = false;
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false,
+            isPausedProvider: () => paused,
+            pauseGame,
+            resumeGame
+        });
+
+        const pauseButton = document.getElementById('touch-btn-pause');
+        dispatchTouchEvent(pauseButton, 'touchstart', { identifier: 2, clientX: 10, clientY: 10 });
+        expect(pauseGame).toHaveBeenCalledOnce();
+
+        paused = true;
+        dispatchTouchEvent(pauseButton, 'touchstart', { identifier: 3, clientX: 10, clientY: 10 });
+        expect(resumeGame).toHaveBeenCalledOnce();
+    });
+
     it('kurzer Tap im Look-Bereich feuert eine Linksklick-Interaktion', () => {
         Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
         const buttons = [];
@@ -118,6 +152,87 @@ describe('isTouchDevice', () => {
 
         document.removeEventListener('mousedown', onMouseDown);
         expect(buttons).toEqual([0]);
+    });
+
+    it('haelt den Abbau bis zum Loslassen aktiv', () => {
+        vi.useFakeTimers();
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const events = [];
+        const onMouseDown = (e) => events.push(`down:${e.button}`);
+        const onMouseUp = (e) => events.push(`up:${e.button}`);
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mouseup', onMouseUp);
+
+        try {
+            initTouchControls({
+                camera: { rotation: { x: 0 } },
+                controls: { getObject: () => ({ rotation: { y: 0 } }) },
+                isInventoryOpenedProvider: () => false
+            });
+
+            const area = document.getElementById('touch-look-area');
+            dispatchTouchEvent(area, 'touchstart', { identifier: 8, clientX: 100, clientY: 100 });
+            vi.advanceTimersByTime(181);
+            expect(events).toEqual(['down:0']);
+
+            dispatchTouchEvent(area, 'touchend', { identifier: 8, clientX: 100, clientY: 100 });
+            expect(events).toEqual(['down:0', 'up:0']);
+        } finally {
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('mouseup', onMouseUp);
+            vi.useRealTimers();
+        }
+    });
+
+    it('loest bei einem abgebrochenen Touch keinen Schlag aus', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const buttons = [];
+        const onMouseDown = (e) => buttons.push(e.button);
+        document.addEventListener('mousedown', onMouseDown);
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const area = document.getElementById('touch-look-area');
+        dispatchTouchEvent(area, 'touchstart', { identifier: 9, clientX: 100, clientY: 100 });
+        dispatchTouchEvent(area, 'touchcancel', { identifier: 9, clientX: 100, clientY: 100 });
+
+        document.removeEventListener('mousedown', onMouseDown);
+        expect(buttons).toEqual([]);
+    });
+
+    it('Pinch-Zoom veraendert den Abstand ohne Angriff', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const attacks = [];
+        const onAttack = (event) => attacks.push(event.button);
+        document.addEventListener('mousedown', onAttack);
+        let distance = 4.2;
+        const player = {
+            cameraMode: 'third',
+            getThirdPersonCameraDistance: () => distance,
+            setThirdPersonCameraDistance: (value) => { distance = value; }
+        };
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            player,
+            isInventoryOpenedProvider: () => false
+        });
+
+        const area = document.getElementById('touch-look-area');
+        const first = { identifier: 10, clientX: 100, clientY: 100 };
+        const second = { identifier: 11, clientX: 200, clientY: 100 };
+        dispatchTouches(area, 'touchstart', [first], [first]);
+        dispatchTouches(area, 'touchstart', [first, second], [second]);
+        dispatchTouches(area, 'touchmove', [first, { ...second, clientX: 230 }]);
+        dispatchTouches(area, 'touchend', [], [first, second]);
+        document.removeEventListener('mousedown', onAttack);
+
+        expect(distance).toBeLessThan(4.2);
+        expect(attacks).toEqual([]);
     });
 
     it('Touch-Look erzeugt keinen Roll/Seitwaerts-Kippwinkel', () => {

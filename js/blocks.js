@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
 
 export const BLOCK_TYPES = {
         AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, WATER: 4, WOOD: 5, LEAVES: 6, SAND: 7, CLOUD: 8, FLOWER_RED: 9, FLOWER_YELLOW: 10, SNOW: 11, ICE: 12, JUNGLE_WOOD: 13, JUNGLE_LEAVES: 14, PALM_WOOD: 15, PALM_LEAVES: 16, EGG: 17, MILK: 18, WOOL: 19, BEDROCK: 20, FISH: 21, RAW_MEAT: 22, RAW_CHICKEN: 23, ROTTEN_FLESH: 24, MUTTON: 25, PLANKS: 26, STICK: 27, WORKBENCH: 28, STONE_BRICK: 29, SANDSTONE: 30, BONE: 31, WINDOW: 32, DOOR_BOTTOM: 33, DOOR_TOP: 34, WORKBENCH_SIDE: 36, BED_HEAD: 38, BED_FOOT: 39,
@@ -10,7 +11,11 @@ export const BLOCK_TYPES = {
         WOOD_SHOVEL: 71, STONE_SHOVEL: 72, IRON_SHOVEL: 73, GOLD_SHOVEL: 74,
         CHEST: 75,
         SNOW_BLOCK: 77, ICE_BLOCK: 78, PRESSURE_PLATE: 79, MINE_RAIL: 80, MINE_SUPPORT: 81, SANDSTONE_CARVED: 82,
-        SPAWNER: 83, MOSSY_STONE: 84, COBBLESTONE: 85, FIRE: 86, VILLAGE_PATH: 87, HAY_BALE: 88
+        SPAWNER: 83, MOSSY_STONE: 84, COBBLESTONE: 85, FIRE: 86, VILLAGE_PATH: 87, HAY_BALE: 88,
+        WOOD_SWORD: 89, STONE_SWORD: 90, IRON_SWORD: 91, GOLD_SWORD: 92,
+        STRING: 93, BOW: 94, ARROW: 95,
+        COOKED_FISH: 96, COOKED_MEAT: 97, COOKED_CHICKEN: 98, COOKED_MUTTON: 99, COOKED_TURTLE_MEAT: 100,
+        TORCH: 101
         };
 
         export const BLOCK_COLORS = {
@@ -30,7 +35,12 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.WOOD_SHOVEL]: 0xCD853F, [BLOCK_TYPES.STONE_SHOVEL]: 0x808080, [BLOCK_TYPES.IRON_SHOVEL]: 0xC0C0C0, [BLOCK_TYPES.GOLD_SHOVEL]: 0xFFD700,
             [BLOCK_TYPES.CHEST]: 0xA0724A,
             [BLOCK_TYPES.SNOW_BLOCK]: 0xF0F0F0, [BLOCK_TYPES.ICE_BLOCK]: 0x99DDEE, [BLOCK_TYPES.PRESSURE_PLATE]: 0x999999, [BLOCK_TYPES.MINE_RAIL]: 0x888888, [BLOCK_TYPES.MINE_SUPPORT]: 0x6B4226, [BLOCK_TYPES.SANDSTONE_CARVED]: 0xD2A85A,
-            [BLOCK_TYPES.SPAWNER]: 0x1A1A2E, [BLOCK_TYPES.MOSSY_STONE]: 0x5A7A5A, [BLOCK_TYPES.COBBLESTONE]: 0x7A7A7A, [BLOCK_TYPES.FIRE]: 0xFF6600, [BLOCK_TYPES.VILLAGE_PATH]: 0x8B6B3D, [BLOCK_TYPES.HAY_BALE]: 0xD4A820
+            [BLOCK_TYPES.SPAWNER]: 0x1A1A2E, [BLOCK_TYPES.MOSSY_STONE]: 0x5A7A5A, [BLOCK_TYPES.COBBLESTONE]: 0x7A7A7A, [BLOCK_TYPES.FIRE]: 0xFF6600, [BLOCK_TYPES.VILLAGE_PATH]: 0x8B6B3D, [BLOCK_TYPES.HAY_BALE]: 0xD4A820,
+            [BLOCK_TYPES.WOOD_SWORD]: 0xCD853F, [BLOCK_TYPES.STONE_SWORD]: 0x888888, [BLOCK_TYPES.IRON_SWORD]: 0xC0C0C0, [BLOCK_TYPES.GOLD_SWORD]: 0xFFD700,
+            [BLOCK_TYPES.STRING]: 0xF2F2F2, [BLOCK_TYPES.BOW]: 0x8B6B3D, [BLOCK_TYPES.ARROW]: 0xA0A0A0,
+            [BLOCK_TYPES.COOKED_FISH]: 0xB9783E, [BLOCK_TYPES.COOKED_MEAT]: 0x8B4513, [BLOCK_TYPES.COOKED_CHICKEN]: 0xC98B52,
+            [BLOCK_TYPES.COOKED_MUTTON]: 0xA65A3A, [BLOCK_TYPES.COOKED_TURTLE_MEAT]: 0x6F7A3D,
+            [BLOCK_TYPES.TORCH]: 0xFFB02E
         };
 
         export const BLOCK_TEX = {
@@ -39,9 +49,10 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.SNOW]: 8, [BLOCK_TYPES.ICE]: 9, [BLOCK_TYPES.JUNGLE_WOOD]: 10, [BLOCK_TYPES.JUNGLE_LEAVES]: 11,
             [BLOCK_TYPES.PALM_WOOD]: 12, [BLOCK_TYPES.PALM_LEAVES]: 13, [BLOCK_TYPES.BEDROCK]: 14,
             [BLOCK_TYPES.FLOWER_RED]: 15, [BLOCK_TYPES.FLOWER_YELLOW]: 16,
+            [BLOCK_TYPES.FISH]: 35, [BLOCK_TYPES.RAW_MEAT]: 37, [BLOCK_TYPES.RAW_CHICKEN]: 55, [BLOCK_TYPES.ROTTEN_FLESH]: 76, [BLOCK_TYPES.MUTTON]: 77,
             [BLOCK_TYPES.PLANKS]: 27, [BLOCK_TYPES.STICK]: 28, [BLOCK_TYPES.WORKBENCH]: 29, [BLOCK_TYPES.STONE_BRICK]: 30, [BLOCK_TYPES.SANDSTONE]: 31, [BLOCK_TYPES.BONE]: 32, [BLOCK_TYPES.WORKBENCH_SIDE]: 36,
             [BLOCK_TYPES.WINDOW]: 38, [BLOCK_TYPES.DOOR_BOTTOM]: 39, [BLOCK_TYPES.DOOR_TOP]: 40, [BLOCK_TYPES.BED_HEAD]: 41, [BLOCK_TYPES.BED_FOOT]: 42,
-            [BLOCK_TYPES.BERRY_BUSH]: 43, [BLOCK_TYPES.TALL_GRASS]: 44, [BLOCK_TYPES.CACTUS]: 45, [BLOCK_TYPES.DEAD_BUSH]: 46, [BLOCK_TYPES.MUSHROOM_RED]: 47, [BLOCK_TYPES.MUSHROOM_BROWN]: 48, [BLOCK_TYPES.SUGARCANE]: 49, [BLOCK_TYPES.FERN]: 50, [BLOCK_TYPES.BERRIES]: 51, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 52, [BLOCK_TYPES.SEAGRASS]: 54,
+            [BLOCK_TYPES.BERRY_BUSH]: 43, [BLOCK_TYPES.TALL_GRASS]: 44, [BLOCK_TYPES.CACTUS]: 45, [BLOCK_TYPES.DEAD_BUSH]: 46, [BLOCK_TYPES.MUSHROOM_RED]: 47, [BLOCK_TYPES.MUSHROOM_BROWN]: 48, [BLOCK_TYPES.SUGARCANE]: 49, [BLOCK_TYPES.FERN]: 50, [BLOCK_TYPES.BERRIES]: 51, [BLOCK_TYPES.BERRY_BUSH_EMPTY]: 52, [BLOCK_TYPES.SEAGRASS]: 54, [BLOCK_TYPES.TURTLE_MEAT]: 78,
             [BLOCK_TYPES.COAL_ORE]: 56, [BLOCK_TYPES.IRON_ORE]: 57, [BLOCK_TYPES.GOLD_ORE]: 58, [BLOCK_TYPES.FURNACE]: 59,
             [BLOCK_TYPES.COAL]: 60, [BLOCK_TYPES.IRON_INGOT]: 61, [BLOCK_TYPES.GOLD_INGOT]: 62,
             [BLOCK_TYPES.WOOD_PICKAXE]: 63, [BLOCK_TYPES.STONE_PICKAXE]: 64, [BLOCK_TYPES.IRON_PICKAXE]: 65, [BLOCK_TYPES.GOLD_PICKAXE]: 66,
@@ -49,7 +60,12 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.WOOD_SHOVEL]: 71, [BLOCK_TYPES.STONE_SHOVEL]: 72, [BLOCK_TYPES.IRON_SHOVEL]: 73, [BLOCK_TYPES.GOLD_SHOVEL]: 74,
             [BLOCK_TYPES.CHEST]: 75,
             [BLOCK_TYPES.SNOW_BLOCK]: 8, [BLOCK_TYPES.ICE_BLOCK]: 9, [BLOCK_TYPES.PRESSURE_PLATE]: 79, [BLOCK_TYPES.MINE_RAIL]: 80, [BLOCK_TYPES.MINE_SUPPORT]: 81, [BLOCK_TYPES.SANDSTONE_CARVED]: 82,
-            [BLOCK_TYPES.SPAWNER]: 83, [BLOCK_TYPES.MOSSY_STONE]: 84, [BLOCK_TYPES.COBBLESTONE]: 85, [BLOCK_TYPES.FIRE]: 86, [BLOCK_TYPES.VILLAGE_PATH]: 87, [BLOCK_TYPES.HAY_BALE]: 88
+            [BLOCK_TYPES.SPAWNER]: 83, [BLOCK_TYPES.MOSSY_STONE]: 84, [BLOCK_TYPES.COBBLESTONE]: 85, [BLOCK_TYPES.FIRE]: 86, [BLOCK_TYPES.VILLAGE_PATH]: 87, [BLOCK_TYPES.HAY_BALE]: 88,
+            [BLOCK_TYPES.WOOD_SWORD]: 89, [BLOCK_TYPES.STONE_SWORD]: 90, [BLOCK_TYPES.IRON_SWORD]: 91, [BLOCK_TYPES.GOLD_SWORD]: 92,
+            [BLOCK_TYPES.STRING]: 93, [BLOCK_TYPES.BOW]: 94, [BLOCK_TYPES.ARROW]: 95,
+            [BLOCK_TYPES.COOKED_FISH]: 96, [BLOCK_TYPES.COOKED_MEAT]: 97, [BLOCK_TYPES.COOKED_CHICKEN]: 98,
+            [BLOCK_TYPES.COOKED_MUTTON]: 99, [BLOCK_TYPES.COOKED_TURTLE_MEAT]: 100,
+            [BLOCK_TYPES.TORCH]: 200
         };
 
 // --- TEXTURE GENERATOR ---
@@ -238,15 +254,15 @@ export const BLOCK_TYPES = {
                 grad.addColorStop(0, 'rgba(255,255,255,0.08)'); grad.addColorStop(1, 'rgba(0,0,0,0.05)');
                 c.fillStyle = grad; c.fillRect(0, 0, 64, 64);
             });
-            // WOLKE (Weiche Wolkenstruktur)
+            // WOLKE (helle, blockige Wolkenstruktur)
             drawTile(7, 0, (c) => {
-                c.fillStyle = '#ffffff'; c.fillRect(0, 0, 64, 64);
-                // Sanfte Schatten-Flecken
-                for (let i = 0; i < 8; i++) {
-                    c.fillStyle = 'rgba(200,210,220,0.15)';
-                    c.beginPath(); c.arc(Math.random()*64, Math.random()*64, 10+Math.random()*12, 0, Math.PI*2); c.fill();
+                c.fillStyle = '#fbfdff'; c.fillRect(0, 0, 64, 64);
+                drawNoise(c, 64, 64, 8, ['#ffffff', '#f7fbff', '#edf5fb']);
+                for (let i = 0; i < 10; i++) {
+                    c.fillStyle = 'rgba(190,210,225,0.18)';
+                    c.fillRect(Math.random()*56, Math.random()*56, 8, 8);
                 }
-                c.fillStyle = 'rgba(255,255,255,0.5)'; c.fillRect(0, 0, 64, 64);
+                c.fillStyle = 'rgba(255,255,255,0.36)'; c.fillRect(0, 0, 64, 28);
             });
             // SCHNEE (Kristallweiß mit Glitzer und Schatten)
             drawTile(8, 0, (c) => {
@@ -1167,6 +1183,40 @@ export const BLOCK_TYPES = {
                 for (let y=4; y<64; y+=16) { c.fillRect(0,y,64,8); }
             });
 
+            // Dynamische Gleisformen; der Worker dreht sie anhand der Nachbargleise.
+            drawTile(251, 0, (c) => {
+                c.fillStyle = '#5A4A3A'; c.fillRect(0,0,64,64);
+                c.strokeStyle = '#666'; c.lineWidth = 7;
+                for (const radius of [8, 24, 40, 56]) {
+                    c.beginPath(); c.arc(64, 0, radius, Math.PI / 2, Math.PI); c.stroke();
+                }
+                c.strokeStyle = '#999'; c.lineWidth = 8;
+                for (const radius of [13, 51]) {
+                    c.beginPath(); c.arc(64, 0, radius, Math.PI / 2, Math.PI); c.stroke();
+                }
+            });
+            drawTile(252, 0, (c) => {
+                c.fillStyle = '#5A4A3A'; c.fillRect(0,0,64,64);
+                c.fillStyle = '#666';
+                for (let offset=4; offset<64; offset+=16) {
+                    c.fillRect(0,offset,64,6);
+                    if (offset < 36) c.fillRect(offset,0,6,40);
+                }
+                c.fillStyle = '#999';
+                c.fillRect(8,0,9,38); c.fillRect(47,0,9,38);
+                c.fillRect(0,27,64,9); c.fillRect(0,47,64,9);
+            });
+            drawTile(253, 0, (c) => {
+                c.fillStyle = '#5A4A3A'; c.fillRect(0,0,64,64);
+                c.fillStyle = '#666';
+                for (let offset=4; offset<64; offset+=16) {
+                    c.fillRect(0,offset,64,6); c.fillRect(offset,0,6,64);
+                }
+                c.fillStyle = '#999';
+                c.fillRect(8,0,9,64); c.fillRect(47,0,9,64);
+                c.fillRect(0,8,64,9); c.fillRect(0,47,64,9);
+            });
+
             // MINENBALKEN (Tile 81) – Holzstützbalken
             drawTile(81, 0, (c) => {
                 const woods = ['#6B4226','#5C3A1E','#7A4C2C'];
@@ -1284,6 +1334,16 @@ export const BLOCK_TYPES = {
                 c.fillRect(6, 56, 52, 8);
             });
 
+            // TORCH (Tile 200) - transparentes Item- und Welt-Sprite
+            drawTile(200, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.fillStyle = '#FFE066'; c.fillRect(24, 2, 16, 10);
+                c.fillStyle = '#FF9F1C'; c.fillRect(20, 10, 24, 12);
+                c.fillStyle = '#6D3F22'; c.fillRect(27, 22, 10, 40);
+                c.fillStyle = '#9A6032'; c.fillRect(27, 22, 4, 38);
+                c.fillStyle = '#3E2416'; c.fillRect(31, 24, 6, 38);
+            });
+
             // VILLAGE_PATH (Tile 87) – Kompakter brauner Dorfweg
             drawTile(87, 0, (c) => {
                 const pathColors = ['#8B6B3D', '#7D5F35', '#9A7A4A', '#705530', '#8C7040'];
@@ -1322,12 +1382,264 @@ export const BLOCK_TYPES = {
                 pixelDraw(c, 64, 64, 4, () => Math.random() > 0.88 ? 'rgba(0,0,0,0.08)' : null);
             });
 
+            const drawSwordTile = (tile, bladeColor, highlightColor) => drawTile(tile, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.fillStyle = '#6B4226';
+                c.fillRect(28, 43, 8, 15);
+                c.fillStyle = '#3D2A1F';
+                c.fillRect(24, 56, 16, 6);
+                c.fillStyle = '#4A382A';
+                c.fillRect(18, 39, 28, 6);
+                c.fillStyle = bladeColor;
+                c.fillRect(25, 10, 14, 31);
+                c.fillRect(28, 5, 8, 5);
+                c.fillStyle = highlightColor;
+                c.fillRect(28, 11, 4, 27);
+                c.fillStyle = 'rgba(0,0,0,0.22)';
+                c.fillRect(35, 12, 4, 27);
+            });
+            drawSwordTile(89, '#B8793F', '#E0AD72');
+            drawSwordTile(90, '#777777', '#B0B0B0');
+            drawSwordTile(91, '#BFC7CF', '#F1F5F8');
+            drawSwordTile(92, '#E2B814', '#FFF176');
+
+            drawTile(93, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.strokeStyle = '#F2F2F2';
+                c.lineWidth = 5;
+                c.beginPath();
+                c.moveTo(12, 18); c.bezierCurveTo(46, 4, 15, 58, 52, 44);
+                c.stroke();
+            });
+            drawTile(94, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.strokeStyle = '#8B5A2B'; c.lineWidth = 7;
+                c.beginPath(); c.arc(23, 32, 23, -Math.PI / 2, Math.PI / 2); c.stroke();
+                c.strokeStyle = '#EEEEEE'; c.lineWidth = 3;
+                c.beginPath(); c.moveTo(23, 9); c.lineTo(23, 55); c.stroke();
+            });
+            drawTile(95, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.strokeStyle = '#8B6B3D'; c.lineWidth = 5;
+                c.beginPath(); c.moveTo(12, 52); c.lineTo(48, 16); c.stroke();
+                c.fillStyle = '#B0B0B0';
+                c.beginPath(); c.moveTo(45, 10); c.lineTo(58, 7); c.lineTo(54, 20); c.closePath(); c.fill();
+                c.fillStyle = '#EEEEEE';
+                c.beginPath(); c.moveTo(10, 45); c.lineTo(5, 58); c.lineTo(18, 53); c.closePath(); c.fill();
+            });
+
+            const drawCookedFoodTile = (tile, baseColor, accentColor) => drawTile(tile, 0, (c) => {
+                c.clearRect(0, 0, 64, 64);
+                c.fillStyle = baseColor;
+                c.beginPath();
+                c.ellipse(32, 34, 22, 15, -0.2, 0, Math.PI * 2);
+                c.fill();
+                c.fillStyle = accentColor;
+                c.fillRect(17, 27, 30, 4);
+                c.fillRect(21, 36, 24, 4);
+                c.fillStyle = 'rgba(255,255,255,0.25)';
+                c.fillRect(20, 22, 18, 3);
+            });
+            drawCookedFoodTile(96, '#B9783E', '#6D3F24');
+            drawCookedFoodTile(97, '#8B4513', '#4E2917');
+            drawCookedFoodTile(98, '#C98B52', '#7A4A29');
+            drawCookedFoodTile(99, '#A65A3A', '#673522');
+            drawCookedFoodTile(100, '#6F7A3D', '#3D4822');
+
+            if (graphicsPrototype.usesPainterlyTextures) {
+                const fallbackFamilies = [
+                    [0, [101, 102, 103]], [1, [104, 105, 106]],
+                    [4, [107, 108, 109]], [5, [110, 111, 112]],
+                    [53, [113, 114, 115]], [2, [116, 117, 118]],
+                    [44, [119, 120, 121]], [50, [122, 123, 124]],
+                    [43, [125, 126, 127]], [52, [128, 129, 130]],
+                    [27, [131, 132, 133]], [6, [134, 135, 136]],
+                    [8, [137, 138, 139]], [6, [140, 141, 142, 143]],
+                    [0, [144, 145, 146, 147]], [15, [148, 149, 150]],
+                    [16, [151, 152, 153]], [47, [154]], [48, [155]],
+                    [46, [156, 157, 158]], [29, [159, 160, 161]],
+                    [39, [162]], [40, [163]], [75, [164, 165, 166]],
+                    [80, [167, 168, 169]], [81, [170, 171, 172]],
+                    [87, [173, 174, 175]], [85, [176, 177, 178]],
+                    [31, [179, 180, 181]], [82, [182, 183, 184]],
+                    [88, [185, 186, 187]], [9, [188, 189, 190]],
+                    [84, [191, 192, 193]], [83, [194, 195, 196]],
+                    [79, [197, 198, 199]], [86, [201, 202, 203]],
+                    [30, [204, 205, 206]], [56, [207, 208, 209]],
+                    [57, [210, 211, 212]], [58, [213, 214, 215]],
+                    [45, [216, 217, 218]], [7, [219, 220, 221]],
+                    [49, [222, 223, 224]], [54, [225, 226, 227]],
+                    [10, [228, 229, 230]], [11, [231, 232, 233]],
+                    [12, [234, 235, 236]], [13, [237, 238, 239]]
+                ];
+                for (const [sourceTile, targetTiles] of fallbackFamilies) {
+                    const sourceX = (sourceTile % 16) * 64;
+                    const sourceY = Math.floor(sourceTile / 16) * 64;
+                    for (const targetTile of targetTiles) {
+                        const targetX = (targetTile % 16) * 64;
+                        const targetY = Math.floor(targetTile / 16) * 64;
+                        ctx.drawImage(canvas, sourceX, sourceY, 64, 64, targetX, targetY, 64, 64);
+                    }
+                }
+            }
+
             atlasDataURL = canvas.toDataURL("image/png");
 
 
             const tex = new THREE.CanvasTexture(canvas);
-            tex.magFilter = THREE.NearestFilter; tex.minFilter = THREE.NearestFilter;
-            tex.generateMipmaps = false; 
+            const prototypeFilter = graphicsPrototype.usesPainterlyTextures ? THREE.LinearFilter : THREE.NearestFilter;
+            tex.magFilter = prototypeFilter; tex.minFilter = prototypeFilter;
+            tex.generateMipmaps = false;
+            if (graphicsPrototype.usesPainterlyTextures) {
+                tex.colorSpace = THREE.SRGBColorSpace;
+                const loadImage = (url) => new Promise((resolve) => {
+                    const image = new Image();
+                    image.onload = () => resolve(image);
+                    image.onerror = () => resolve(null);
+                    image.src = url;
+                });
+                Promise.all([
+                    loadImage(new URL('../assets/graphics-prototype/forest-material-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/forest-variation-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/biome-material-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/undergrowth-variation-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/crafted-wood-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/mine-village-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/desert-snow-village-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/dungeon-special-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/underground-material-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/dry-wet-biome-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/tropical-tree-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/furnishing-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/equipment-item-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/combat-food-item-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/graphics-prototype/raw-item-tiles.png', import.meta.url).href)
+                ]).then(([image, variationImage, biomeImage, undergrowthImage, craftedWoodImage, mineVillageImage, desertSnowVillageImage, dungeonSpecialImage, undergroundMaterialImage, dryWetBiomeImage, tropicalTreeImage, furnishingImage, equipmentItemImage, combatFoodItemImage, rawItemImage]) => {
+                    if (!image || !variationImage) return;
+                    const tileReplacements = [
+                        [0, 0], [1, 1], [2, 2], [3, 4],
+                        [4, 5], [5, 3], [6, 27], [7, 53],
+                        [8, 44], [9, 50], [10, 43], [11, 52]
+                    ];
+                    const variationReplacements = [
+                        [0, 0], [1, 101], [2, 102], [3, 103],
+                        [4, 1], [5, 104], [6, 105], [7, 106],
+                        [8, 4], [9, 107], [10, 108], [11, 109],
+                        [12, 5], [13, 110], [14, 111], [15, 112],
+                        [16, 53], [17, 113], [18, 114], [19, 115],
+                        [20, 2], [21, 116], [22, 117], [23, 118],
+                        [24, 44], [25, 119], [26, 120], [27, 121],
+                        [28, 50], [29, 122], [30, 123], [31, 124],
+                        [32, 43], [33, 125], [34, 126], [35, 127],
+                        [36, 52], [37, 128], [38, 129], [39, 130],
+                        [40, 27], [41, 131], [42, 132], [43, 133]
+                    ];
+                    const biomeReplacements = [
+                        [0, 6], [1, 134], [2, 135], [3, 136],
+                        [4, 8], [5, 137], [6, 138], [7, 139],
+                        [8, 140], [9, 141], [10, 142], [11, 143],
+                        [12, 144], [13, 145], [14, 146], [15, 147]
+                    ];
+                    const undergrowthReplacements = [
+                        [0, 15], [1, 148], [2, 149], [3, 150],
+                        [4, 16], [5, 151], [6, 152], [7, 153],
+                        [8, 47], [9, 154], [10, 48], [11, 155],
+                        [12, 46], [13, 156], [14, 157], [15, 158]
+                    ];
+                    const craftedWoodReplacements = [
+                        [0, 29], [1, 159], [2, 160], [3, 161],
+                        [4, 39], [5, 40], [6, 162], [7, 163],
+                        [8, 75], [9, 164], [10, 165], [11, 166],
+                        [12, 27], [13, 131], [14, 132], [15, 133]
+                    ];
+                    const mineVillageReplacements = [
+                        [0, 80], [1, 167], [2, 168], [3, 169],
+                        [4, 81], [5, 170], [6, 171], [7, 172],
+                        [8, 87], [9, 173], [10, 174], [11, 175],
+                        [12, 85], [13, 176], [14, 177], [15, 178]
+                    ];
+                    const desertSnowVillageReplacements = [
+                        [0, 31], [1, 179], [2, 180], [3, 181],
+                        [4, 82], [5, 182], [6, 183], [7, 184],
+                        [8, 88], [9, 185], [10, 186], [11, 187],
+                        [12, 9], [13, 188], [14, 189], [15, 190]
+                    ];
+                    const dungeonSpecialReplacements = [
+                        [0, 84], [1, 191], [2, 192], [3, 193],
+                        [4, 83], [5, 194], [6, 195], [7, 196],
+                        [8, 79], [9, 197], [10, 198], [11, 199],
+                        [12, 86], [13, 201], [14, 202], [15, 203]
+                    ];
+                    const undergroundMaterialReplacements = [
+                        [0, 30], [1, 204], [2, 205], [3, 206],
+                        [4, 56], [5, 207], [6, 208], [7, 209],
+                        [8, 57], [9, 210], [10, 211], [11, 212],
+                        [12, 58], [13, 213], [14, 214], [15, 215]
+                    ];
+                    const dryWetBiomeReplacements = [
+                        [0, 45], [1, 216], [2, 217], [3, 218],
+                        [4, 7], [5, 219], [6, 220], [7, 221],
+                        [8, 49], [9, 222], [10, 223], [11, 224],
+                        [12, 54], [13, 225], [14, 226], [15, 227]
+                    ];
+                    const tropicalTreeReplacements = [
+                        [0, 10], [1, 228], [2, 229], [3, 230],
+                        [4, 11], [5, 231], [6, 232], [7, 233],
+                        [8, 12], [9, 234], [10, 235], [11, 236],
+                        [12, 13], [13, 237], [14, 238], [15, 239]
+                    ];
+                    const furnishingReplacements = [
+                        [0, 59], [1, 240], [2, 241], [3, 242],
+                        [4, 36], [5, 243], [6, 244], [7, 245],
+                        [8, 38], [9, 246], [10, 247], [11, 248],
+                        [12, 41], [13, 249], [14, 42], [15, 250]
+                    ];
+                    const equipmentItemReplacements = [
+                        [0, 60], [1, 61], [2, 62], [3, 32],
+                        [4, 63], [5, 64], [6, 65], [7, 66],
+                        [8, 67], [9, 68], [10, 69], [11, 70],
+                        [12, 71], [13, 72], [14, 73], [15, 74]
+                    ];
+                    const combatFoodItemReplacements = [
+                        [0, 89], [1, 90], [2, 91], [3, 92],
+                        [4, 93], [5, 94], [6, 95], [7, 200],
+                        [8, 96], [9, 97], [10, 98], [11, 99],
+                        [12, 100], [13, 28], [14, 51], [15, 26]
+                    ];
+                    const rawItemReplacements = [
+                        [0, 21], [1, 23], [2, 35], [3, 37],
+                        [4, 55], [5, 76], [6, 77], [7, 78]
+                    ];
+                    const copyTiles = (source, replacements) => {
+                        for (const [sourceTile, atlasTile] of replacements) {
+                            const sourceX = (sourceTile % 4) * 64;
+                            const sourceY = Math.floor(sourceTile / 4) * 64;
+                            const atlasX = (atlasTile % 16) * 64;
+                            const atlasY = Math.floor(atlasTile / 16) * 64;
+                            ctx.clearRect(atlasX, atlasY, 64, 64);
+                            ctx.drawImage(source, sourceX, sourceY, 64, 64, atlasX, atlasY, 64, 64);
+                        }
+                    };
+                    copyTiles(image, tileReplacements);
+                    copyTiles(variationImage, variationReplacements);
+                    if (biomeImage) copyTiles(biomeImage, biomeReplacements);
+                    if (undergrowthImage) copyTiles(undergrowthImage, undergrowthReplacements);
+                    if (craftedWoodImage) copyTiles(craftedWoodImage, craftedWoodReplacements);
+                    if (mineVillageImage) copyTiles(mineVillageImage, mineVillageReplacements);
+                    if (desertSnowVillageImage) copyTiles(desertSnowVillageImage, desertSnowVillageReplacements);
+                    if (dungeonSpecialImage) copyTiles(dungeonSpecialImage, dungeonSpecialReplacements);
+                    if (undergroundMaterialImage) copyTiles(undergroundMaterialImage, undergroundMaterialReplacements);
+                    if (dryWetBiomeImage) copyTiles(dryWetBiomeImage, dryWetBiomeReplacements);
+                    if (tropicalTreeImage) copyTiles(tropicalTreeImage, tropicalTreeReplacements);
+                    if (furnishingImage) copyTiles(furnishingImage, furnishingReplacements);
+                    if (equipmentItemImage) copyTiles(equipmentItemImage, equipmentItemReplacements);
+                    if (combatFoodItemImage) copyTiles(combatFoodItemImage, combatFoodItemReplacements);
+                    if (rawItemImage) copyTiles(rawItemImage, rawItemReplacements);
+                    atlasDataURL = canvas.toDataURL('image/png');
+                    tex.needsUpdate = true;
+                    window.dispatchEvent(new CustomEvent('butzcraft:prototype-atlas-ready'));
+                });
+            }
             return tex;
         }
 export let atlasDataURL = "";

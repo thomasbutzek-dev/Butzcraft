@@ -8,13 +8,14 @@
  *  - Kurzer Tap in den Look-Bereich: ABBAUEN/Angreifen (mousedown button=0)
  *
  *  PointerLock funktioniert auf iOS/Android nicht (kein API-Support) → wir setzen
- *  window.touchActive=true, und PlayerInteraction sowie der Pause-Check ignorieren
+ *  Game.touchActive=true, und PlayerInteraction sowie der Pause-Check ignorieren
  *  controls.isLocked, wenn touchActive gesetzt ist.
  *
  *  Look-Empfindlichkeit: 0.005 rad pro Pixel — Daumen-tauglich, nicht wackelig.
  */
 
 import { Input } from './Input.js?v=20260507b';
+import { Game } from './Game.js?v=20260716b';
 
 const LOOK_SENSITIVITY = 0.005;
 const JOYSTICK_DEADZONE = 0.18;
@@ -22,6 +23,7 @@ const JOYSTICK_RADIUS_PX = 60;
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const TAP_MAX_MOVE_PX = 10;
 const TAP_MAX_MS = 260;
+const MINE_HOLD_DELAY_MS = 180;
 
 export function isTouchDevice() {
     return ('ontouchstart' in window) ||
@@ -30,6 +32,10 @@ export function isTouchDevice() {
 }
 
 export function applyTouchLookDelta(ctx, dx, dy) {
+    if (ctx?.player?.cameraMode === 'third' && typeof ctx.player.adjustThirdPersonOrbit === 'function') {
+        ctx.player.adjustThirdPersonOrbit(-dx * LOOK_SENSITIVITY, -dy * LOOK_SENSITIVITY);
+        return;
+    }
     const camera = ctx && ctx.camera;
     if (!camera || !camera.rotation) return;
 
@@ -73,7 +79,7 @@ export function initTouchControls(ctx) {
     if (!isTouchDevice()) return;
     if (document.getElementById('touch-overlay')) return; // schon initialisiert
 
-    window.touchActive = true;
+    Game.touchActive = true;
     document.documentElement.classList.add('touch-device');
     document.body.classList.add('touch-device');
 
@@ -223,8 +229,8 @@ function _injectTouchStyles() {
     document.head.appendChild(style);
 }
 
-function _dispatchInteraction(button) {
-    const evt = new MouseEvent('mousedown', {
+function _dispatchInteraction(button, type = 'mousedown') {
+    const evt = new MouseEvent(type, {
         button,
         buttons: button === 2 ? 2 : 1,
         bubbles: true,
@@ -292,46 +298,126 @@ function _bindLookArea(ctx) {
     let lastX = 0, lastY = 0;
     let startX = 0, startY = 0, startTime = 0;
     let moved = false;
+    let miningStarted = false;
+    let miningTimer = null;
+    let pinching = false;
+    let pinchDistance = 0;
+
+    const distanceBetween = (touches) => Math.hypot(
+        touches[0].clientX - touches[1].clientX,
+        touches[0].clientY - touches[1].clientY
+    );
+
+    const stopMining = () => {
+        if (miningTimer) {
+            clearTimeout(miningTimer);
+            miningTimer = null;
+        }
+        if (miningStarted) {
+            _dispatchInteraction(0, 'mouseup');
+            miningStarted = false;
+        }
+    };
 
     area.addEventListener('touchstart', (e) => {
         // Ignorieren, wenn Inventar offen
         if (ctx.isInventoryOpenedProvider && ctx.isInventoryOpenedProvider()) return;
-        if (activeId !== null) return;
+        if (activeId !== null) {
+            if (e.touches.length >= 2) {
+                e.preventDefault();
+                pinching = true;
+                moved = true;
+                pinchDistance = distanceBetween(e.touches);
+                stopMining();
+            }
+            return;
+        }
         const t = e.changedTouches[0];
         activeId = t.identifier;
         lastX = startX = t.clientX;
         lastY = startY = t.clientY;
         startTime = performance.now();
         moved = false;
-    }, { passive: true });
+        miningStarted = false;
+        if (miningTimer) clearTimeout(miningTimer);
+        miningTimer = setTimeout(() => {
+            miningTimer = null;
+            if (activeId === null || moved) return;
+            miningStarted = true;
+            _dispatchInteraction(0, 'mousedown');
+        }, MINE_HOLD_DELAY_MS);
+    }, { passive: false });
 
     area.addEventListener('touchmove', (e) => {
         if (activeId === null) return;
         e.preventDefault();
+        if (pinching && e.touches.length >= 2) {
+            const nextDistance = distanceBetween(e.touches);
+            const delta = nextDistance - pinchDistance;
+            pinchDistance = nextDistance;
+            if (typeof ctx.player?.setThirdPersonCameraDistance === 'function') {
+                ctx.player.setThirdPersonCameraDistance(ctx.player.getThirdPersonCameraDistance() - delta * 0.015);
+            }
+            return;
+        }
         for (const t of e.touches) {
             if (t.identifier !== activeId) continue;
             const dx = t.clientX - lastX;
             const dy = t.clientY - lastY;
             lastX = t.clientX; lastY = t.clientY;
-            if (Math.hypot(t.clientX - startX, t.clientY - startY) > TAP_MAX_MOVE_PX) moved = true;
+            if (Math.hypot(t.clientX - startX, t.clientY - startY) > TAP_MAX_MOVE_PX) {
+                moved = true;
+                if (miningTimer) {
+                    clearTimeout(miningTimer);
+                    miningTimer = null;
+                }
+                if (miningStarted) {
+                    _dispatchInteraction(0, 'mouseup');
+                    miningStarted = false;
+                }
+            }
             applyTouchLookDelta(ctx, dx, dy);
         }
     }, { passive: false });
 
     const endHandler = (e) => {
+        if (pinching) {
+            stopMining();
+            moved = true;
+            if (e.touches.length < 2) pinching = false;
+            if (e.touches.length === 0) activeId = null;
+            return;
+        }
         for (const t of e.changedTouches) {
             if (t.identifier === activeId) {
                 const elapsed = performance.now() - startTime;
-                if (!moved && elapsed <= TAP_MAX_MS && !(ctx.isInventoryOpenedProvider && ctx.isInventoryOpenedProvider())) {
-                    _dispatchInteraction(0);
+                if (miningTimer) {
+                    clearTimeout(miningTimer);
+                    miningTimer = null;
+                }
+                if (miningStarted) {
+                    _dispatchInteraction(0, 'mouseup');
+                    miningStarted = false;
+                } else if (!moved && elapsed <= TAP_MAX_MS && !(ctx.isInventoryOpenedProvider && ctx.isInventoryOpenedProvider())) {
+                    _dispatchInteraction(0, 'mousedown');
+                    _dispatchInteraction(0, 'mouseup');
                 }
                 activeId = null;
                 break;
             }
         }
     };
+    const cancelHandler = (e) => {
+        pinching = false;
+        for (const t of e.changedTouches) {
+            if (t.identifier !== activeId) continue;
+            stopMining();
+            activeId = null;
+            break;
+        }
+    };
     area.addEventListener('touchend', endHandler);
-    area.addEventListener('touchcancel', endHandler);
+    area.addEventListener('touchcancel', cancelHandler);
 }
 
 function _bindActionButtons(ctx) {
@@ -344,7 +430,7 @@ function _bindActionButtons(ctx) {
     if (pauseOverlay) {
         pauseOverlay.addEventListener('click', (e) => {
             const btn = e.target.closest('button');
-            if (!btn || !window.touchActive) return;
+            if (!btn || !Game.touchActive) return;
             if (btn.textContent && btn.textContent.includes('Weiter')) {
                 e.stopPropagation();
                 pauseOverlay.style.display = 'none';
@@ -378,13 +464,18 @@ function _bindActionButtons(ctx) {
         pauseBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             const inst = document.getElementById('instructions');
-            if (!inst) return;
-            const isPaused = inst.style.display === 'block';
+            const isPaused = ctx.isPausedProvider
+                ? ctx.isPausedProvider()
+                : inst?.style.display === 'block';
             if (isPaused) {
-                inst.style.display = 'none';
+                if (typeof ctx.resumeGame === 'function') ctx.resumeGame();
+                else if (inst) inst.style.display = 'none';
             } else {
-                inst.style.display = 'block';
-                if (typeof window.loadGamesList === 'function') window.loadGamesList();
+                if (typeof ctx.pauseGame === 'function') ctx.pauseGame();
+                else if (inst) {
+                    inst.style.display = 'block';
+                    if (typeof window.loadGamesList === 'function') window.loadGamesList();
+                }
             }
         }, { passive: false });
     }

@@ -6,6 +6,8 @@
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
+    "perf:chunks": "node scripts/benchmarkChunkWorker.cjs",
+    "perf:mobs": "vitest run tests/mobPerformance.test.js",
     "start": "node server.js",
     "dev": "vite",
     "build": "vite build"

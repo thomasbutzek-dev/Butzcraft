@@ -5,8 +5,11 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName } from './inventory.js?v=20260507b';
-import { getQuestProgress, removeQuestItems } from './quests.js?v=20260515b';
+import { createBlockHTML, getItemName, inventorySlots, tryExchangeInventory } from './inventory.js?v=20260719b';
+import { getQuestProgress } from './quests.js?v=20260515b';
+import { Game } from './Game.js?v=20260716b';
+import { STORY_EVENTS } from './storyProgress.js?v=20260718b';
+import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 let currentNPC = null;
 
@@ -75,11 +78,13 @@ export function openTradeUI(npc, controls) {
     });
 
     overlay.style.display = 'flex';
+    activateDialog(overlay, '.trade-btn:not(:disabled), .panel-close-button');
+    window.dispatchEvent(new CustomEvent(STORY_EVENTS.VILLAGER_MET));
     if (controls) controls.unlock();
 }
 
 function buildQuestRow(quest) {
-    const progress = getQuestProgress(window.inventorySlots, quest);
+    const progress = getQuestProgress(inventorySlots, quest);
     const row = document.createElement('div');
     row.className = 'trade-row quest-row';
 
@@ -118,35 +123,14 @@ function buildQuestRow(quest) {
  * Trade ausführen.
  */
 function executeTrade(trade, idx) {
-    const inventorySlots = window.inventorySlots;
-    if (!inventorySlots) return;
-
-    // Prüfe ob genug Items vorhanden
-    let totalAvailable = 0;
-    for (const slot of inventorySlots) {
-        if (slot.type === trade.give.type) totalAvailable += slot.count;
-    }
-
-    if (totalAvailable < trade.give.count) {
+    const result = tryExchangeInventory(trade.give, trade.receive);
+    if (result.reason === 'insufficient-items') {
         showTradeMessage('Nicht genug Items! ❌', '#ff4444');
         return;
     }
-
-    // Items abziehen
-    let toRemove = trade.give.count;
-    for (const slot of inventorySlots) {
-        if (toRemove <= 0) break;
-        if (slot.type === trade.give.type) {
-            const remove = Math.min(slot.count, toRemove);
-            slot.count -= remove;
-            toRemove -= remove;
-            if (slot.count <= 0) { slot.type = 0; slot.count = 0; }
-        }
-    }
-
-    // Items hinzufügen
-    if (window.addItemToInventory) {
-        window.addItemToInventory(trade.receive.type, trade.receive.count);
+    if (!result.exchanged) {
+        showTradeMessage('Inventar voll! ❌', '#ff9800');
+        return;
     }
 
     // UI aktualisieren
@@ -167,19 +151,18 @@ function executeTrade(trade, idx) {
 }
 
 function executeQuest(quest, btn) {
-    const inventorySlots = window.inventorySlots;
-    if (!inventorySlots) return;
-
     const progress = getQuestProgress(inventorySlots, quest);
     if (!progress.complete) return;
 
-    if (!removeQuestItems(inventorySlots, quest)) return;
-    if (window.addItemToInventory) {
-        window.addItemToInventory(quest.receive.type, quest.receive.count);
+    const result = tryExchangeInventory(quest.give, quest.receive);
+    if (!result.exchanged) {
+        showTradeMessage('Inventar voll! ❌', '#ff9800');
+        return;
     }
     if (window.updateInventoryUI) window.updateInventoryUI();
 
     showTradeMessage(`Auftrag erledigt: +${quest.receive.count}x ${getItemName(quest.receive.type)}`, '#4caf50');
+    window.dispatchEvent(new CustomEvent(STORY_EVENTS.QUEST_COMPLETED));
     if (currentNPC) openTradeUI(currentNPC);
 }
 
@@ -196,9 +179,10 @@ function showTradeMessage(text, color) {
  */
 export function closeTradeUI(controls) {
     const overlay = document.getElementById('trade-overlay');
+    deactivateDialog(overlay);
     if (overlay) overlay.style.display = 'none';
     currentNPC = null;
-    if (controls && !window.touchActive) {
+    if (controls && !Game.touchActive) {
         if (typeof window.resumeGame === 'function') window.resumeGame();
         else controls.lock();
     }

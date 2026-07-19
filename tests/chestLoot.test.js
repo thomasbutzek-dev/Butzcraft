@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../js/structures.js', () => ({
+    classifyChestLoot: () => 'mine_timber',
+    getLootDiscoveryMessage: () => 'Minenfund entdeckt!',
     rollLoot: () => [{ type: 60, count: 2 }]
 }));
 
@@ -53,5 +55,23 @@ describe('chest loot UI', () => {
         expect(context.addItemToInventory).toHaveBeenCalledTimes(1);
         expect(context.addItemToInventory).toHaveBeenCalledWith(60, 2);
         expect(world.chestContents['chest,1,20,3'][0]).toEqual({ type: 0, count: 0 });
+    });
+
+    it('keeps loot in the chest when the inventory is full', () => {
+        const world = {
+            chestContents: {},
+            lootedChests: new Set(),
+            getBlock: () => 0
+        };
+        const context = {
+            addItemToInventory: vi.fn(() => ({ added: 0, remaining: 2 })),
+            updateInventoryUI: vi.fn()
+        };
+        const interaction = new PlayerInteraction(null, null, world, [], {}, context);
+
+        interaction._openChest(1, 20, 3);
+        document.querySelector('#chest-grid .inv-slot').click();
+
+        expect(world.chestContents['chest,1,20,3'][0]).toEqual({ type: 60, count: 2 });
     });
 });

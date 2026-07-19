@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260511c">
+    <link rel="stylesheet" href="style.css?v=20260719b">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -170,25 +170,36 @@
         <div id="start-menu-content">
             <img src="logo.png" alt="BUTZCRAFT" class="logo-img">
             <div id="start-promise">
-                <span>Dein erster Tag in Butzcraft</span>
-                Sammle Holz, baue deine erste Werkbank und bereite dich auf die Nacht vor.
+                <span>Deine Welt. Dein Weg. Dein Abenteuer.</span>
+                Erkunde, baue, kämpfe und entdecke, was jenseits des nächsten Horizonts wartet.
             </div>
             <button
                 id="start-button"
                 class="menu-btn"
                 type="button"
+                aria-describedby="mobile-start-status"
                 ontouchstart="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
                 onpointerdown="if (event.pointerType !== 'mouse') return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
                 onclick="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
             >Neues Spiel starten</button>
+            <button id="character-editor-button" class="menu-btn" type="button" data-open-character-editor>Charakter gestalten</button>
             <div id="start-goals" aria-label="Erste Ziele">
                 <span>Holz sammeln</span>
                 <span>Werkbank bauen</span>
                 <span>Überleben</span>
             </div>
-            <div id="mobile-start-status" style="display:none; color:#ffd966; font-size:13px; text-align:center; min-height:18px;"></div>
+            <div id="mobile-start-status" role="status" aria-live="polite" aria-atomic="true" style="display:none; color:#ffd966; font-size:13px; text-align:center; min-height:18px;"></div>
             <div id="save-list">
                 <!-- Gespeicherte Spiele werden hier injected -->
+            </div>
+        </div>
+    </div>
+    <div id="character-editor-overlay" aria-hidden="true">
+        <div class="character-editor-dialog" role="dialog" aria-modal="true" aria-label="Charakter-Editor" onclick="event.stopPropagation()">
+            <iframe id="character-editor-frame" src="character-editor.html" title="Charakter-Editor"></iframe>
+            <div class="character-editor-actions">
+                <button id="character-editor-close" class="save-btn" type="button">Abbrechen</button>
+                <button id="character-editor-apply" class="save-btn" type="button">Übernehmen</button>
             </div>
         </div>
     </div>
@@ -238,37 +249,51 @@
         <div id="top-ui">
             <div style="display: flex; flex-direction: column; align-items: flex-start; pointer-events: auto;">
                 <div id="stats">Lädt...</div>
-                <div id="fps-counter">FPS: --</div>
 
-                <div id="esc-hint" style="font-size: 9px; color: #aaa; margin-top: 2px;">(TAB fuer Pause | Klick fuer Maus)</div>
+                <div id="esc-hint" style="font-size: 11px; color: #d0d0d0; margin-top: 2px;">(TAB für Pause | Klick für Maus)</div>
             </div>
-            <div id="time-info">Tag 1 | 08:00</div>
+            <div id="time-info">
+                <div id="world-time-info">Tag 1 | 08:00</div>
+                <div id="fps-summary" aria-label="FPS: Aktuell noch nicht gemessen, Minimum noch nicht gemessen, Maximum noch nicht gemessen">FPS · Aktuell -- · Min -- · Max --</div>
+            </div>
         </div>
-        <div id="crosshair"></div>
+        <div id="crosshair">
+            <div id="mining-progress" role="progressbar" aria-label="Abbaufortschritt" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>
+        </div>
         <div id="controls-hint" role="status" aria-live="polite" aria-hidden="true">
             <div class="controls-hint-title">Los geht's</div>
             <div id="controls-hint-text">WASD bewegen · Maus umsehen · Linksklick abbauen · Rechtsklick bauen · E Inventar</div>
         </div>
-        <div id="first-objective" role="status" aria-live="polite" aria-hidden="true">
-            <span id="first-objective-label">Erstes Ziel</span>
+        <div id="first-objective" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+            <div class="first-objective-kicker">
+                <span id="first-objective-label">Erster Tag</span>
+                <span id="first-objective-step">Schritt 1 von 11</span>
+            </div>
             <strong id="first-objective-text">Sammle Holz</strong>
+            <div id="first-objective-hint">Suche einen Baum und halte Linksklick.</div>
+            <div id="first-objective-progress" aria-hidden="true">
+                <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+            </div>
         </div>
-        <div id="instructions">
+        <div id="instructions" role="dialog" aria-modal="true" aria-labelledby="pause-title" aria-hidden="true">
             <img src="logo.png" alt="BUTZCRAFT" style="width: 200px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">
-            <h1>Pause</h1>
+            <h1 id="pause-title">Pause</h1>
             <div style="display: flex; gap: 20px; justify-content: center; margin: 20px 0;">
-                <button class="save-btn" style="padding: 15px 30px; font-size: 18px; cursor: pointer;" onclick="window.resumeGame && window.resumeGame();">Weiter spielen</button>
-                <button class="save-btn" style="padding: 15px 30px; font-size: 18px; cursor: pointer; background: #e74c3c;" onclick="event.stopPropagation(); window.location.reload();">Spiel neu starten</button>
+                <button class="save-btn" type="button" data-resume-game style="padding: 15px 30px; font-size: 18px; cursor: pointer;" onclick="window.resumeGame && window.resumeGame();">Weiter spielen</button>
+                <button id="pause-character-editor-button" class="save-btn" type="button" data-open-character-editor onclick="event.stopPropagation()">Charakter</button>
+                <button class="save-btn danger-button" style="padding: 15px 30px; font-size: 18px; cursor: pointer; background: #e74c3c;" onclick="event.stopPropagation(); window.location.reload();">Spiel neu starten</button>
             </div>
             <p style="font-size: 12px; color: #aaa;">(WASD = Bewegen, LEERTASTE = Springen/Auftauchen)<br>
                (SHIFT = Sprinten, STRG = Schleichen)<br>
+               (V = Kamera wechseln, MAUSRAD = Third-Person-Zoom)<br>
+               (Q = In Lore ein-/aussteigen, W/S = Fahren/Bremsen, A/D = Weiche)<br>
                (LINKSKLICK = Abbauen/Angreifen, RECHTSKLICK = Bauen/Kuh melken)</p>
             
             <div id="save-section" onclick="event.stopPropagation()">
-                <input type="text" id="save-input" placeholder="Name für Spielstand..." />
-                <button class="save-btn" onclick="saveGame()">Speichern</button>
-                <button class="save-btn" onclick="exportSaveGame()">Export</button>
-                <button class="save-btn" onclick="importSaveGame()">Import</button>
+                <input type="text" id="save-input" aria-label="Name für Spielstand" placeholder="Name für Spielstand..." />
+                <button class="save-btn" type="button" onclick="saveGame()">Speichern</button>
+                <button class="save-btn" type="button" onclick="exportSaveGame()">Export</button>
+                <button class="save-btn" type="button" onclick="importSaveGame()">Import</button>
                 <input type="file" id="save-import-input" accept="application/json,.json" style="display:none" onchange="handleSaveImport(this)" />
             </div>
             <div id="save-msg" style="color: #4caf50; font-size: 14px; margin-top: 10px; display: none;">Spiel gespeichert!</div>
@@ -315,6 +340,10 @@
                     </div>
                 </div>
             </div>
+            <div id="attack-cooldown" role="progressbar" aria-label="Angriff bereit" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100">
+                <span>Angriff</span>
+                <div class="attack-cooldown-track"><div id="attack-cooldown-fill"></div></div>
+            </div>
             <div id="inventory">
                 <div class="slot active" data-slot="0"><span class="key-hint">1</span></div>
                 <div class="slot" data-slot="1"><span class="key-hint">2</span></div>
@@ -329,78 +358,104 @@
     </div>
 
     <!-- INVENTAR OVERLAY -->
-    <div id="inventory-overlay">
-        <button
-            id="inventory-close-btn"
-            type="button"
-            aria-label="Inventar schliessen"
-            onclick="window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', bubbles: true }));"
-        >x</button>
-        <div id="inventory-title">Inventar</div>
-        
+    <div id="inventory-overlay" role="dialog" aria-modal="true" aria-labelledby="inventory-title" aria-hidden="true">
+        <div id="recipe-book">
+            <div id="recipe-book-title">Rezeptbuch</div>
+            <input id="recipe-search" type="search" aria-label="Rezepte suchen" placeholder="Rezepte suchen…" autocomplete="off">
+            <div id="recipe-list-container"></div>
+        </div>
+        <div id="inventory-main-content">
+        <div id="inventory-header">
+            <div id="inventory-title">Inventar</div>
+            <button
+                id="inventory-close-btn"
+                type="button"
+                aria-label="Inventar schließen"
+                onclick="window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', bubbles: true }));"
+            >Schließen</button>
+        </div>
+        <div id="inventory-objective" role="status" aria-live="polite" aria-atomic="true" aria-hidden="true">
+            <div class="inventory-objective-kicker">
+                <span id="inventory-objective-label">Aktuelles Ziel</span>
+                <span id="inventory-objective-step"></span>
+            </div>
+            <strong id="inventory-objective-text"></strong>
+            <div id="inventory-objective-hint"></div>
+        </div>
+
         <!-- NEUES CRAFTING AREA (3×3) -->
+        <div id="crafting-label">Bastelfeld</div>
         <div id="crafting-area" style="display: flex; gap: 20px; align-items: center; justify-content: center; margin-bottom: 20px;">
             <div id="crafting-grid" style="display: grid; grid-template-columns: repeat(3, 60px); grid-template-rows: repeat(3, 60px); gap: 5px;">
                 <!-- Wird dynamisch mit 9 inv-slot für Crafting gefüllt -->
             </div>
-            <div style="font-size: 24px; color: white;">➔</div>
-            <div id="crafting-result" style="width: 60px; height: 60px;">
-                <!-- Result Slot -->
+            <div class="panel-flow-arrow" style="font-size: 24px; color: white;">➔</div>
+            <div id="crafting-output">
+                <div id="crafting-result" style="width: 60px; height: 60px;">
+                    <!-- Result Slot -->
+                </div>
+                <button id="crafting-create-btn" type="button">Herstellen</button>
             </div>
         </div>
+        <div id="crafting-status" role="status" aria-live="polite">Rezept anklicken, um Zutaten einzusetzen.</div>
 
         <div id="inventory-grid">
             <!-- Wird dynamisch gefüllt -->
         </div>
         <p style="color: #aaa; font-size: 12px; margin-top: 15px;">Klicke auf Items, um sie zu nehmen/abzulegen. Rechtsklick teilt Stacks. 'E' zum Schließen.</p>
+        </div>
     </div>
 
     <!-- OFEN-UI OVERLAY -->
-    <div id="furnace-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center;">
-        <div style="background:#2a2a2a; border:2px solid #555; border-radius:8px; padding:24px; min-width:340px; color:white; font-family:monospace;">
-            <div style="text-align:center; font-size:18px; margin-bottom:16px; color:#ff9900;">🔥 Ofen</div>
+    <div id="furnace-overlay" role="dialog" aria-modal="true" aria-labelledby="furnace-title" aria-hidden="true" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center;">
+        <div class="furnace-panel" style="background:#2a2a2a; border:2px solid #555; border-radius:8px; padding:24px; min-width:340px; color:white; font-family:monospace;">
+            <div id="furnace-title" class="panel-title" style="text-align:center; font-size:18px; margin-bottom:16px; color:#ff9900;">🔥 Ofen</div>
             <div style="display:flex; gap:16px; align-items:center; justify-content:center; margin-bottom:16px;">
                 <div style="text-align:center;">
-                    <div style="font-size:11px; color:#aaa; margin-bottom:4px;">Schmelzen</div>
+                    <div class="panel-slot-label" style="font-size:11px; color:#aaa; margin-bottom:4px;">Schmelzen / Garen</div>
                     <div id="furnace-input-slot" class="inv-slot" style="width:60px;height:60px;"></div>
                 </div>
                 <div style="text-align:center;">
-                    <div style="font-size:11px; color:#aaa; margin-bottom:4px;">Brennstoff</div>
+                    <div class="panel-slot-label" style="font-size:11px; color:#aaa; margin-bottom:4px;">Brennstoff</div>
                     <div id="furnace-fuel-slot" class="inv-slot" style="width:60px;height:60px;"></div>
                 </div>
-                <div style="font-size:24px;">➔</div>
+                <div class="panel-flow-arrow" style="font-size:24px;">➔</div>
                 <div style="text-align:center;">
-                    <div style="font-size:11px; color:#aaa; margin-bottom:4px;">Ergebnis</div>
+                    <div class="panel-slot-label" style="font-size:11px; color:#aaa; margin-bottom:4px;">Ergebnis</div>
                     <div id="furnace-output-slot" class="inv-slot" style="width:60px;height:60px;"></div>
                 </div>
             </div>
             <div id="furnace-progress" style="background:#444; border-radius:4px; height:12px; margin-bottom:12px; overflow:hidden;">
                 <div id="furnace-progress-bar" style="background:#ff6600; height:100%; width:0%; transition:width 0.5s;"></div>
             </div>
+            <div id="furnace-fuel-reserve">Keine aktive Brennstoffladung</div>
             <div id="furnace-status" style="text-align:center; font-size:12px; color:#aaa; margin-bottom:16px;">Bereit</div>
-            <button onclick="window.closeFurnace && window.closeFurnace()" style="display:block; margin:0 auto; padding:8px 24px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Schließen (E)</button>
+            <div id="furnace-selection-title" class="furnace-selection-help">Schmelzen / Garen: geeigneten Gegenstand wählen</div>
+            <div id="furnace-inventory-grid" aria-label="Inventar für den Ofen"></div>
+            <div class="furnace-return-help">Gewählten belegten Slot erneut anklicken: zurück ins Inventar</div>
+            <button class="panel-close-button" type="button" onclick="window.closeFurnace && window.closeFurnace()" style="display:block; margin:0 auto; padding:8px 24px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Schließen (E)</button>
         </div>
     </div>
 
     <!-- TRUHEN-UI OVERLAY -->
-    <div id="chest-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center;">
-        <div style="background:#2a2a2a; border:2px solid #555; border-radius:8px; padding:24px; color:white; font-family:monospace;">
-            <div style="text-align:center; font-size:18px; margin-bottom:16px; color:#c8a060;">📦 Truhe</div>
+    <div id="chest-overlay" role="dialog" aria-modal="true" aria-labelledby="chest-title" aria-hidden="true" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7); z-index:500; align-items:center; justify-content:center;">
+        <div class="chest-panel" style="background:#2a2a2a; border:2px solid #555; border-radius:8px; padding:24px; color:white; font-family:monospace;">
+            <div id="chest-title" class="panel-title" style="text-align:center; font-size:18px; margin-bottom:16px; color:#c8a060;">📦 Truhe</div>
             <div id="chest-grid" style="display:grid; grid-template-columns:repeat(5,60px); gap:5px; margin-bottom:16px;">
                 <!-- Wird per JS befüllt -->
             </div>
-            <button onclick="window.closeChest && window.closeChest()" style="display:block; margin:0 auto; padding:8px 24px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Schließen (E)</button>
+            <button class="panel-close-button" type="button" onclick="window.closeChest && window.closeChest()" style="display:block; margin:0 auto; padding:8px 24px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer;">Schließen (E)</button>
         </div>
     </div>
 
     <!-- HANDELS-UI OVERLAY (Tier 3: NPC-Dorf) -->
-    <div id="trade-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:500; align-items:center; justify-content:center;">
+    <div id="trade-overlay" role="dialog" aria-modal="true" aria-labelledby="trade-title" aria-hidden="true" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:500; align-items:center; justify-content:center;">
         <div class="trade-panel">
-            <div id="trade-title" style="text-align:center; font-size:20px; margin-bottom:20px; color:#FFD700;">🤝 Händler</div>
+            <div id="trade-title" class="panel-title" style="text-align:center; font-size:20px; margin-bottom:20px; color:#FFD700;">🤝 Händler</div>
             <div id="trade-grid" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto; padding-right:8px;">
                 <!-- Wird per JS befüllt -->
             </div>
-            <button onclick="window.closeTradeUI && window.closeTradeUI()" style="display:block; margin:16px auto 0; padding:10px 28px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Schließen (E)</button>
+            <button class="panel-close-button" type="button" onclick="window.closeTradeUI && window.closeTradeUI()" style="display:block; margin:16px auto 0; padding:10px 28px; background:#555; color:white; border:none; border-radius:4px; cursor:pointer; font-size:14px;">Schließen (E)</button>
         </div>
     </div>
 
@@ -421,7 +476,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260517a"
+        src="./js/GameMain.js?v=20260719h"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

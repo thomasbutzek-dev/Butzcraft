@@ -26,6 +26,7 @@ export const craftingRecipes = [
     { pattern: [26, 12, 12, 26], result: { type: 32, count: 1 } },   // PLANKS+ICE -> WINDOW
     { pattern: [27, 26, 27, 26], result: { type: 33, count: 1 } },   // STICK+PLANKS -> DOOR
     { pattern: [19, 19, 26, 26], result: { type: 38, count: 1 } },   // WOOL+PLANKS -> BED
+    { kind: 'shapeless', ingredients: [60, 27], result: { type: 101, count: 4 } }, // KOHLE+STOCK -> 4x FACKEL
 
     // Neue 3×3-Rezepte: Werkzeuge
     // Schema: pattern[0..8] = Zeile0-2, Spalte0-2
@@ -44,6 +45,14 @@ export const craftingRecipes = [
     { kind: 'shaped', gridSize: 3, pattern: [0, 3,0, 0,27,0, 0,27,0], result: { type: 72, count: 1 } }, // Stein-Schaufel
     { kind: 'shaped', gridSize: 3, pattern: [0,61,0, 0,27,0, 0,27,0], result: { type: 73, count: 1 } }, // Eisen-Schaufel
     { kind: 'shaped', gridSize: 3, pattern: [0,62,0, 0,27,0, 0,27,0], result: { type: 74, count: 1 } }, // Gold-Schaufel
+    // Schwerter (2 Material übereinander, 1 Stock als Griff)
+    { kind: 'shaped', gridSize: 3, pattern: [0,26,0, 0,26,0, 0,27,0], result: { type: 89, count: 1 } }, // Holzschwert
+    { kind: 'shaped', gridSize: 3, pattern: [0, 3,0, 0, 3,0, 0,27,0], result: { type: 90, count: 1 } }, // Steinschwert
+    { kind: 'shaped', gridSize: 3, pattern: [0,61,0, 0,61,0, 0,27,0], result: { type: 91, count: 1 } }, // Eisenschwert
+    { kind: 'shaped', gridSize: 3, pattern: [0,62,0, 0,62,0, 0,27,0], result: { type: 92, count: 1 } }, // Goldschwert
+    // Fernkampf: Bogen an der Werkbank, Pfeile günstig auch unterwegs
+    { kind: 'shaped', gridSize: 3, pattern: [27,93,0, 27,0,93, 27,93,0], result: { type: 94, count: 1 } }, // Bogen
+    { kind: 'shapeless', ingredients: [3,27], result: { type: 95, count: 4 } }, // 4 Pfeile
     // Ofen (8x Stein im Ring)
     { kind: 'shaped', gridSize: 3, pattern: [3,3,3, 3,0,3, 3,3,3], result: { type: 59, count: 1 } }, // Ofen
 ];

@@ -2,35 +2,47 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260507b';
-        import { World, getBiomeAt, getHeightAt, BIOMES } from './world.js?v=20260507c';
-        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260511a';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717y';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260719a';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260719d';
 
         import { Input } from './Input.js?v=20260507b';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260511c';
-        import { migrateSave, stampSaveVersion } from './saveMigrations.js?v=20260507b';
-        import { Game } from './Game.js?v=20260507b'; // Sprint 3 Phase 1: zentraler State-Container (proxy zu window.*)
-        import { Player } from './Player.js?v=20260511a';
-        import { PlayerInteraction } from './PlayerInteraction.js?v=20260507c';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, updateInventoryUI, toggleInventory, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260511a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260507c';
-        import { WeatherSystem } from './weather.js?v=20260517a';
-        import { NPC } from './npc.js?v=20260507b';
-        import { openTradeUI, closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260507c';
-        import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260512a';
-        import { getDayRatio, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260515a';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260717b';
+        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260719a';
+        import { Game } from './Game.js?v=20260716b'; // Central state container
+        import { Player } from './Player.js?v=20260718d';
+        import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
+        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260719b';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260719b';
+        import { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } from './itemCollection.js?v=20260718c';
+        import { getOnboardingProgress } from './onboarding.js?v=20260718f';
+        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260718b';
+        import { findNewGameSpawn } from './newGameSpawn.js?v=20260718a';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260719a';
+        import { WeatherSystem } from './weather.js?v=20260718b';
+        import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
+        import { NPC } from './npc.js?v=20260719a';
+        import { preloadEntityMaterials } from './entityMaterials.js?v=20260719a';
+        import { Minecart } from './minecart.js?v=20260719a';
+        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260718d';
+        import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260718b';
+        import { SaveRepository } from './saveRepository.js?v=20260718a';
+        import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260719a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
+        import { findSafeBedRespawn, normalizeRespawnBed } from './respawn.js?v=20260716a';
+        import { TorchLightSystem, TORCH_TYPE } from './torchLights.js?v=20260718b';
+        import { DamageFeedback } from './damageFeedback.js?v=20260718a';
+        import { FrameRateTracker } from './frameRateTracker.js?v=20260718a';
+        import { calculateRenderPixelRatio } from './renderResolution.js?v=20260718a';
+        import { resolveUiInputCommand } from './inputCommand.js?v=20260718a';
+        import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
-        window.inventorySlots = inventorySlots;
         window.updateInventoryUI = updateInventoryUI;
         window.getSelectedSlot = getSelectedSlot;
         window.setSelectedSlot = setSelectedSlot;
         window.getBiomeAt = getBiomeAt;
 
-        window.SoundManager = SoundManager;
-        window.BLOCK_TYPES = BLOCK_TYPES;
-        window.BLOCK_TEX = BLOCK_TEX;
         window._blockTexData = { BLOCK_TEX, atlasDataURL };
         
 
@@ -39,38 +51,50 @@
 
         // --- KONSTANTEN & KONFIGURATION ---
         const { CHUNK_SIZE, CHUNK_HEIGHT, WATER_LEVEL, RENDER_DIST, CLOUD_HEIGHT } = CONFIG.WORLD;
-        const { DAY_DURATION, MAX_HEALTH, MAX_HUNGER, HUNGER_LOSS_PASSIVE, HUNGER_LOSS_MOVE, HUNGER_GAIN_PIG, HUNGER_GAIN_EGG, HUNGER_GAIN_MILK, REGEN_RATE, REGEN_THRESHOLD, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULT } = CONFIG.GAMEPLAY;
+        const { DAY_DURATION, MAX_HEALTH, MAX_HUNGER, HUNGER_LOSS_PASSIVE, HUNGER_LOSS_MOVE, REGEN_RATE, REGEN_THRESHOLD, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULT } = CONFIG.GAMEPLAY;
         const { GRAVITY, GRAVITY_MULTIPLIER, WATER_DRAG, JUMP_FORCE, PLAYER_JUMP_FORCE, WALK_SPEED, FRICTION, PLAYER_WIDTH } = CONFIG.PHYSICS;
         const { MAX_COUNT, SPAWN_CHANCE, SPAWN_DIST_MIN, SPAWN_DIST_MAX, ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS , WEIGHT_COW, WEIGHT_PIG, WEIGHT_SHEEP, WEIGHT_CHICKEN } = CONFIG.MOBS;
         const MOB_JUMP_FORCE = 5.5; // Konstante für das Springen von Tieren/Zombies (ca. 1.5 Blöcke hoch bei g=9.8)
 
         // --- GAME STATE ---
-        let camera, scene, renderer, controls, world, sun, sunGroup;
+        let camera, scene, renderer, controls, world, sun, sunGroup, ambient;
         let skyUniforms, skyMesh;
         // Spielstart auf Mittag setzen
         let time = DAY_DURATION * 0.45, prevTime = performance.now(), spawnTimer = 0;
         let collectedEggs = 0, collectedWool = 0;
         let lastBloodMoonRewardDay = -1;
+        let pendingBloodMoonRewardDay = -1;
+        let lastBloodMoonRewardRetry = 0;
+        let storyObjectiveIndex = 0;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
-        window.droppedItems = [];
-        const droppedItems = window.droppedItems;
+        Game.droppedItems = [];
+        const droppedItems = Game.droppedItems;
         let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
+        let torchLightSystem = null;
+        let damageFeedback = null;
         const npcs = [];            // Tier 3: NPC-Array
         window.npcs = npcs;
+        const minecarts = [];
+        const spawnedMinecartKeys = new Set();
+        let activeMinecart = null;
+        window.minecarts = minecarts;
         // Tier 3: Spawner-Tick-Timer auf Modul-Scope. WICHTIG nicht `this._spawnerTickTimer`
         // verwenden — `this` ist in einer Top-Level-Funktion innerhalb eines ES-Moduls `undefined`
         // (strict mode), und `this.x = 0` wirft TypeError. Das war der Grund, warum nach dem
         // Tier-3-Update die gesamte Steuerung blockiert war: animate() ist jeden Frame in dieser
-        // Zeile abgestürzt, BEVOR `window.player.updatePhysics(...)` aufgerufen werden konnte.
+        // Zeile abgestürzt, BEVOR `Game.player.updatePhysics(...)` aufgerufen werden konnte.
         let _spawnerTickTimer = 0;
         let _lastVisibleChunkX = null, _lastVisibleChunkZ = null, _lastVisibleRenderDist = null;
         
         
         let inventoryOpened = false;
-        window.BLOCK_TEX = BLOCK_TEX;
         let gameActive = true, spawning = true, gameStarted = false, manuallyPaused = false;
         let currentSaveName = null;
+        let respawnBed = null;
+        const CHARACTER_PROFILE_STORAGE_KEY = 'butzcraft.characterProfile';
+        const legacyCharacterProfile = readLegacyCharacterProfile();
+        let activeCharacterProfile = legacyCharacterProfile;
 
         // Schwert & Animation
 
@@ -83,7 +107,84 @@
         }
 
         function shouldUseTouchMode() {
-            return Boolean(window.touchActive) || isTouchDevice();
+            return Boolean(Game.touchActive) || isTouchDevice();
+        }
+
+        function readLegacyCharacterProfile() {
+            try {
+                const saved = localStorage.getItem(CHARACTER_PROFILE_STORAGE_KEY);
+                return saved ? parseCharacterProfile(saved) : createCharacterProfile();
+            } catch {
+                return createCharacterProfile();
+            }
+        }
+
+        function showCameraModeMessage(mode) {
+            const msg = document.createElement('div');
+            msg.textContent = mode === 'third' ? 'Third Person' : 'First Person';
+            msg.style.cssText = 'position:fixed;left:50%;bottom:120px;transform:translateX(-50%);z-index:3000;padding:8px 14px;background:rgba(0,0,0,0.65);color:#fff;font:600 14px sans-serif;border-radius:4px;pointer-events:none;';
+            document.body.appendChild(msg);
+            setTimeout(() => msg.remove(), 900);
+        }
+
+        function setActiveCharacterProfile(profile) {
+            activeCharacterProfile = normalizeCharacterProfile(profile);
+            if (Game.player?.setCharacterProfile) Game.player.setCharacterProfile(activeCharacterProfile);
+            return activeCharacterProfile;
+        }
+
+        function initStartCharacterEditor() {
+            const openButtons = document.querySelectorAll('[data-open-character-editor]');
+            const overlay = document.getElementById('character-editor-overlay');
+            const frame = document.getElementById('character-editor-frame');
+            const applyBtn = document.getElementById('character-editor-apply');
+            const closeBtn = document.getElementById('character-editor-close');
+            if (!openButtons.length || !overlay || !frame || !applyBtn || !closeBtn) return;
+
+            const send = (type, extra = {}) => {
+                frame.contentWindow?.postMessage({ type, ...extra }, window.location.origin);
+            };
+            const close = () => {
+                send('cancel');
+                overlay.classList.remove('open');
+                deactivateDialog(overlay);
+            };
+            const open = () => {
+                overlay.classList.add('open');
+                activateDialog(overlay, '#character-editor-close');
+                if (frame.dataset.ready === 'true') send('load-profile', { profile: activeCharacterProfile });
+            };
+            const apply = () => {
+                send('apply-profile');
+            };
+
+            frame.addEventListener('load', () => {
+                frame.dataset.ready = 'true';
+                if (overlay.classList.contains('open')) send('load-profile', { profile: activeCharacterProfile });
+            });
+            openButtons.forEach((button) => bindPress(button, open));
+            bindPress(applyBtn, apply);
+            bindPress(closeBtn, close);
+            overlay.addEventListener('click', (event) => {
+                if (event.target === overlay) close();
+            });
+            window.addEventListener('message', (event) => {
+                if (event.origin !== window.location.origin || event.source !== frame.contentWindow || !event.data) return;
+                if (event.data.type === 'editor-ready') {
+                    frame.dataset.ready = 'true';
+                    if (overlay.classList.contains('open')) send('load-profile', { profile: activeCharacterProfile });
+                }
+                if (event.data.type === 'apply-profile') {
+                    setActiveCharacterProfile(event.data.profile);
+                    overlay.classList.remove('open');
+                    deactivateDialog(overlay);
+                }
+            });
+            window.openCharacterEditor = open;
+            if (window.__butzcraftCharacterEditorRequested) {
+                window.__butzcraftCharacterEditorRequested = false;
+                open();
+            }
         }
 
         function lockControlsForDesktop() {
@@ -130,7 +231,7 @@
                     e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD' ||
                     e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' ||
                     e.code === 'ControlLeft' || e.code === 'ControlRight' ||
-                    e.code === 'KeyE' || e.code === 'Tab' ||
+                    e.code === 'KeyE' || e.code === 'KeyQ' || e.code === 'Tab' ||
                     (e.key >= '1' && e.key <= '8')
                 )
             );
@@ -139,7 +240,7 @@
         function relockControlsFromInput(e) {
             if (!isGameplayKey(e)) return;
             if (!gameStarted || manuallyPaused || isBlockingOverlayOpen()) return;
-            if (!controls?.isLocked && !window.touchActive) lockControlsForDesktop();
+            if (!controls?.isLocked && !Game.touchActive) lockControlsForDesktop();
         }
 
         function relockControlsFromPointer(e) {
@@ -151,78 +252,61 @@
                 manuallyPaused = false;
                 hidePauseMenu();
             }
-            if (!controls?.isLocked && !window.touchActive) lockControlsForDesktop();
+            if (!controls?.isLocked && !Game.touchActive) lockControlsForDesktop();
+        }
+
+        function handleCameraModeToggle(e) {
+            const tag = document.activeElement?.tagName;
+            if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+            if (e.code !== 'KeyV') return;
+            if (!gameStarted || manuallyPaused || isBlockingOverlayOpen()) return;
+            if (e.cancelable) e.preventDefault();
+            const mode = Game.player.toggleCameraMode();
+            showCameraModeMessage(mode);
         }
 
         window.butzcraftCanInteract = function() {
-            return Boolean(
-                gameStarted &&
-                gameActive &&
-                !spawning &&
-                !manuallyPaused &&
-                !isBlockingOverlayOpen() &&
-                (controls?.isLocked || window.touchActive || window.butzcraftPointerLockUnavailable)
-            );
+            return canUseMouseInteraction({
+                gameStarted,
+                gameActive,
+                spawning,
+                manuallyPaused,
+                blockingOverlayOpen: isBlockingOverlayOpen()
+            });
         };
 
         function showPauseMenu() {
             const inst = document.getElementById('instructions');
             if (!inst) return;
+            document.body.classList.add('game-paused');
             inst.style.display = 'block';
+            activateDialog(inst, '[data-resume-game]');
             if (typeof window.loadGamesList === 'function') window.loadGamesList();
         }
 
         function hidePauseMenu() {
             const inst = document.getElementById('instructions');
-            if (inst) inst.style.display = 'none';
+            document.body.classList.remove('game-paused');
+            if (inst) {
+                deactivateDialog(inst);
+                inst.style.display = 'none';
+            }
         }
 
         const CONTROLS_HINT_HIDE_MS = 8500;
-        const WOOD_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.WOOD, BLOCK_TYPES.JUNGLE_WOOD, BLOCK_TYPES.PALM_WOOD,
-            BLOCK_TYPES.PLANKS, BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
-            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
-        ]);
-        const PLANK_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.PLANKS, BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
-            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
-        ]);
-        const STICK_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.STICK, BLOCK_TYPES.WORKBENCH,
-            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
-            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
-        ]);
-        const WORKBENCH_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.WORKBENCH,
-            BLOCK_TYPES.WOOD_PICKAXE, BLOCK_TYPES.WOOD_AXE, BLOCK_TYPES.WOOD_SHOVEL,
-            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK, BLOCK_TYPES.FURNACE
-        ]);
-        const STONE_OBJECTIVE_TYPES = new Set([
-            BLOCK_TYPES.STONE, BLOCK_TYPES.STONE_BRICK,
-            BLOCK_TYPES.STONE_PICKAXE, BLOCK_TYPES.STONE_AXE, BLOCK_TYPES.STONE_SHOVEL,
-            BLOCK_TYPES.FURNACE
-        ]);
-        const MINI_OBJECTIVES = [
-            { label: 'Erstes Ziel', text: 'Sammle Holz', completeTypes: WOOD_OBJECTIVE_TYPES },
-            { label: 'Weiter', text: 'Stelle Holzbretter her', completeTypes: PLANK_OBJECTIVE_TYPES },
-            { label: 'Werkzeugbasis', text: 'Mache Stöcke', completeTypes: STICK_OBJECTIVE_TYPES },
-            { label: 'Arbeitsplatz', text: 'Baue eine Werkbank', completeTypes: WORKBENCH_OBJECTIVE_TYPES },
-            { label: 'Steinzeit', text: 'Sammle Stein', completeTypes: STONE_OBJECTIVE_TYPES },
-            { label: 'Überleben', text: 'Baue einen Ofen', completeTypes: new Set([BLOCK_TYPES.FURNACE]) }
-        ];
+        const OBJECTIVE_COMPLETION_MS = 1200;
         let controlsHintTimer = null;
+        let objectiveCompletionTimer = null;
         let controlsHintShownForRun = false;
         let miniObjectiveIndex = 0;
+        let currentMiniObjective = null;
+        let currentStoryObjective = null;
 
         function getControlsHintText() {
             if (shouldUseTouchMode() || window.innerWidth <= 760) {
-                return 'Linker Daumen bewegt · rechts umsehen · tippen abbauen · Buttons bauen, springen, Inventar, Pause';
+                return 'Schaue auf einen Baum und tippe zum Abbauen - linker Daumen bewegt - rechts umsehen';
             }
-            return 'WASD bewegen · Maus umsehen · Linksklick abbauen · Rechtsklick bauen · E Inventar';
+            return 'Schaue auf einen Baum und halte Linksklick - WASD bewegen - Maus umsehen - E Inventar';
         }
 
         function hideControlsHint() {
@@ -250,57 +334,170 @@
             }, CONTROLS_HINT_HIDE_MS);
         }
 
-        function inventoryHasAny(types) {
-            return inventorySlots.some(slot => slot && slot.count > 0 && types.has(slot.type));
-        }
-
         function advanceMiniObjective() {
-            while (
-                miniObjectiveIndex < MINI_OBJECTIVES.length &&
-                inventoryHasAny(MINI_OBJECTIVES[miniObjectiveIndex].completeTypes)
-            ) {
-                miniObjectiveIndex++;
-            }
+            const previousIndex = miniObjectiveIndex;
+            const completedObjective = currentMiniObjective;
+            const progress = getOnboardingProgress(inventorySlots, miniObjectiveIndex, { respawnSet: Boolean(respawnBed) });
+            miniObjectiveIndex = progress.index;
+            currentMiniObjective = progress.objective;
+            return {
+                advanced: progress.index > previousIndex,
+                completedObjective
+            };
         }
 
         function hideFirstObjective() {
             const el = document.getElementById('first-objective');
             if (!el) return;
-            el.classList.remove('visible');
-            el.setAttribute('aria-hidden', 'true');
+            if (el.classList.contains('visible')) el.classList.remove('visible');
+            if (el.getAttribute('aria-hidden') !== 'true') el.setAttribute('aria-hidden', 'true');
         }
 
         function showFirstObjective() {
             const el = document.getElementById('first-objective');
             const label = document.getElementById('first-objective-label');
+            const step = document.getElementById('first-objective-step');
             const text = document.getElementById('first-objective-text');
-            const objective = MINI_OBJECTIVES[miniObjectiveIndex];
-            if (!el || !label || !text || !objective) return;
-            label.textContent = objective.label;
-            text.textContent = objective.text;
+            const hint = document.getElementById('first-objective-hint');
+            const objective = currentMiniObjective || currentStoryObjective;
+            if (!el || !label || !step || !text || !hint || !objective) return;
+            const objectiveSource = currentMiniObjective ? 'onboarding' : 'story';
+            const objectiveKey = `${objectiveSource}-${objective.step}`;
+            const objectiveHint = shouldUseTouchMode() ? objective.touchHint : objective.hint;
+            const needsRender = el.dataset.objectiveKey !== objectiveKey
+                || el.classList.contains('complete')
+                || hint.textContent !== objectiveHint;
+            el.classList.remove('complete');
+            if (needsRender) {
+                label.textContent = objective.label;
+                step.textContent = `Schritt ${objective.step} von ${objective.total}`;
+                text.textContent = objective.text;
+                hint.textContent = objectiveHint;
+                updateObjectiveProgress(objective.step, objective.total);
+                el.dataset.objectiveKey = objectiveKey;
+            }
+            if (!el.classList.contains('visible')) el.classList.add('visible');
+            if (el.getAttribute('aria-hidden') !== 'false') el.setAttribute('aria-hidden', 'false');
+        }
+
+        function updateObjectiveProgress(completedSteps, totalSteps) {
+            const segments = document.querySelectorAll('#first-objective-progress i');
+            segments.forEach((segment, index) => {
+                segment.classList.toggle('unused', index >= totalSteps);
+                segment.classList.toggle('active', index < completedSteps);
+            });
+        }
+
+        function updateInventoryObjective() {
+            const el = document.getElementById('inventory-objective');
+            const label = document.getElementById('inventory-objective-label');
+            const step = document.getElementById('inventory-objective-step');
+            const text = document.getElementById('inventory-objective-text');
+            const hint = document.getElementById('inventory-objective-hint');
+            const objective = currentMiniObjective || currentStoryObjective;
+            if (!el || !label || !step || !text || !hint) return;
+
+            if (!isInventoryOpened() || !objective) {
+                el.classList.remove('visible');
+                el.setAttribute('aria-hidden', 'true');
+                return;
+            }
+
+            const objectiveSource = currentMiniObjective ? 'onboarding' : 'story';
+            const objectiveKey = `${objectiveSource}-${objective.step}`;
+            const objectiveHint = shouldUseTouchMode() ? objective.touchHint : objective.hint;
+            if (el.dataset.objectiveKey !== objectiveKey || hint.textContent !== objectiveHint) {
+                label.textContent = objective.label;
+                step.textContent = `Schritt ${objective.step} von ${objective.total}`;
+                text.textContent = objective.text;
+                hint.textContent = objectiveHint;
+                el.dataset.objectiveKey = objectiveKey;
+            }
             el.classList.add('visible');
             el.setAttribute('aria-hidden', 'false');
         }
 
+        function showObjectiveCompletion(objective) {
+            const el = document.getElementById('first-objective');
+            const label = document.getElementById('first-objective-label');
+            const step = document.getElementById('first-objective-step');
+            const text = document.getElementById('first-objective-text');
+            const hint = document.getElementById('first-objective-hint');
+            if (!el || !label || !step || !text || !hint) return;
+
+            label.textContent = 'Geschafft';
+            step.textContent = `Schritt ${objective.step} von ${objective.total}`;
+            text.textContent = objective.text;
+            hint.textContent = 'Nächstes Ziel kommt gleich.';
+            updateObjectiveProgress(objective.step, objective.total);
+            el.classList.add('complete', 'visible');
+            el.setAttribute('aria-hidden', 'false');
+
+            objectiveCompletionTimer = setTimeout(() => {
+                objectiveCompletionTimer = null;
+                el.classList.remove('complete');
+                updateFirstObjective();
+            }, OBJECTIVE_COMPLETION_MS);
+        }
+
         function updateFirstObjective() {
-            advanceMiniObjective();
-            if (miniObjectiveIndex >= MINI_OBJECTIVES.length) {
-                hideFirstObjective();
-                return;
-            }
+            const { advanced, completedObjective } = advanceMiniObjective();
+            updateStoryObjectiveFromTime();
+            updateInventoryObjective();
             const controlsHint = document.getElementById('controls-hint');
             const controlsHintVisible = controlsHint && controlsHint.classList.contains('visible');
             if (!gameStarted || spawning || manuallyPaused || isBlockingOverlayOpen() || controlsHintVisible) {
                 hideFirstObjective();
                 return;
             }
+            if (objectiveCompletionTimer) return;
+            if (advanced && completedObjective) {
+                showObjectiveCompletion(completedObjective);
+                return;
+            }
+            if (!currentMiniObjective && !currentStoryObjective) {
+                hideFirstObjective();
+                return;
+            }
             showFirstObjective();
         }
 
-        function resetControlsHintForRun() {
+        function updateStoryObjectiveFromTime() {
+            const playerPosition = controls?.getObject?.()?.position || null;
+            const progress = getStoryProgress(storyObjectiveIndex, {
+                dayCount: Math.floor(time / DAY_DURATION),
+                playerPosition,
+                villages: world?.villages || []
+            });
+            storyObjectiveIndex = progress.index;
+            currentStoryObjective = progress.objective;
+        }
+
+        function handleStoryEvent(eventName) {
+            updateStoryObjectiveFromTime();
+            const nextIndex = advanceStoryProgress(storyObjectiveIndex, eventName);
+            if (nextIndex === storyObjectiveIndex) return;
+            storyObjectiveIndex = nextIndex;
+            updateStoryObjectiveFromTime();
+            updateFirstObjective();
+        }
+
+        window.addEventListener(STORY_EVENTS.VILLAGER_MET, () => handleStoryEvent(STORY_EVENTS.VILLAGER_MET));
+        window.addEventListener(STORY_EVENTS.QUEST_COMPLETED, () => handleStoryEvent(STORY_EVENTS.QUEST_COMPLETED));
+        window.addEventListener(STORY_EVENTS.BLOOD_MOON_SURVIVED, () => handleStoryEvent(STORY_EVENTS.BLOOD_MOON_SURVIVED));
+
+        function resetControlsHintForRun(restoredObjectiveIndex = 0, restoredStoryObjectiveIndex = 0) {
             controlsHintShownForRun = false;
-            miniObjectiveIndex = 0;
+            miniObjectiveIndex = restoredObjectiveIndex;
+            storyObjectiveIndex = restoredStoryObjectiveIndex;
+            currentMiniObjective = null;
+            currentStoryObjective = null;
+            if (objectiveCompletionTimer) {
+                clearTimeout(objectiveCompletionTimer);
+                objectiveCompletionTimer = null;
+            }
             advanceMiniObjective();
+            updateStoryObjectiveFromTime();
             hideControlsHint();
             hideFirstObjective();
         }
@@ -313,6 +510,7 @@
 
         window.pauseGame = function() {
             if (!gameStarted || spawning || isBlockingOverlayOpen()) return;
+            if (window.playerInteraction) window.playerInteraction.cancelMining();
             manuallyPaused = true;
             if (controls?.isLocked) controls.unlock();
             hideControlsHint();
@@ -349,41 +547,20 @@
             return new URL(path.replace(/^\/+/, ''), window.location.href).toString();
         }
 
-        async function loadSaveData(name) {
-            try {
-                const browserSave = await loadBrowserSave(name);
-                if (browserSave) return browserSave;
-            } catch (err) {
-                if (err && err.message === 'Invalid name') throw err;
-                console.warn('[Save] Browser-Save nicht lesbar, versuche Server-Fallback:', err);
-            }
-
-            const res = await fetch(apiUrl(`api/load?name=${encodeURIComponent(name)}`));
-            const data = await res.json();
-            if (data.error) throw new Error(data.error);
-            return data;
+        async function fetchSaveJson(path) {
+            const res = await fetch(apiUrl(path));
+            return res.json();
         }
 
-        async function listServerSaves() {
-            try {
-                const res = await fetch(apiUrl('api/saves'));
-                const saves = await res.json();
-                return Array.isArray(saves) ? saves : [];
-            } catch (err) {
-                return [];
-            }
-        }
-
-        async function listAllSaveNames() {
-            let browserSaves = [];
-            try {
-                browserSaves = await listBrowserSaves();
-            } catch (err) {
-                console.warn('[Save] Browser-Save-Liste nicht lesbar:', err);
-            }
-            const serverSaves = await listServerSaves();
-            return [...new Set([...browserSaves, ...serverSaves])];
-        }
+        const saveRepository = new SaveRepository({
+            browserStore: {
+                list: listBrowserSaves,
+                load: loadBrowserSave,
+                save: saveBrowserSave
+            },
+            fetchJson: fetchSaveJson,
+            warn: (...args) => console.warn(...args)
+        });
 
         function showSaveMessage(text, color = '#4caf50') {
             const msg = document.getElementById('save-msg');
@@ -392,6 +569,15 @@
             msg.style.color = color;
             msg.style.display = 'block';
             setTimeout(() => msg.style.display = 'none', 3000);
+        }
+
+        function showSaveNameError() {
+            const input = document.getElementById('save-input');
+            showSaveMessage('Bitte gib einen Namen fuer den Spielstand ein.', '#ff9800');
+            if (!input) return;
+            input.classList.add('save-input-error');
+            input.focus();
+            input.addEventListener('input', () => input.classList.remove('save-input-error'), { once: true });
         }
 
         function updateVisibleChunksIfNeeded(playerPos, force = false) {
@@ -410,7 +596,7 @@
         }
 
         function applyRenderDistanceVisuals() {
-            if (scene?.fog && !window.player?.inWater) scene.fog.density = getRenderDistanceFogDensity();
+            if (scene?.fog && !Game.player?.inWater) scene.fog.density = getRenderDistanceFogDensity();
         }
 
         function disposeDroppedItem(item) {
@@ -421,6 +607,78 @@
                 if (Array.isArray(item.mesh.material)) item.mesh.material.forEach(m => m.dispose());
                 else item.mesh.material.dispose();
             }
+        }
+
+        function createOverflowDrop(type, count) {
+            const mesh = new THREE.Mesh(
+                new THREE.BoxGeometry(0.25, 0.25, 0.25),
+                new THREE.MeshPhongMaterial({ color: BLOCK_COLORS[type] || 0xffffff })
+            );
+            const playerPosition = controls?.getObject?.()?.position || camera?.position;
+            if (playerPosition) mesh.position.copy(playerPosition);
+            mesh.position.y += 0.3;
+            scene.add(mesh);
+            droppedItems.push({ mesh, velocityY: 2, blockType: type, count });
+        }
+
+        function addItemToInventoryOrDrop(type, count) {
+            return addItemOrCreateDrop(type, count, createOverflowDrop);
+        }
+
+        function spawnMinecart(data) {
+            if (!data?.id || spawnedMinecartKeys.has(data.id)) return null;
+            const minecart = new Minecart(scene, data);
+            minecarts.push(minecart);
+            spawnedMinecartKeys.add(data.id);
+            return minecart;
+        }
+
+        function disposeMinecarts() {
+            activeMinecart = null;
+            while (minecarts.length > 0) minecarts.pop().dispose(scene);
+            spawnedMinecartKeys.clear();
+        }
+
+        function exitActiveMinecart() {
+            if (!activeMinecart) return false;
+            const cart = activeMinecart;
+            cart.hasRider = false;
+            activeMinecart = null;
+
+            const playerPosition = controls.getObject().position;
+            const sideX = cart.direction.z;
+            const sideZ = -cart.direction.x;
+            playerPosition.set(
+                cart.group.position.x + sideX * 1.15,
+                cart.group.position.y + 1.58,
+                cart.group.position.z + sideZ * 1.15
+            );
+            Game.player.velocity.set(0, 0, 0);
+            window.playerInteraction?.showMessage('Lore verlassen.', '#ffe066', 18);
+            return true;
+        }
+
+        function tryToggleMinecart() {
+            if (activeMinecart) return exitActiveMinecart();
+            if (!controls || !Game.player) return false;
+            const playerPosition = controls.getObject().position;
+            let nearest = null;
+            let nearestDistance = 2.6;
+            for (const minecart of minecarts) {
+                const distance = minecart.group.position.distanceTo(playerPosition);
+                if (distance < nearestDistance) {
+                    nearest = minecart;
+                    nearestDistance = distance;
+                }
+            }
+            if (!nearest) return false;
+
+            activeMinecart = nearest;
+            nearest.hasRider = true;
+            nearest.syncRider(playerPosition);
+            Game.player.velocity.set(0, 0, 0);
+            window.playerInteraction?.showMessage('Lore: W fahren, S bremsen, A/D Weiche, Q aussteigen.', '#ffe066', 18);
+            return true;
         }
 
         function resetRuntimeForLoadedGame() {
@@ -434,6 +692,7 @@
                 const projectile = projectiles.pop();
                 if (projectile && typeof projectile.dispose === 'function') projectile.dispose();
             }
+            disposeMinecarts();
             world.fireBlocks.clear();
             world.spawnerMeta = {};
             world.villages = [];
@@ -441,17 +700,19 @@
 
         window.startNewGame = function() {
             if (gameStarted) return;
-            console.log("DEBUG: startNewGame starting...");
+            setActiveCharacterProfile(activeCharacterProfile);
             document.getElementById('start-menu').style.display = 'none';
+            document.body.classList.add('game-started');
             currentSaveName = null;
+            respawnBed = null;
             SoundManager.init();
             manuallyPaused = false;
             lockControlsForDesktop();
             hidePauseMenu();
             gameStarted = true;
+            fpsTracker.reset(performance.now());
             resetControlsHintForRun();
             window.__butzcraftStartRequested = false;
-            console.log("DEBUG: startNewGame finished, gameStarted set to true");
         };
         window.__butzcraftStartFunctionReady = true;
         if (window.__butzcraftStartRequested && window.__butzcraftRefreshStartStatus) {
@@ -459,37 +720,37 @@
         }
 
         window.loadGame = function(name) {
-            console.log("DEBUG: loadGame starting for", name);
             SoundManager.init();
-            loadSaveData(name)
-                .then(data => {
+            saveRepository.load(name)
+                .then(rawData => {
+                    const data = prepareSaveForLoad(rawData);
                     document.getElementById('start-menu').style.display = 'none';
+                    document.body.classList.add('game-started');
                     lockControlsForDesktop();
                     gameStarted = true;
-                    resetControlsHintForRun();
+                    fpsTracker.reset(performance.now());
                     currentSaveName = name;
                     document.getElementById('save-input').value = name;
 
-                    // Sprint 6: Migration zentralisiert via saveMigrations.js
-                    // Vorher war die Inventory-Migration hier inline + oldInventoryMap aus inventory.js.
-                    // Jetzt: ein Aufruf, alle nötigen Versions-Schritte werden angewendet.
-                    data = migrateSave(data);
                     resetRuntimeForLoadedGame();
 
                     const playerPos = camera.position;
                     playerPos.set(data.pos.x, data.pos.y, data.pos.z);
-                    window.player.health = data.health;
-                    window.player.hunger = data.hunger;
+                    Game.player.health = data.health;
+                    Game.player.hunger = data.hunger;
+                    setActiveCharacterProfile(data.characterProfile || legacyCharacterProfile || createCharacterProfile());
+                    Game.player.setThirdPersonCameraDistance(data.thirdPersonCamera?.distance);
                     time = data.time;
+                    respawnBed = normalizeRespawnBed(data.respawnBed);
                     spawning = false;
 
-                    // Nach migrateSave ist data.inventory garantiert ein Array (v1+).
-                    if (Array.isArray(data.inventory)) {
-                        data.inventory.forEach((item, i) => inventorySlots[i] = item);
-                    }
+                    // migrateSave liefert immer exakt 64 Slots und ersetzt damit den vorherigen Inventarstand vollständig.
+                    data.inventory.forEach((item, i) => inventorySlots[i] = item);
+                    resetControlsHintForRun(data.onboardingObjectiveIndex, data.storyObjectiveIndex);
                     
                     collectedWool = data.collectedWool || 0;
                     lastBloodMoonRewardDay = typeof data.lastBloodMoonRewardDay === 'number' ? data.lastBloodMoonRewardDay : -1;
+                    pendingBloodMoonRewardDay = typeof data.pendingBloodMoonRewardDay === 'number' ? data.pendingBloodMoonRewardDay : -1;
                     updateInventoryUI();
                     updateUI();
                     
@@ -522,6 +783,9 @@
                                 }
                             }
                         }
+                        if (Array.isArray(data.minecarts)) {
+                            for (const minecartData of data.minecarts) spawnMinecart(minecartData);
+                        }
 
                         world.disposeAllChunks({ reuseBuffers: true });
                         updateVisibleChunksIfNeeded(playerPos, true);
@@ -537,27 +801,23 @@
         const DOM = {
             healthFill: document.getElementById('health-fill'),
             hungerFill: document.getElementById('hunger-fill'),
-            timeInfo: document.getElementById('time-info'),
+            worldTimeInfo: document.getElementById('world-time-info'),
+            fpsSummary: document.getElementById('fps-summary'),
             stats: document.getElementById('stats'),
-            fpsCounter: document.getElementById('fps-counter'),
             gameOver: document.getElementById('game-over')
         };
         const UI_UPDATE_INTERVAL_MS = 100;
         const STATS_UPDATE_INTERVAL_MS = 250;
-        const FPS_UPDATE_INTERVAL_MS = 500;
         let lastUiUpdateAt = 0;
         let lastStatsUpdateAt = 0;
         let lastStatsText = '';
-        let fpsFrameCount = 0;
-        let fpsWindowStartedAt = performance.now();
+        const fpsTracker = new FrameRateTracker(500);
         let debugHudVisible = false;
 
         function setDebugHudVisible(visible) {
             debugHudVisible = Boolean(visible);
             DOM.stats.classList.toggle('debug-visible', debugHudVisible);
-            DOM.fpsCounter.classList.toggle('debug-visible', debugHudVisible);
             DOM.stats.setAttribute('aria-hidden', debugHudVisible ? 'false' : 'true');
-            DOM.fpsCounter.setAttribute('aria-hidden', debugHudVisible ? 'false' : 'true');
         }
 
         function toggleDebugHud() {
@@ -568,14 +828,14 @@
 
         // --- SKY-COLOR CACHE (statt 8x new THREE.Color pro Frame) ---
         const SKY = {
-            nightH: new THREE.Color().setHSL(0.64, 0.4, 0.1),
-            nightZ: new THREE.Color().setHSL(0.64, 0.6, 0.03),
+            nightH: new THREE.Color().setHSL(0.64, 0.4, 0.18),
+            nightZ: new THREE.Color().setHSL(0.64, 0.55, 0.08),
             sunriseH: new THREE.Color().setHSL(0.08, 0.8, 0.4),
             sunriseZ: new THREE.Color().setHSL(0.6, 0.5, 0.25),
             dayH: new THREE.Color().setHSL(0.55, 0.5, 0.7),
             dayZ: new THREE.Color().setHSL(0.58, 0.8, 0.45),
-            bloodMoonH: new THREE.Color().setHSL(0.0, 0.8, 0.15),   // Blutmond-Horizont: dunkelrot
-            bloodMoonZ: new THREE.Color().setHSL(0.02, 0.6, 0.05),  // Blutmond-Zenit: schwarz-rot
+            bloodMoonH: new THREE.Color().setHSL(0.0, 0.8, 0.2),    // Blutmond-Horizont: dunkelrot
+            bloodMoonZ: new THREE.Color().setHSL(0.02, 0.6, 0.08),  // Blutmond-Zenit: schwarz-rot
             hColor: new THREE.Color(),
             zColor: new THREE.Color(),
             weatherColor: new THREE.Color(),
@@ -584,20 +844,33 @@
         };
         const BLOOD_MOON_INTERVAL = CONFIG.GAMEPLAY.BLOOD_MOON_INTERVAL || 3;
 
-        function grantBloodMoonReward(dayCount) {
+        function grantBloodMoonReward(dayCount, notifyFailure = true) {
             if (BLOOD_MOON_INTERVAL <= 0) return;
             if (dayCount % BLOOD_MOON_INTERVAL !== BLOOD_MOON_INTERVAL - 1) return;
             if (lastBloodMoonRewardDay === dayCount) return;
-            if (!window.player || window.player.health <= 0) return;
+            if (!Game.player || Game.player.health <= 0) return;
+            const shouldAnnounceSurvival = pendingBloodMoonRewardDay !== dayCount;
+            if (shouldAnnounceSurvival) {
+                window.dispatchEvent(new CustomEvent(STORY_EVENTS.BLOOD_MOON_SURVIVED));
+            }
+
+            const result = tryAddItemsToInventory([
+                { type: 61, count: 1 },
+                { type: 60, count: 4 },
+                { type: 31, count: 2 }
+            ]);
+            if (!result.added) {
+                pendingBloodMoonRewardDay = dayCount;
+                if (notifyFailure) showSaveMessage('Blutmond-Belohnung wartet: Inventar voll', '#ff9800');
+                return;
+            }
 
             lastBloodMoonRewardDay = dayCount;
-            addItemToInventory(61, 1);
-            addItemToInventory(60, 4);
-            addItemToInventory(31, 2);
+            pendingBloodMoonRewardDay = -1;
             showSaveMessage('Blutmond ueberlebt: +1 Eisenbarren, +4 Kohle, +2 Knochen', '#FFD700');
         }
 
-        window.trySleepInBed = function() {
+        window.trySleepInBed = function(bedPosition) {
             const dayRatio = getDayRatio(time, DAY_DURATION);
             const dayCount = Math.floor(time / DAY_DURATION);
             const isBloodMoonNight = dayCount % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1);
@@ -613,93 +886,64 @@
             if (blockReason === 'bloodMoon') return { ok: false, message: 'Der Blutmond laesst dich nicht schlafen.' };
             if (blockReason === 'hostile') return { ok: false, message: 'Monster sind zu nah.' };
 
+            const safeRespawn = findSafeBedRespawn(world, bedPosition);
+            if (!safeRespawn) return { ok: false, message: 'Raeume neben dem Bett einen sicheren Platz frei.' };
+
             time = getWakeTime(time, DAY_DURATION);
+            respawnBed = normalizeRespawnBed(bedPosition);
             mobs.forEach(m => {
                 if (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'spider' || m.type === 'geist') m.isDead = true;
             });
-            window.player.health = Math.min(MAX_HEALTH, window.player.health + 10);
-            window.player.hunger = Math.max(0, window.player.hunger - 5);
+            Game.player.health = Math.min(MAX_HEALTH, Game.player.health + 10);
+            Game.player.hunger = Math.max(0, Game.player.hunger - 5);
             updateUI();
-            return { ok: true, message: 'Gut geschlafen. Es ist Morgen.' };
+            return { ok: true, message: 'Gut geschlafen. Rueckkehrpunkt gesetzt.' };
         };
 
-        // ============================================================
-        // Damage-Feedback (Sprint 5)
-        // ============================================================
-        // Visuelles + akustisches Feedback bei Player-Schaden:
-        //   - Roter Vignette-Flash (fadet 250ms)
-        //   - Subtiler Pain-Sound (water_splash bei tieferem Pitch)
-        //   - Camera-Shake (kurze Pitch/Yaw-Pertubation, 150ms)
-        // Cooldown 250ms verhindert Visual-Spam bei kontinuierlichem Zombie-Damage.
-        //
-        // WICHTIG: State + Funktionen MÜSSEN vor `animate()`-Aufruf deklariert sein,
-        // sonst TDZ — animate() ruft applyCameraShake() bereits im ersten Tick.
-        const _damageFx = { lastAt: 0, flashEl: null, shakeUntil: 0, shakeMag: 0 };
-        function ensureDamageFlashDOM() {
-            if (_damageFx.flashEl) return _damageFx.flashEl;
-            const el = document.createElement('div');
-            el.id = 'damage-flash';
-            el.style.cssText = 'position:fixed;inset:0;pointer-events:none;z-index:200;opacity:0;background:radial-gradient(ellipse at center, transparent 35%, rgba(180,0,0,0.55) 100%);transition:opacity 250ms ease-out;';
-            document.body.appendChild(el);
-            _damageFx.flashEl = el;
-            return el;
-        }
-        function triggerDamageFeedback(amount) {
-            const now = performance.now();
-            if (now - _damageFx.lastAt < 250) return;
-            _damageFx.lastAt = now;
-            const el = ensureDamageFlashDOM();
-            const intensity = Math.min(1, amount / 8);
-            el.style.opacity = String(0.4 + 0.5 * intensity);
-            requestAnimationFrame(() => requestAnimationFrame(() => { el.style.opacity = '0'; }));
-            try {
-                if (window.SoundManager && window.SoundManager.playSound) {
-                    window.SoundManager.playSound('water_splash', 0.5, 0.6 + Math.random() * 0.15, { skipCooldown: true });
-                }
-            } catch (e) { /* sound-system optional */ }
-            _damageFx.shakeUntil = now + 150;
-            _damageFx.shakeMag = 0.025 * intensity;
-        }
-        function applyCameraShake() {
-            // Shake wird über CSS-Transform am Canvas gemacht, NICHT über Three.js-Camera-Rotation.
-            //
-            // WARUM CSS statt camera.rotation.z?
-            //   PointerLockControls nutzt intern Euler-Order 'YXZ' und überschreibt bei jedem
-            //   Mausbewegen `camera.quaternion` via `setFromEuler(setFromQuaternion(...))`.
-            //   Der Z-Anteil (Roll) wird dabei aus der Quaternion extrahiert und wieder
-            //   zurückgeschrieben — d.h. ein einmal gesetzter Roll WÄCHST mit jeder Mausbewegung
-            //   weiter, weil die XYZ↔YXZ-Konvertierung nicht winkeltreu ist.
-            //   Resultat: Welt verdreht sich beim Mausbewegen.
-            //   Mit CSS-Transform am Canvas-Element passiert das alles außerhalb von Three.js
-            //   und kann sauber via leerem `transform`-String zurückgesetzt werden.
-            const canvas = renderer && renderer.domElement;
-            if (!canvas) return;
-            const now = performance.now();
-            if (now >= _damageFx.shakeUntil || _damageFx.shakeMag <= 0) {
-                if (canvas.style.transform) canvas.style.transform = '';
-                return;
-            }
-            const remain = (_damageFx.shakeUntil - now) / 150;
-            const m = _damageFx.shakeMag * remain;
-            const angle = Math.sin(now * 0.05) * m * 0.5; // rad
-            canvas.style.transform = `rotate(${angle}rad)`;
+        function respawnAtBed() {
+            const point = findSafeBedRespawn(world, respawnBed);
+            if (!point) return false;
+
+            controls.getObject().position.set(point.x, point.y, point.z);
+            Game.player.velocity.set(0, 0, 0);
+            velocity.set(0, 0, 0);
+            Game.player.health = MAX_HEALTH;
+            Game.player.hunger = Math.max(50, Game.player.hunger);
+            mobs.forEach(mob => {
+                const hostile = mob.type === 'zombie' || mob.type === 'skeleton' || mob.type === 'spider' || mob.type === 'geist';
+                if (hostile && !mob.isDead && mob.group.position.distanceTo(controls.getObject().position) < 8) mob.isDead = true;
+            });
+            gameActive = true;
+            spawning = false;
+            manuallyPaused = false;
+            DOM.gameOver.style.display = 'none';
+            updateVisibleChunksIfNeeded(controls.getObject().position, true);
+            updateUI(true);
+            lockControlsForDesktop();
+            showSaveMessage('Am Bett wiederbelebt.', '#ffe066');
+            return true;
         }
 
-        try {
-            Input.init(isInventoryOpened);
-            setupInventoryEvents();
-            init();
-            window.__butzcraftGameMainReady = true;
-            window.__butzcraftGameMainEvaluating = false;
-            animate();
-        } catch (err) {
-            window.__butzcraftGameMainError = err && (err.stack || err.message || String(err));
-            window.__butzcraftGameMainEvaluating = false;
-            if (window.__butzcraftShowStartError) {
-                window.__butzcraftShowStartError('GameMain Fehler: ' + (err && err.message ? err.message : String(err)));
+        async function startGame() {
+            try {
+                await preloadEntityMaterials();
+                Input.init(isInventoryOpened);
+                setupInventoryEvents();
+                prepareInventoryUI();
+                init();
+                window.__butzcraftGameMainReady = true;
+                window.__butzcraftGameMainEvaluating = false;
+                animate();
+            } catch (err) {
+                window.__butzcraftGameMainError = err && (err.stack || err.message || String(err));
+                window.__butzcraftGameMainEvaluating = false;
+                if (window.__butzcraftShowStartError) {
+                    window.__butzcraftShowStartError('GameMain Fehler: ' + (err && err.message ? err.message : String(err)));
+                }
+                throw err;
             }
-            throw err;
         }
+        startGame();
 
         function init() {
             scene = new THREE.Scene();
@@ -747,38 +991,28 @@
 
             camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.05, 1000);
             
-            // Zufälligen Spawn-Punkt über einem Land-Biom ermitteln (mit Garantie, dass Höhe > WATER_LEVEL ist)
-            let spawnX = 0, spawnZ = 0, spawnH = 0;
-            let foundLand = false;
-            while (!foundLand) {
-                spawnX = Math.floor(Math.random() * 2000 - 1000);
-                spawnZ = Math.floor(Math.random() * 2000 - 1000);
-                const h = getHeightAt(spawnX, spawnZ);
-                if (h > WATER_LEVEL) {
-                    spawnH = h;
-                    foundLand = true;
-                }
-            }
-            camera.position.set(spawnX, spawnH + 5, spawnZ); // Näher am Boden spawnen
+            // Grasland bevorzugen, damit neue Spieler mit freier Sicht und Holz in der Nähe starten.
+            const spawn = findNewGameSpawn();
+            camera.position.set(spawn.x, spawn.height + 5, spawn.z); // Näher am Boden spawnen
 
-            const ambient = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambient);
+            ambient = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambient);
             sunGroup = new THREE.Group(); scene.add(sunGroup);
             sun = new THREE.DirectionalLight(0xffffff, 1.0); sun.position.set(0, 50, 0); sunGroup.add(sun);
 
-            window.celestialGroup = new THREE.Group();
-            scene.add(window.celestialGroup);
+            const celestialGroup = new THREE.Group();
+            scene.add(celestialGroup);
             
             const sunGeo = new THREE.CircleGeometry(30, 32);
             const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffcc, fog: false, transparent: true, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-            window.sunMesh = new THREE.Mesh(sunGeo, sunMat);
-            window.sunMesh.position.set(0, 400, 0);
-            window.celestialGroup.add(window.sunMesh);
+            const sunMesh = new THREE.Mesh(sunGeo, sunMat);
+            sunMesh.position.set(0, 400, 0);
+            celestialGroup.add(sunMesh);
 
             const moonGeo = new THREE.CircleGeometry(25, 32);
             const moonMat = new THREE.MeshBasicMaterial({ color: 0xdddddf, fog: false, transparent: true, side: THREE.DoubleSide });
-            window.moonMesh = new THREE.Mesh(moonGeo, moonMat);
-            window.moonMesh.position.set(0, -400, 0);
-            window.celestialGroup.add(window.moonMesh);
+            const moonMesh = new THREE.Mesh(moonGeo, moonMat);
+            moonMesh.position.set(0, -400, 0);
+            celestialGroup.add(moonMesh);
 
             const starsGeo = new THREE.BufferGeometry();
             const starsPos = [];
@@ -787,25 +1021,34 @@
                 starsPos.push(vec.x, vec.y, vec.z);
             }
             starsGeo.setAttribute('position', new THREE.Float32BufferAttribute(starsPos, 3));
-            window.starsMat = new THREE.PointsMaterial({color: 0xffffff, size: 2.0, transparent: true, opacity: 0, fog: false});
-            window.starsMesh = new THREE.Points(starsGeo, window.starsMat);
-            scene.add(window.starsMesh);
+            const starsMat = new THREE.PointsMaterial({color: 0xffffff, size: 2.0, transparent: true, opacity: 0, fog: false});
+            const starsMesh = new THREE.Points(starsGeo, starsMat);
+            scene.add(starsMesh);
 
             renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
             renderer.domElement.id = 'game-canvas';
             const DEFAULT_RENDER_SCALE = 1;
             let renderScale = DEFAULT_RENDER_SCALE;
-            renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            const applyRendererResolution = () => {
+                renderer.setPixelRatio(calculateRenderPixelRatio(
+                    window.innerWidth,
+                    window.innerHeight,
+                    window.devicePixelRatio || 1,
+                    renderScale
+                ));
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            };
+            applyRendererResolution();
             document.body.appendChild(renderer.domElement);
+            damageFeedback = new DamageFeedback(renderer.domElement);
 
             // WebGL Context-Loss Handling: tritt auf bei Tab-Wechsel auf Mobile, GPU-Reset, oder
             // wenn der Browser den Context wegen Inaktivität freigibt. Ohne preventDefault wird
             // der Context NIE wiederhergestellt → Canvas bleibt schwarz für immer.
-            window.webglContextLost = false;
+            Game.webglContextLost = false;
             renderer.domElement.addEventListener('webglcontextlost', (e) => {
                 e.preventDefault();
-                window.webglContextLost = true;
+                Game.webglContextLost = true;
                 console.warn('[WebGL] Context lost — pausing render loop, awaiting restore.');
                 let overlay = document.getElementById('webgl-context-lost-overlay');
                 if (!overlay) {
@@ -825,21 +1068,21 @@
 
             renderer.domElement.addEventListener('webglcontextrestored', () => {
                 console.warn('[WebGL] Context restored — rebuilding chunk meshes.');
-                window.webglContextLost = false;
+                Game.webglContextLost = false;
                 const overlay = document.getElementById('webgl-context-lost-overlay');
                 if (overlay) overlay.style.display = 'none';
                 // Chunk-Meshes neu aufbauen — alte BufferGeometries sind nach Context-Loss ungültig.
-                if (window.world && window.world.chunks) {
-                    for (const chunk of window.world.chunks.values()) {
-                        window.world.disposeChunkMeshes(chunk);
-                        window.world.requestMesh(chunk.cx, chunk.cz);
+                if (Game.world && Game.world.chunks) {
+                    for (const chunk of Game.world.chunks.values()) {
+                        Game.world.disposeChunkMeshes(chunk);
+                        Game.world.requestMesh(chunk.cx, chunk.cz);
                     }
                 }
             }, false);
             document.addEventListener('pointerdown', relockControlsFromPointer, true);
 
-            window.player = new Player(scene, camera, document.body, CONFIG);
-            controls = window.player.controls;
+            Game.player = new Player(scene, camera, document.body, CONFIG, activeCharacterProfile, renderer.domElement);
+            controls = Game.player.controls;
 
             // Sicherheits-Reset: Falls aus einem früheren Sprint-5-Bug-Run noch ein roll-Drift
             // in der Camera-Quaternion saß (Sprint 5 setzte camera.rotation.z direkt), hier
@@ -847,19 +1090,9 @@
             // Quaternion-Roundtrip beim ersten Mausbewegen reaktivieren.
             camera.rotation.set(0, 0, 0);
             camera.quaternion.setFromEuler(camera.rotation);
-            // Empfindlichkeit anpassen: Wir verstärken die Drehung durch einen Multiplikator
-            // Three.js PointerLockControls nutzt intern camera.rotation. 
-            // Ein einfacher Weg: Wir hängen uns an den PointerLock-Mechanismus.
-            const sensitivity = 1.8; 
-            const originalOnMouseMove = document.onmousemove;
-            // Wir können hier nicht einfach onmousemove überschreiben, da Three.js Event-Listener nutzt.
-            // Aber wir können in der animate-Schleife die Drehung verstärken, 
-            // indem wir die Differenz zur vorherigen Rotation skalieren.
-            
             // Start-Button Event-Listener
             const startBtn = document.getElementById('start-button');
             bindPress(startBtn, () => {
-                console.log("DEBUG: Start Button Press Event (ID-based)");
                 if (typeof window.startNewGame === 'function') {
                     window.startNewGame();
                 } else {
@@ -872,8 +1105,12 @@
             // Sprint 6: Game-Over-"Neu starten" → Reload (alter Inline-onclick-Handler ist weg)
             const restartBtn = document.getElementById('game-over-restart');
             if (restartBtn) {
-                restartBtn.addEventListener('click', () => window.location.reload());
+                restartBtn.addEventListener('click', () => {
+                    if (!respawnAtBed()) window.location.reload();
+                });
             }
+
+            initStartCharacterEditor();
 
             // Sprint 6: Auto-Load-Hint nach Reload (gesetzt vom Death-Overlay-Save-Klick)
             try {
@@ -889,7 +1126,6 @@
 
             const inst = document.getElementById('instructions');
             inst.addEventListener('click', () => { 
-                console.log("DEBUG: Instructions clicked -> Locking mouse");
                 if (gameActive && manuallyPaused) window.resumeGame();
             });
             controls.addEventListener('lock', () => {
@@ -912,7 +1148,8 @@
             scene.add(camera); // Kamera muss in die Szene, da sie nun Kinder hat
 
             world = new World(scene);
-            window.world = world;
+            Game.world = world;
+            torchLightSystem = new TorchLightSystem(scene);
 
             // Tier 3: Wetter-System initialisieren
             weatherSystem = new WeatherSystem(scene, world);
@@ -931,6 +1168,10 @@
                 }
             });
 
+            window.addEventListener('minecartGenerated', (e) => {
+                spawnMinecart(e.detail);
+            });
+
             // Trade-UI globale Schließ-Funktion
             window.closeTradeUI = () => closeTradeUI(controls);
 
@@ -946,8 +1187,8 @@
                 try { localStorage.setItem(RD_STORAGE_KEY, String(n)); } catch (e) { /* QuotaExceeded etc. ignorieren */ }
                 applyRenderDistanceVisuals();
                 // Sofort wirksam machen, wenn Spieler bereits in der Welt ist
-                if (window.player && window.player.controls) {
-                    const p = window.player.controls.getObject().position;
+                if (Game.player && Game.player.controls) {
+                    const p = Game.player.controls.getObject().position;
                     updateVisibleChunksIfNeeded(p, true);
                 }
             };
@@ -955,8 +1196,7 @@
                 const n = parseFloat(value);
                 if (!RS_ALLOWED.includes(n)) return;
                 renderScale = n;
-                renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
-                renderer.setSize(window.innerWidth, window.innerHeight);
+                applyRendererResolution();
                 try { localStorage.setItem(RS_STORAGE_KEY, String(n)); } catch (e) { /* QuotaExceeded etc. ignorieren */ }
             };
             window.applyRenderDistance = applyRenderDistance;
@@ -980,22 +1220,30 @@
                 rsSelect.addEventListener('change', (e) => applyRenderScale(e.target.value));
             }
 
+            if (window.playerInteraction && typeof window.playerInteraction.destroy === 'function') {
+                window.playerInteraction.destroy();
+            }
             window.playerInteraction = new PlayerInteraction(camera, scene, world, mobs, SoundManager, {
                 getSelectedSlot: getSelectedSlot,
                 getInventorySlots: () => inventorySlots,
-                addItemToInventory: addItemToInventory,
+                addItemToInventory: addItemToInventoryOrDrop,
                 updateInventoryUI: updateInventoryUI,
-                updateUI: updateUI
+                updateUI: updateUI,
+                openWorkbenchCrafting: () => openWorkbenchCrafting(gameStarted, spawning, controls)
             });
             window.playerInteractions = window.playerInteraction; // Alias für Backwards-Compat
             window.playerInteraction.init(controls, () => gameActive, () => spawning);
 
-            // Touch-Controls: nur auf Touch-Devices aktiv. Setzt window.touchActive=true,
+            // Touch-Controls: nur auf Touch-Devices aktiv. Setzt Game.touchActive=true,
             // damit der PointerLock-Pause-Mechanismus übersprungen wird.
             initTouchControls({
                 camera,
                 controls,
-                isInventoryOpenedProvider: isInventoryOpened
+                player: Game.player,
+                isInventoryOpenedProvider: isInventoryOpened,
+                isPausedProvider: () => manuallyPaused,
+                pauseGame: window.pauseGame,
+                resumeGame: window.resumeGame
             });
             window.addEventListener('keydown', e => {
                 // Wenn ein Textfeld fokussiert ist, keine Spielsteuerung auslösen
@@ -1006,43 +1254,53 @@
                     toggleDebugHud();
                     return;
                 }
-                if (isGameplayKey(e) && e.cancelable) e.preventDefault();
-
-                if (e.code === 'Tab') {
-                    const furnaceOverlay = document.getElementById('furnace-overlay');
-                    const chestOverlay = document.getElementById('chest-overlay');
-                    const tradeOverlay = document.getElementById('trade-overlay');
-                    if (isInventoryOpened()) { toggleInventory(gameStarted, spawning, controls); return; }
-                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
-                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
-                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
-                    if (manuallyPaused) window.resumeGame(); else window.pauseGame();
+                if (e.code === 'KeyV') {
+                    handleCameraModeToggle(e);
                     return;
                 }
+                if (isGameplayKey(e) && e.cancelable) e.preventDefault();
 
-                if (e.code === 'Escape') {
-                    const furnaceOverlay = document.getElementById('furnace-overlay');
-                    const chestOverlay = document.getElementById('chest-overlay');
-                    const tradeOverlay = document.getElementById('trade-overlay');
-                    if (isInventoryOpened()) { toggleInventory(gameStarted, spawning, controls); return; }
-                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
-                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
-                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
+                const furnaceOverlay = document.getElementById('furnace-overlay');
+                const chestOverlay = document.getElementById('chest-overlay');
+                const tradeOverlay = document.getElementById('trade-overlay');
+                const stationOverlayOpen =
+                    Boolean(furnaceOverlay && furnaceOverlay.style.display !== 'none') ||
+                    Boolean(chestOverlay && chestOverlay.style.display !== 'none') ||
+                    Boolean(tradeOverlay && tradeOverlay.style.display !== 'none');
+                if (
+                    e.code === 'KeyQ' && !e.repeat && !manuallyPaused &&
+                    !isInventoryOpened() && !stationOverlayOpen && tryToggleMinecart()
+                ) {
+                    if (e.cancelable) e.preventDefault();
+                    return;
+                }
+                const uiCommand = resolveUiInputCommand({
+                    code: e.code,
+                    inventoryOpen: isInventoryOpened(),
+                    furnaceOpen: Boolean(furnaceOverlay && furnaceOverlay.style.display !== 'none'),
+                    chestOpen: Boolean(chestOverlay && chestOverlay.style.display !== 'none'),
+                    tradeOpen: Boolean(tradeOverlay && tradeOverlay.style.display !== 'none'),
+                    paused: manuallyPaused
+                });
+                if (uiCommand) {
+                    if (uiCommand === 'close-inventory' || uiCommand === 'toggle-inventory') {
+                        if (window.playerInteraction) window.playerInteraction.cancelMining();
+                        toggleInventory(gameStarted, spawning, controls);
+                    } else if (uiCommand === 'close-furnace') {
+                        window.closeFurnace && window.closeFurnace();
+                    } else if (uiCommand === 'close-chest') {
+                        window.closeChest && window.closeChest();
+                    } else if (uiCommand === 'close-trade') {
+                        closeTradeUI(controls);
+                    } else if (uiCommand === 'resume') {
+                        window.resumeGame();
+                    } else if (uiCommand === 'pause') {
+                        window.pauseGame();
+                    }
                     return;
                 }
 
                 relockControlsFromInput(e);
-
-                if (e.code === 'KeyE') {
-                    // Ofen/Truhe/Handel zuerst schließen
-                    const furnaceOverlay = document.getElementById('furnace-overlay');
-                    const chestOverlay = document.getElementById('chest-overlay');
-                    const tradeOverlay = document.getElementById('trade-overlay');
-                    if (furnaceOverlay && furnaceOverlay.style.display !== 'none') { window.closeFurnace && window.closeFurnace(); return; }
-                    if (chestOverlay && chestOverlay.style.display !== 'none') { window.closeChest && window.closeChest(); return; }
-                    if (tradeOverlay && tradeOverlay.style.display !== 'none') { closeTradeUI(controls); return; }
-                    toggleInventory(gameStarted, spawning, controls); return;
-                }
                 if (isInventoryOpened()) return;
 
                 // Space logik in Input.js
@@ -1056,19 +1314,10 @@
             window.addEventListener('resize', () => {
                 camera.aspect = window.innerWidth / window.innerHeight;
                 camera.updateProjectionMatrix();
-                renderer.setPixelRatio(Math.min((window.devicePixelRatio || 1) * renderScale, 2));
-                renderer.setSize(window.innerWidth, window.innerHeight);
+                applyRendererResolution();
             });
-            window.camera = camera;
-            window.controls = controls;
-            window.world = world;
-            window.renderer = renderer;
-            window.scene = scene;
-            window.SoundManager = SoundManager;
-            window.mobs = mobs;
-
-
-
+            Game.world = world;
+            Game.renderer = renderer;
             // Komfort-Funktion zum Testen von Wasser
             
         }
@@ -1083,32 +1332,34 @@
         }
 
         function updateFpsCounter(now) {
-            fpsFrameCount++;
-            const elapsed = now - fpsWindowStartedAt;
-            if (elapsed < FPS_UPDATE_INTERVAL_MS) return;
-            const fps = Math.round((fpsFrameCount * 1000) / elapsed);
-            DOM.fpsCounter.textContent = `FPS: ${fps}`;
-            fpsFrameCount = 0;
-            fpsWindowStartedAt = now;
+            const active = gameStarted && gameActive && !manuallyPaused && !spawning;
+            const sample = fpsTracker.record(now, active);
+            if (!sample) return;
+            DOM.fpsSummary.textContent = `FPS · Aktuell ${sample.current} · Min ${sample.min} · Max ${sample.max}`;
+            DOM.fpsSummary.setAttribute('aria-label', `FPS: Aktuell ${sample.current}, Minimum ${sample.min}, Maximum ${sample.max}`);
         }
 
         function updateUI(force = true, now = performance.now()) {
             if (force || now - lastUiUpdateAt >= UI_UPDATE_INTERVAL_MS) {
                 lastUiUpdateAt = now;
-                DOM.healthFill.style.width = Math.max(0, window.player.health) + '%';
-                DOM.hungerFill.style.width = Math.max(0, window.player.hunger) + '%';
+                DOM.healthFill.style.width = Math.max(0, Game.player.health) + '%';
+                DOM.hungerFill.style.width = Math.max(0, Game.player.hunger) + '%';
                 const tm = Math.floor((time / DAY_DURATION) * 1440), hh = Math.floor(tm / 60) % 24, mm = tm % 60, dd = Math.floor(time / DAY_DURATION) + 1;
                 const dayRatioUI = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
                 const dayCountUI = Math.floor(time / DAY_DURATION);
                 const isBloodMoonUI = dayCountUI % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1);
                 const bloodMoonWarning = isBloodMoonUI && dayRatioUI > 0.65 && dayRatioUI <= 0.80 ? ' | \u{1F534} Blutmond!' : '';
                 const bloodMoonActive = isBloodMoonUI && (dayRatioUI > 0.80 || dayRatioUI < 0.20) ? ' | \u{1F7E5} BLUTMOND' : '';
-                DOM.timeInfo.textContent = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}${bloodMoonWarning}${bloodMoonActive}`;
+                DOM.worldTimeInfo.textContent = `Tag ${dd} | ${hh.toString().padStart(2, '0')}:${mm.toString().padStart(2, '0')}${bloodMoonWarning}${bloodMoonActive}`;
             }
-            if (window.player.health <= 0 && gameActive && !spawning) {
+            if (Game.player.health <= 0 && gameActive && !spawning) {
                 gameActive = false;
                 controls.unlock();
                 hideFirstObjective();
+                const restartBtn = document.getElementById('game-over-restart');
+                if (restartBtn) restartBtn.textContent = findSafeBedRespawn(world, respawnBed)
+                    ? 'Am Bett wiederbeleben'
+                    : 'Neu starten';
                 DOM.gameOver.style.display = 'flex';
                 // Sprint 6: Death-Overlay um "Spielstand laden"-Liste erweitern.
                 // Lädt asynchron — User muss nicht warten, falls die Server-Liste leer ist.
@@ -1125,7 +1376,7 @@
             const list = document.getElementById('game-over-save-list');
             if (!section || !list) return;
             list.innerHTML = '';
-            listAllSaveNames()
+            saveRepository.list()
                 .then(names => {
                     if (!Array.isArray(names) || names.length === 0) {
                         section.style.display = 'none';
@@ -1151,7 +1402,7 @@
             requestAnimationFrame(animate);
             // Bei verlorenem WebGL-Context: prevTime trotzdem aktualisieren,
             // damit nach Restore kein riesiger delta-Spike entsteht (würde Wall-Phasing auslösen).
-            if (window.webglContextLost) { prevTime = performance.now(); return; }
+            if (Game.webglContextLost) { prevTime = performance.now(); return; }
             const now = performance.now();
             updateFpsCounter(now);
             const delta = Math.min((now - prevTime) / 1000, 0.02);
@@ -1168,10 +1419,10 @@
             SoundManager.updateListener(camera);
 
             // Camera-Shake bei aktivem Damage-Feedback (Sprint 5).
-            applyCameraShake();
+            damageFeedback.update();
 
             // 1. VOID PROTECTION (Immer aktiv)
-            window.player.updateWaterAndVoid(world, SoundManager, delta);
+            Game.player.updateWaterAndVoid(world, SoundManager, delta);
             // 3. SKY & HUD (Immer aktiv)
             const dayRatio = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
             const dayCount = Math.floor(time / DAY_DURATION);
@@ -1183,21 +1434,28 @@
             const nightZ = isBloodMoon ? SKY.bloodMoonZ : SKY.nightZ;
 
             // Sky-Colors: Wiederverwendung gecachter Color-Objekte (0 Allokationen pro Frame)
-            let skyInty = 1.0;
+            const skyInty = getSkyLightIntensity(dayRatio);
             if (dayRatio >= 0.20 && dayRatio < 0.25) {
-                const f = (dayRatio - 0.20) / 0.05; SKY.hColor.lerpColors(nightH, SKY.sunriseH, f); SKY.zColor.lerpColors(nightZ, SKY.sunriseZ, f); skyInty = 0.05 + f * 0.35;
+                const f = (dayRatio - 0.20) / 0.05; SKY.hColor.lerpColors(nightH, SKY.sunriseH, f); SKY.zColor.lerpColors(nightZ, SKY.sunriseZ, f);
             } else if (dayRatio >= 0.25 && dayRatio < 0.30) {
-                const f = (dayRatio - 0.25) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, SKY.dayH, f); SKY.zColor.lerpColors(SKY.sunriseZ, SKY.dayZ, f); skyInty = 0.4 + f * 0.6;
+                const f = (dayRatio - 0.25) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, SKY.dayH, f); SKY.zColor.lerpColors(SKY.sunriseZ, SKY.dayZ, f);
             } else if (dayRatio >= 0.30 && dayRatio <= 0.70) {
-                SKY.hColor.copy(SKY.dayH); SKY.zColor.copy(SKY.dayZ); skyInty = 1.0;
+                SKY.hColor.copy(SKY.dayH); SKY.zColor.copy(SKY.dayZ);
             } else if (dayRatio > 0.70 && dayRatio <= 0.75) {
-                const f = (dayRatio - 0.70) / 0.05; SKY.hColor.lerpColors(SKY.dayH, SKY.sunriseH, f); SKY.zColor.lerpColors(SKY.dayZ, SKY.sunriseZ, f); skyInty = 1.0 - f * 0.6;
+                const f = (dayRatio - 0.70) / 0.05; SKY.hColor.lerpColors(SKY.dayH, SKY.sunriseH, f); SKY.zColor.lerpColors(SKY.dayZ, SKY.sunriseZ, f);
             } else if (dayRatio > 0.75 && dayRatio <= 0.80) {
-                const f = (dayRatio - 0.75) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, nightH, f); SKY.zColor.lerpColors(SKY.sunriseZ, nightZ, f); skyInty = 0.4 - f * 0.35;
-            } else { SKY.hColor.copy(nightH); SKY.zColor.copy(nightZ); skyInty = 0.05; }
+                const f = (dayRatio - 0.75) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, nightH, f); SKY.zColor.lerpColors(SKY.sunriseZ, nightZ, f);
+            } else { SKY.hColor.copy(nightH); SKY.zColor.copy(nightZ); }
             sun.intensity = skyInty;
+            if (ambient?.userData.painterlyDayIntensity !== undefined) {
+                ambient.intensity = getAmbientLightIntensity(
+                    skyInty,
+                    ambient.userData.painterlyNightIntensity,
+                    ambient.userData.painterlyDayIntensity
+                );
+            }
 
-            if (window.player.inWater) {
+            if (Game.player.inWater) {
                 scene.background = SKY.underwaterColor;
                 if (scene.fog) { scene.fog.color.copy(SKY.underwaterColor); scene.fog.density = 0.12; }
             } else {
@@ -1241,9 +1499,13 @@
             const isPaused = !gameStarted || manuallyPaused || (!spawning && isBlockingOverlayOpen());
             if (!isPaused) {
                 const previousDayCount = Math.floor(time / DAY_DURATION);
-                time += delta;
+                time += delta * getDayCycleSpeed(dayRatio);
                 const currentDayCount = Math.floor(time / DAY_DURATION);
                 if (currentDayCount > previousDayCount) grantBloodMoonReward(previousDayCount);
+                if (pendingBloodMoonRewardDay >= 0 && now - lastBloodMoonRewardRetry >= 1000) {
+                    lastBloodMoonRewardRetry = now;
+                    grantBloodMoonReward(pendingBloodMoonRewardDay, false);
+                }
 
                 // Tier 3: Wetter-System Update
                 if (weatherSystem) {
@@ -1254,25 +1516,24 @@
                     const cx = Math.floor(playerPos.x / CHUNK_SIZE);
                     const cz = Math.floor(playerPos.z / CHUNK_SIZE);
                     if (!world.chunks.has(world.getChunkKey(cx, cz))) {
-                        window.player.velocity.set(0, 0, 0);
+                        Game.player.velocity.set(0, 0, 0);
                         playerPos.y = CHUNK_HEIGHT + 10; 
                     } else {
-                        window.player.velocity.y = Math.max(window.player.velocity.y, -4.0);
+                        Game.player.velocity.y = Math.max(Game.player.velocity.y, -4.0);
                         const bt = world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y - 1.7), Math.floor(playerPos.z));
                         if (bt !== 0 && bt !== 8 && bt !== 9 && bt !== 10) {
                             spawning = false;
-                            if (!controls.isLocked && !window.touchActive) lockControlsForDesktop();
+                            if (!controls.isLocked && !Game.touchActive) lockControlsForDesktop();
                         }
                     }
                 }
                 showControlsHintOnceReady();
 
-                // Wrapped onDamage: appliziert Schaden UND triggert Feedback (Flash + Pain-Sound + Shake).
-                // _lastPainAt verhindert Sound-Spam bei kontinuierlichem Zombie-Damage (≤ 1 Sound/300ms).
+                // Wrapped onDamage: appliziert Schaden UND triggert Feedback (Flash + Shake).
                 const onPlayerDamage = (d) => {
                     if (d <= 0) return;
-                    window.player.health -= d;
-                    triggerDamageFeedback(d);
+                    Game.player.health -= d;
+                    damageFeedback.trigger(d);
                 };
                 mobs.forEach(m => {
                     if ((dayRatio < 0.25 || dayRatio > 0.75) === false && (m.type === 'zombie' || m.type === 'skeleton')) m.isDead = true;
@@ -1465,32 +1726,50 @@
                         item.velocityY -= 9.8 * delta; ip.y += item.velocityY * delta;
                         const bB = world.getBlock(Math.floor(ip.x), Math.floor(ip.y - 0.1), Math.floor(ip.z));
                         if (bB !== 0 && bB !== 4 && bB !== 8 && bB !== 9 && item.velocityY < 0) { ip.y = Math.floor(ip.y - 0.1) + 1.0; item.velocityY = 0; }
+                        updateDroppedItemVisual(item, delta, graphicsPrototype.usesPainterlyTextures);
                         if (Math.hypot(ip.x - playerPos.x, ip.z - playerPos.z) < 2.0 && Math.abs(ip.y - playerPos.y) < 2.5) {
-                            disposeDrop(item);
-                            items.splice(i, 1);
-                            addItemToInventory(item.blockType, 1);
+                            tryCollectDroppedItem(items, i, disposeDrop);
                         }
                     }
                 };
                 updateItems(droppedItems);
 
-                // PLAYER PHYSICS
-                window.player.updatePhysics(delta, Input, world, SoundManager);
-                window.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (window.player.hunger <= 0) { window.player.hunger = 0; window.player.health -= 2 * delta; }
-                if (window.player.hunger > REGEN_THRESHOLD && window.player.health < MAX_HEALTH) window.player.health += REGEN_RATE * delta;
+                // PLAYER PHYSICS / MINECART
+                for (const minecart of minecarts) minecart.update(delta, Input, world);
+                if (activeMinecart) {
+                    activeMinecart.syncRider(playerPos);
+                    Game.player.velocity.set(0, 0, 0);
+                } else {
+                    Game.player.updatePhysics(delta, Input, world, SoundManager);
+                }
+                Game.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (Game.player.hunger <= 0) { Game.player.hunger = 0; Game.player.health -= 2 * delta; }
+                if (Game.player.hunger > REGEN_THRESHOLD && Game.player.health < MAX_HEALTH) Game.player.health += REGEN_RATE * delta;
 
                 // Druckplatten-Schaden
                 if (window.playerInteraction) window.playerInteraction.checkPressurePlates(playerPos.x, playerPos.y, playerPos.z);
+                if (window.playerInteraction) window.playerInteraction.updateMining(delta);
+                if (window.playerInteraction) window.playerInteraction.updateCombat();
+                if (window.playerInteraction) window.playerInteraction.updateRanged(delta);
             }
 
             // Ofen-Tick (auch wenn pausiert, solange UI offen)
             tickFurnace(controls);
 
             updateVisibleChunksIfNeeded(playerPos);
-            window.player.updateSword(delta);
+            world.processPendingMeshResults();
+            const selectedItem = inventorySlots[getSelectedSlot()];
+            Game.player.updateHeldTorch(Boolean(selectedItem && selectedItem.count > 0 && selectedItem.type === TORCH_TYPE));
+            torchLightSystem.update(delta, world.modifiedBlocks, world.fireLightKeys, playerPos);
+            Game.player.updateSword(delta);
+            Game.player.updateCharacterModel(delta);
 
 
-            renderer.render(scene, camera);
+            const cameraRestoreState = Game.player.prepareCameraForRender(world);
+            try {
+                renderer.render(scene, camera);
+            } finally {
+                Game.player.restoreCameraAfterRender(cameraRestoreState);
+            }
         }
 
 
@@ -1536,7 +1815,7 @@
             setStatus(startList, 'Lade...', '#aaa');
             setStatus(pauseList, 'Lade...', '#aaa');
 
-            listAllSaveNames()
+            saveRepository.list()
                 .then(saves => {
                     if (startList) startList.textContent = '';
                     if (pauseList) pauseList.textContent = '';
@@ -1561,18 +1840,22 @@
 
         window.saveGame = function() {
             const name = document.getElementById('save-input').value.trim();
-            if(!name) { alert("Bitte einen Namen eingeben!"); return; }
+            if(!name) { showSaveNameError(); return; }
             
             const playerPos = camera.position;
             const gameData = stampSaveVersion({
                 pos: { x: playerPos.x, y: playerPos.y, z: playerPos.z },
-                health: window.player.health,
-                hunger: window.player.hunger,
+                health: Game.player.health,
+                hunger: Game.player.hunger,
                 time: time,
                 inventory: inventorySlots,
                 collectedEggs: collectedEggs,
                 collectedWool: collectedWool,
                 lastBloodMoonRewardDay: lastBloodMoonRewardDay,
+                pendingBloodMoonRewardDay: pendingBloodMoonRewardDay,
+                onboardingObjectiveIndex: miniObjectiveIndex,
+                storyObjectiveIndex: storyObjectiveIndex,
+                respawnBed: respawnBed,
                 modifiedBlocks: world.modifiedBlocks,
                 blockMeta: world.blockMeta,
                 chestContents: world.chestContents,
@@ -1581,7 +1864,10 @@
                 weather: weatherSystem ? weatherSystem.serialize() : null,
                 fireBlocks: weatherSystem ? weatherSystem.saveFireBlocks() : {},
                 villages: world.villages || [],
-                npcs: npcs.filter(n => !n.isDead).map(n => n.serialize())
+                npcs: npcs.filter(n => !n.isDead).map(n => n.serialize()),
+                minecarts: minecarts.map(minecart => minecart.serialize()),
+                characterProfile: normalizeCharacterProfile(activeCharacterProfile),
+                thirdPersonCamera: { distance: Game.player.getThirdPersonCameraDistance() }
             });
             
             if (!isValidSaveName(name)) {
@@ -1589,7 +1875,7 @@
                 return;
             }
 
-            saveBrowserSave(name, gameData)
+            saveRepository.save(name, gameData)
                 .then(() => {
                     currentSaveName = name;
                     showSaveMessage('Spiel gespeichert!');
@@ -1605,7 +1891,7 @@
                 alert("Bitte erst einen Spielstand speichern oder einen Namen eingeben.");
                 return;
             }
-            loadSaveData(name)
+            saveRepository.load(name)
                 .then(gameData => {
                     const blob = new Blob([serializeSaveFile(name, gameData)], { type: 'application/json' });
                     const url = URL.createObjectURL(blob);
@@ -1636,7 +1922,7 @@
                 try {
                     const raw = JSON.parse(reader.result);
                     const save = normalizeImportedSave(raw, file.name);
-                    saveBrowserSave(save.name, save.gameData)
+                    saveRepository.save(save.name, save.gameData)
                         .then(() => {
                             currentSaveName = save.name;
                             const nameInput = document.getElementById('save-input');

@@ -1,15 +1,11 @@
-/* tests/Game.test.js - Smoke-Test für die Game-Singleton-Proxy.
+/* tests/Game.test.js - Smoke tests for the central Game state.
  *
- * Während Phase 1 der Migration leitet jeder Slot transparent zu window weiter.
- * Diese Tests verifizieren:
- *  - Schreiben auf Game.x setzt window.x (und umgekehrt)
- *  - playerPosition liefert null, wenn kein Player gesetzt ist
- *  - reset() räumt alle Slots auf
+ * These tests verify owned state, derived values and reset behavior.
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Game } from '../js/Game.js';
 
-describe('Game-Singleton (Phase-1-Proxy)', () => {
+describe('Game singleton', () => {
     beforeEach(() => {
         Game.reset();
     });
@@ -23,16 +19,12 @@ describe('Game-Singleton (Phase-1-Proxy)', () => {
         expect(window.Game).toBe(Game);
     });
 
-    it('Schreiben auf Game.player propagiert zu window.player', () => {
+    it('owns player state without leaking it to window', () => {
+        delete window.player;
         const fakePlayer = { health: 100 };
         Game.player = fakePlayer;
-        expect(window.player).toBe(fakePlayer);
-    });
-
-    it('Schreiben auf window.player ist über Game.player lesbar', () => {
-        const fakePlayer = { health: 50 };
-        window.player = fakePlayer;
         expect(Game.player).toBe(fakePlayer);
+        expect(window.player).toBeUndefined();
     });
 
     it('playerPosition ist null, solange kein Player gesetzt', () => {
@@ -63,21 +55,27 @@ describe('Game-Singleton (Phase-1-Proxy)', () => {
         });
     });
 
-    it('reset() räumt alle Proxied-Slots auf', () => {
+    it('reset() restores every shared state default', () => {
         Game.player = { dummy: true };
         Game.world = { dummy: true };
-        Game.scene = { dummy: true };
+        Game.renderer = { dummy: true };
+        Game.droppedItems = [];
+        Game.webglContextLost = true;
+        Game.touchActive = true;
         Game.reset();
         expect(Game.player).toBeUndefined();
         expect(Game.world).toBeUndefined();
-        expect(Game.scene).toBeUndefined();
-        expect(window.player).toBeUndefined();
+        expect(Game.renderer).toBeUndefined();
+        expect(Game.droppedItems).toBeUndefined();
+        expect(Game.webglContextLost).toBe(false);
+        expect(Game.touchActive).toBe(false);
     });
 
-    it('touchActive (Sprint 6) ist proxied — read/write konsistent mit window', () => {
+    it('owns and resets touchActive without leaking it to window', () => {
+        delete window.touchActive;
         Game.touchActive = true;
-        expect(window.touchActive).toBe(true);
-        window.touchActive = false;
+        expect(window.touchActive).toBeUndefined();
+        Game.reset();
         expect(Game.touchActive).toBe(false);
     });
 });

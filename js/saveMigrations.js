@@ -14,8 +14,11 @@
  * Vorteil ggü. der vorigen Inline-Migration: Eine Stelle, eine Versions-Reihe, testbar.
  */
 
+import { getToolInfo } from './miningRules.js?v=20260716a';
+import { normalizeCharacterProfile } from './characterProfile.js?v=20260602a';
+
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 5;
+export const CURRENT_SAVE_VERSION = 11;
 
 // Migration v0 → v1: Inventory-Format vom Objekt {type: count} auf Array<{type, count}>
 const OLD_INVENTORY_MAP = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
@@ -75,14 +78,100 @@ function migrateV4toV5(data) {
     return data;
 }
 
+function migrateV5toV6(data) {
+    if (typeof data.onboardingObjectiveIndex !== 'number') data.onboardingObjectiveIndex = 0;
+    if (typeof data.pendingBloodMoonRewardDay !== 'number') data.pendingBloodMoonRewardDay = -1;
+    return data;
+}
+
+function migrateV6toV7(data) {
+    if (typeof data.storyObjectiveIndex !== 'number') data.storyObjectiveIndex = 0;
+    return data;
+}
+
+function migrateV7toV8(data) {
+    if (!Array.isArray(data.inventory)) return data;
+    const extraTools = [];
+    for (const slot of data.inventory) {
+        if (!slot || typeof slot !== 'object') continue;
+        const toolInfo = getToolInfo(slot.type);
+        if (!toolInfo || slot.count <= 0) continue;
+        const extraCount = Math.max(0, Math.floor(slot.count) - 1);
+        for (let i = 0; i < extraCount; i++) extraTools.push(slot.type);
+        slot.count = 1;
+        slot.durability = Number.isFinite(slot.durability)
+            ? Math.max(1, Math.min(toolInfo.maxDurability, Math.floor(slot.durability)))
+            : toolInfo.maxDurability;
+    }
+
+    for (const type of extraTools) {
+        let freeIndex = -1;
+        for (let index = 0; index < 64; index++) {
+            if (index >= 8 && index < 16) continue;
+            const slot = data.inventory[index];
+            if (!slot || slot.type === 0 || slot.count <= 0) {
+                freeIndex = index;
+                break;
+            }
+        }
+        if (freeIndex === -1) break;
+        data.inventory[freeIndex] = { type, count: 1, durability: getToolInfo(type).maxDurability };
+    }
+    return data;
+}
+
+function migrateV8toV9(data) {
+    if (!data.respawnBed || typeof data.respawnBed !== 'object') data.respawnBed = null;
+    return data;
+}
+
+function migrateV9toV10(data) {
+    if (!Object.prototype.hasOwnProperty.call(data, 'characterProfile')) data.characterProfile = null;
+    if (!data.thirdPersonCamera || typeof data.thirdPersonCamera !== 'object') {
+        data.thirdPersonCamera = { distance: 4.2 };
+    }
+    return data;
+}
+
+function migrateV10toV11(data) {
+    if (!Array.isArray(data.minecarts)) data.minecarts = [];
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
     2: migrateV1toV2,
     3: migrateV2toV3,
     4: migrateV3toV4,
-    5: migrateV4toV5
+    5: migrateV4toV5,
+    6: migrateV5toV6,
+    7: migrateV6toV7,
+    8: migrateV7toV8,
+    9: migrateV8toV9,
+    10: migrateV9toV10,
+    11: migrateV10toV11
 };
+
+function normalizeCharacterSettings(data) {
+    if (data.characterProfile) data.characterProfile = normalizeCharacterProfile(data.characterProfile);
+    if (!data.thirdPersonCamera || typeof data.thirdPersonCamera !== 'object') data.thirdPersonCamera = {};
+    const distance = Number(data.thirdPersonCamera.distance);
+    data.thirdPersonCamera.distance = Number.isFinite(distance)
+        ? Math.max(2, Math.min(6, distance))
+        : 4.2;
+    return data;
+}
+
+function normalizeInventory(data) {
+    if (!Array.isArray(data.inventory)) data.inventory = [];
+    data.inventory.length = Math.min(data.inventory.length, 64);
+    for (let i = 0; i < 64; i++) {
+        const slot = data.inventory[i];
+        if (!slot || typeof slot !== 'object') data.inventory[i] = { type: 0, count: 0 };
+    }
+    return data;
+}
 
 /**
  * Wendet alle nötigen Migrations an, damit das Save-Object die CURRENT_SAVE_VERSION hat.
@@ -105,6 +194,28 @@ export function migrateSave(data) {
         v = next;
     }
     data.version = v;
+    return normalizeCharacterSettings(normalizeInventory(data));
+}
+
+export function prepareSaveForLoad(rawData) {
+    if (!rawData || typeof rawData !== 'object' || Array.isArray(rawData)) {
+        throw new Error('Ungültiger Spielstand');
+    }
+    if (typeof rawData.version === 'number' && rawData.version > CURRENT_SAVE_VERSION) {
+        throw new Error('Spielstandversion wird nicht unterstützt');
+    }
+
+    const data = migrateSave(rawData);
+    const pos = data.pos;
+    if (
+        !pos || typeof pos !== 'object' ||
+        !Number.isFinite(pos.x) || !Number.isFinite(pos.y) || !Number.isFinite(pos.z)
+    ) {
+        throw new Error('Spielstand enthält keine gültige Position');
+    }
+    if (!Number.isFinite(data.health) || !Number.isFinite(data.hunger) || !Number.isFinite(data.time)) {
+        throw new Error('Spielstand enthält ungültige Spielerwerte');
+    }
     return data;
 }
 

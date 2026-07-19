@@ -1,17 +1,13 @@
-/* js/Game.js - Butzcraft zentraler State-Container (Phase 1)
+/* js/Game.js - Butzcraft zentraler State-Container
  *
  * MIGRATIONS-PFAD aus window-Pollution heraus:
  *
- *  Phase 1 (HIER): Game proxy-zu-window. Existierender Code unverändert. Neuer Code soll
- *                  `import { Game } from './Game.js'` benutzen anstatt window.player etc.
+ *  Phase 1 (complete): Game proxies legacy window state while modules migrate.
  *
- *  Phase 2 (später): Bestehende Module schrittweise migrieren — pro PR ein Modul:
- *                  - PlayerInteraction.js: window.player → Game.player
- *                  - mobs.js: window.droppedItems → Game.droppedItems
- *                  - inventory.js: window.* Recipe-Hooks → Game-Methoden
+ *  Phase 2 (complete): PlayerInteraction and mob state use Game; the obsolete
+ *                      global recipe refresh hook was removed from inventory.
  *
- *  Phase 3 (final): window.* Assignments aus GameMain.js entfernen, Game.set*() aufrufen.
- *                  Tests können Game.reset() aufrufen statt window-Properties zu löschen.
+ *  Phase 3 (complete): Game owns shared runtime state; private and imported dependencies stay local.
  *
  * Vorteile dieses inkrementellen Ansatzes:
  *  - Kein Big-Bang-Refactor (Risiko zu hoch für Hobby-Projekt)
@@ -19,30 +15,18 @@
  *  - Game-Singleton dient als ausgezeichneter Insertion-Point für Tests/Mocks
  */
 
-// Liste der Slots, die Game verwaltet. Jeder bekommt eine Property mit get/set,
-// die transparent durch zu window.* leitet — solange GameMain noch dort schreibt.
-//
-// Sprint 6: `touchActive` ergänzt (war fehlende Lücke aus dem Sprint-5-Review).
-const PROXIED_SLOTS = [
-    'player', 'world', 'scene', 'camera', 'renderer', 'controls',
-    'mobs', 'droppedItems', 'projectiles',
-    'sunMesh', 'moonMesh', 'starsMesh', 'starsMat', 'celestialGroup',
-    'BLOCK_TYPES', 'BLOCK_TEX', 'SoundManager',
-    'inventorySlots',
-    'webglContextLost', 'touchActive'
-];
+const STATE_DEFAULTS = Object.freeze({
+    player: undefined,
+    world: undefined,
+    renderer: undefined,
+    droppedItems: undefined,
+    webglContextLost: false,
+    touchActive: false
+});
 
 class GameClass {
     constructor() {
-        // Define accessor properties auf this, die transparent gegen window proxien.
-        for (const slot of PROXIED_SLOTS) {
-            Object.defineProperty(this, slot, {
-                get: () => (typeof window !== 'undefined' ? window[slot] : undefined),
-                set: (v) => { if (typeof window !== 'undefined') window[slot] = v; },
-                enumerable: true,
-                configurable: true
-            });
-        }
+        this.reset();
     }
 
     // Convenience: Player-Position. null wenn Spiel nicht aktiv.
@@ -64,9 +48,7 @@ class GameClass {
     // Reset für Test-Szenarien. Setzt alle Slots auf undefined (sowohl auf Game als auch auf window).
     // NICHT für Production-Code — nur für Tests/Tear-Down.
     reset() {
-        for (const slot of PROXIED_SLOTS) {
-            this[slot] = undefined;
-        }
+        Object.assign(this, STATE_DEFAULTS);
     }
 }
 

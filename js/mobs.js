@@ -1,31 +1,87 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=20260511a';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { CONFIG } from '../config.js?v=20260719a';
 import { SoundManager } from './sound.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260507b';
-import { Physics } from './Physics.js?v=20260507b';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260717y';
+import { Physics } from './Physics.js?v=20260717a';
+import { Game } from './Game.js?v=20260716b';
+import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260719a';
 
 const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
 const { GRAVITY, MOB_JUMP_FORCE = 5.5 } = CONFIG.PHYSICS;
 const { HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
-window.droppedItems = window.droppedItems || [];
+Game.droppedItems = Game.droppedItems || [];
 
 // Wiederverwendbare Vektor-Objekte (vermeidet GC-Druck durch new Vector3 in update())
 const _tempDir = new THREE.Vector3();
 const _tempPDir = new THREE.Vector3();
 const _tempNormVel = new THREE.Vector3();
 const _tempProjectileMove = new THREE.Vector3();
+const MOB_TEXTURE_TILES = {
+    zombie: 0,
+    skeleton: 1,
+    spider: 2,
+    pig: 3,
+    chicken: 4,
+    sheep: 5,
+    cow: 6,
+    fish: 7,
+    octopus: 8,
+    turtle: 9,
+    parrot: 10
+};
 
-// Material-Cache pro (baseColor, texIdx). Vorher wurde pro Body-Part eines Mobs
+// Material-Cache pro Farb-, Atlas- und Variantenkombination. Vorher wurde pro Body-Part eines Mobs
 // ein NEUES Material + Textur-Clone erzeugt → Skelett-Mob = ~20 Materials, 20 Textur-Klone.
 // Bei 20 Mobs = 400 Material-Instanzen mit eigenen Atlas-Klonen. Mit Cache: ~10 Materials total.
 const _matCache = new Map();
 const _sharedMobMaterials = new Set();
-function getCachedMobMaterial(baseColor, texIdx) {
-    const key = (baseColor << 16) | (texIdx & 0xffff);
+const _sharedMobGeometries = new Set();
+const _lodAssets = new Map();
+const MOB_LOD_DISTANCE_SQ = 32 * 32;
+const MOB_FAR_UPDATE_INTERVAL = 0.1;
+const MOB_LOD_PROFILES = {
+    zombie: { size: [0.7, 1.8, 0.5], y: 0.9, color: 0x587a46 },
+    skeleton: { size: [0.7, 1.8, 0.4], y: 0.9, color: 0xd8d2b8 },
+    spider: { size: [1.8, 0.5, 1.5], y: 0.35, color: 0x34252b },
+    pig: { size: [0.9, 0.8, 1.3], y: 0.45, color: 0xd98585 },
+    chicken: { size: [0.5, 0.8, 0.7], y: 0.4, color: 0xe8e2c9 },
+    sheep: { size: [0.9, 1, 1.2], y: 0.5, color: 0xd9d5c5 },
+    cow: { size: [1, 1.3, 1.5], y: 0.65, color: 0x765342 },
+    fish: { size: [0.5, 0.4, 1], y: 0.2, color: 0x4d91a8 },
+    octopus: { size: [0.9, 0.8, 0.9], y: 0.3, color: 0x80526f },
+    turtle: { size: [1.2, 0.5, 1.4], y: 0.25, color: 0x668351 },
+    geist: { size: [0.8, 1.8, 0.6], y: 0.8, color: 0x9fb7ba },
+    parrot: { size: [0.6, 0.7, 0.7], y: 0.4, color: 0xc45b46 }
+};
+
+function getMobLodAssets(type, visualVariant) {
+    const key = `${type}:${visualVariant}`;
+    let assets = _lodAssets.get(key);
+    if (assets) return assets;
+    const profile = MOB_LOD_PROFILES[type] || MOB_LOD_PROFILES.pig;
+    const bodyGeometry = new THREE.BoxGeometry(...profile.size);
+    const headSize = [profile.size[0] * 0.72, profile.size[1] * 0.62, profile.size[2] * 0.38];
+    const headGeometry = new THREE.BoxGeometry(...headSize);
+    headGeometry.translate(0, profile.size[1] * 0.18, profile.size[2] * 0.62);
+    const geometry = mergeGeometries([bodyGeometry, headGeometry]);
+    bodyGeometry.dispose();
+    headGeometry.dispose();
+    const material = getCachedMobMaterial(profile.color, undefined, MOB_TEXTURE_TILES[type], visualVariant);
+    _sharedMobGeometries.add(geometry);
+    assets = { geometry, material, y: profile.y };
+    _lodAssets.set(key, assets);
+    return assets;
+}
+function getCachedMobMaterial(baseColor, texIdx, painterlyTile, visualVariant) {
+    const key = `${baseColor}:${texIdx ?? 'plain'}:${painterlyTile ?? 'none'}:${visualVariant}`;
     let mat = _matCache.get(key);
     if (mat) return mat;
-    if (!textureAtlas || texIdx === undefined) {
+    const painterlyTexture = painterlyTile === undefined ? null : getPainterlyEntityTexture(painterlyTile, visualVariant);
+    if (painterlyTexture) {
+        mat = new THREE.MeshPhongMaterial({ color: baseColor, map: painterlyTexture });
+    } else if (!textureAtlas || texIdx === undefined) {
         mat = new THREE.MeshPhongMaterial({ color: baseColor });
     } else {
         const tex = textureAtlas.clone();
@@ -62,6 +118,7 @@ export class Mob {
         this.velocity = new THREE.Vector3();
         this.lastJump = 0;
         this.group = new THREE.Group();
+        this.visualVariant = selectEntityTextureVariant(x, z, type.length);
 
         if (type === 'zombie') {
             this._buildZombie();
@@ -92,6 +149,13 @@ export class Mob {
             this._buildParrot();
         }
 
+        this.detailObjects = [...this.group.children];
+        const lodAssets = getMobLodAssets(type, this.visualVariant);
+        this.lodMesh = new THREE.Mesh(lodAssets.geometry, lodAssets.material);
+        this.lodMesh.position.y = lodAssets.y;
+        this.lodMesh.visible = false;
+        this.group.add(this.lodMesh);
+
         this.group.position.set(x, y, z);
         scene.add(this.group);
         this.mesh = this.group;
@@ -101,7 +165,7 @@ export class Mob {
         if (this._disposed || !this.group) return;
         this.scene.remove(this.group);
         this.group.traverse(obj => {
-            if (obj.geometry) obj.geometry.dispose();
+            if (obj.geometry && !_sharedMobGeometries.has(obj.geometry)) obj.geometry.dispose();
             if (obj.material) {
                 const disposeMaterial = (mat) => {
                     if (!_sharedMobMaterials.has(mat)) mat.dispose();
@@ -113,10 +177,20 @@ export class Mob {
         this._disposed = true;
     }
 
-    _getTexMat(baseColor, texIdx) {
-        // Delegiert an Modul-globalen Cache → eine Material/Textur-Instanz pro (color, texIdx)-Paar
+    updateVisualLod(playerPos) {
+        const useLod = this.group.position.distanceToSquared(playerPos) >= MOB_LOD_DISTANCE_SQ;
+        if (this._usingLod === useLod) return useLod;
+        this._usingLod = useLod;
+        for (const object of this.detailObjects) object.visible = !useLod;
+        this.lodMesh.visible = useLod;
+        return useLod;
+    }
+
+    _getTexMat(baseColor, texIdx, usePainterlyTexture = false) {
+        // Delegiert an den Modul-Cache → eine Materialinstanz pro Farb-, Atlas- und Variantenkombination
         // statt pro Mesh. Massive Reduktion bei vielen Mobs.
-        return getCachedMobMaterial(baseColor, texIdx);
+        const painterlyTile = (texIdx !== undefined || usePainterlyTexture) ? MOB_TEXTURE_TILES[this.type] : undefined;
+        return getCachedMobMaterial(baseColor, texIdx, painterlyTile, this.visualVariant);
     }
 
     _buildSkeleton() {
@@ -219,21 +293,18 @@ export class Mob {
 
     _buildSpider() {
         this.legs = [];
-        const box = (w, h, d, c) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c));
-        const dark = 0x051116;
-        const teal = 0x0b4650;
-        const tealDark = 0x082c35;
+        const box = (w, h, d, c, painted = false) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c, undefined, painted));
         const red = 0xc00000;
 
-        const body = box(0.82, 0.34, 0.76, teal);
+        const body = box(0.82, 0.34, 0.76, 0xffffff, true);
         body.position.set(0, 0.42, -0.12);
         this.group.add(body);
 
-        const abdomen = box(0.74, 0.42, 0.68, dark);
+        const abdomen = box(0.74, 0.42, 0.68, 0xffffff, true);
         abdomen.position.set(0, 0.46, -0.62);
         this.group.add(abdomen);
 
-        const head = box(0.62, 0.40, 0.48, tealDark);
+        const head = box(0.62, 0.40, 0.48, 0xffffff, true);
         head.position.set(0, 0.40, 0.38);
         this.group.add(head);
 
@@ -248,7 +319,7 @@ export class Mob {
         mouth.position.set(0, 0.31, 0.65);
         this.group.add(mouth);
 
-        const legMat = this._getTexMat(tealDark);
+        const legMat = this._getTexMat(0xffffff, undefined, true);
         for (const side of [-1, 1]) {
             for (let i = 0; i < 4; i++) {
                 const z = 0.28 - i * 0.24;
@@ -454,9 +525,9 @@ export class Mob {
     _buildFish() {
         this.isAquatic = true;
         this.group = new THREE.Group();
-        const box = (w, h, d, c) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshPhongMaterial({ color: c }));
+        const box = (w, h, d, c, painted = false) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c, undefined, painted));
         
-        const body = box(0.15, 0.3, 0.45, 0xFF9800); // Orange body
+        const body = box(0.15, 0.3, 0.45, 0xffffff, true);
         body.position.y = 0.2;
         this.group.add(body);
         
@@ -495,9 +566,9 @@ export class Mob {
     _buildOctopus() {
         this.isAquatic = true;
         this.group = new THREE.Group();
-        const box = (w, h, d, c) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshPhongMaterial({ color: c }));
+        const box = (w, h, d, c, painted = false) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c, undefined, painted));
         
-        const head = box(0.5, 0.5, 0.5, 0x6A1B9A); // Purple head
+        const head = box(0.5, 0.5, 0.5, 0xffffff, true);
         head.position.y = 0.5;
         this.group.add(head);
 
@@ -522,13 +593,13 @@ export class Mob {
         this.tentacles = [];
         for(let i=0; i<8; i++) {
             const t = new THREE.Group();
-            const arm = box(0.1, 0.4, 0.1, 0x4A148C); // Darker purple tentacles
+            const arm = box(0.1, 0.4, 0.1, 0xffffff, true);
             arm.position.y = 0;
             t.add(arm);
             
             // Suction cups
             for(let j=0; j<3; j++) {
-                const cup = box(0.12, 0.05, 0.12, 0x8E24AA); // Lighter purple cups
+                const cup = box(0.12, 0.05, 0.12, 0xd8a7d3, true);
                 cup.position.y = -0.15 + j * 0.15;
                 t.add(cup);
             }
@@ -554,9 +625,9 @@ export class Mob {
         this.isSurfaceSwimmer = true;
         this.flippers = [];
         this.group = new THREE.Group();
-        const box = (w, h, d, c) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshPhongMaterial({ color: c }));
+        const box = (w, h, d, c, painted = false) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c, undefined, painted));
 
-        const shell = box(0.7, 0.2, 0.8, 0x2E5E22);
+        const shell = box(0.7, 0.2, 0.8, 0xffffff, true);
         shell.position.y = 0.3;
         this.group.add(shell);
 
@@ -564,7 +635,7 @@ export class Mob {
         plastron.position.y = 0.15;
         this.group.add(plastron);
 
-        const head = box(0.2, 0.18, 0.25, 0x5A7A3D);
+        const head = box(0.2, 0.18, 0.25, 0xb7c087, true);
         head.position.set(0, 0.25, 0.45);
         this.group.add(head);
 
@@ -576,7 +647,7 @@ export class Mob {
         this.group.add(eyeR);
 
         const flipper = (ox, oz, angle) => {
-            const f = box(0.25, 0.05, 0.15, 0x4A6A2D);
+            const f = box(0.25, 0.05, 0.15, 0xa2ad73, true);
             f.position.set(ox, 0.18, oz);
             f.rotation.y = angle;
             this.group.add(f);
@@ -598,20 +669,16 @@ export class Mob {
         this.flapPhase = Math.random() * Math.PI * 2;
         this.wings = [];
 
-        const box = (w, h, d, c) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c));
-        const RED = 0xC81818;
-        const RED_DARK = 0x8E1010;
-        const YELLOW = 0xE6C32A;
-        const BLUE = 0x2E6FD4;
+        const box = (w, h, d, c, painted = false) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(c, undefined, painted));
         const BEAK = 0xE8B89A;
         const FEET = 0xC9A88A;
         const DARK = 0x1a1a1a;
 
-        const body = box(0.32, 0.42, 0.32, RED);
+        const body = box(0.32, 0.42, 0.32, 0xffffff, true);
         body.position.y = 0.55;
         this.group.add(body);
 
-        const head = box(0.32, 0.32, 0.30, RED);
+        const head = box(0.32, 0.32, 0.30, 0xffffff, true);
         head.position.set(0, 0.92, 0.04);
         this.group.add(head);
 
@@ -633,11 +700,11 @@ export class Mob {
         this.group.add(beak);
 
         // Federn auf dem Kopf
-        const feather1 = box(0.06, 0.20, 0.06, RED);
+        const feather1 = box(0.06, 0.20, 0.06, 0xffffff, true);
         feather1.position.set(-0.07, 1.18, -0.04);
         feather1.rotation.z = -0.25;
         this.group.add(feather1);
-        const feather2 = box(0.06, 0.20, 0.06, RED);
+        const feather2 = box(0.06, 0.20, 0.06, 0xffffff, true);
         feather2.position.set(0.07, 1.18, -0.01);
         feather2.rotation.z = 0.18;
         this.group.add(feather2);
@@ -645,13 +712,13 @@ export class Mob {
         // Flügel mit Drehgelenk
         const buildWing = (side) => {
             const wingGroup = new THREE.Group();
-            const w1 = box(0.08, 0.34, 0.30, RED);
+            const w1 = box(0.08, 0.34, 0.30, 0xffffff, true);
             w1.position.set(side * 0.04, -0.17, 0);
             wingGroup.add(w1);
-            const w2 = box(0.08, 0.10, 0.24, YELLOW);
+            const w2 = box(0.08, 0.10, 0.24, 0xffd267, true);
             w2.position.set(side * 0.04, -0.34, -0.02);
             wingGroup.add(w2);
-            const w3 = box(0.08, 0.10, 0.16, BLUE);
+            const w3 = box(0.08, 0.10, 0.16, 0x75a8df, true);
             w3.position.set(side * 0.04, -0.45, -0.06);
             wingGroup.add(w3);
             wingGroup.position.set(side * 0.18, 0.73, 0);
@@ -662,7 +729,7 @@ export class Mob {
         buildWing(1);
 
         // Schwanz
-        const tail = box(0.18, 0.08, 0.24, RED_DARK);
+        const tail = box(0.18, 0.08, 0.24, 0xb24a3e, true);
         tail.position.set(0, 0.45, -0.22);
         this.group.add(tail);
 
@@ -894,10 +961,18 @@ export class Mob {
     }
 
     update(delta, playerPos, world, onDamage, dayRatio = 0.5) {
+        if (this.isDead) return;
+        if (this.updateVisualLod(playerPos)) {
+            this._farUpdateAccumulator = (this._farUpdateAccumulator || 0) + delta;
+            if (this._farUpdateAccumulator < MOB_FAR_UPDATE_INTERVAL) return;
+            delta = this._farUpdateAccumulator;
+            this._farUpdateAccumulator = 0;
+        } else {
+            this._farUpdateAccumulator = 0;
+        }
         if (this.isAquatic) { this.updateAquatic(delta, playerPos, world, onDamage); return; }
         if (this.type === 'geist') { this.updateGeist(delta, playerPos, world, dayRatio); return; }
         if (this.type === 'parrot') { this.updateParrot(delta, playerPos, world); return; }
-                if (this.isDead) return;
                 const pos = this.group.position;
                 const dist = pos.distanceTo(playerPos);
 
@@ -942,7 +1017,7 @@ export class Mob {
                         this.velocity.x = 0; this.velocity.z = 0;
                     } else {
                          const speed = this.type === 'skeleton' ? SKELETON_SPEED : (this.type === 'spider' ? SPIDER_SPEED : ZOMBIE_SPEED);
-                        if (this.type === 'skeleton' && dist < 10) {
+                        if ((this.type === 'skeleton' && dist < 10) || (this.type === 'zombie' && dist < 2.0)) {
                             this.velocity.x = 0; this.velocity.z = 0;
                         } else {
                             this.velocity.x = dir.x * speed; this.velocity.z = dir.z * speed;
@@ -1082,12 +1157,17 @@ export class Mob {
                     eggMesh.position.copy(pos);
                     eggMesh.position.y += 0.2; // Etwas über dem Boden spawnen
                     this.scene.add(eggMesh);
-                    if(!window.droppedItems) window.droppedItems=[];
-                    window.droppedItems.push({ mesh: eggMesh, velocityY: 0, blockType: 17 });
+                    if (!Game.droppedItems) Game.droppedItems = [];
+                    Game.droppedItems.push({ mesh: eggMesh, velocityY: 0, blockType: 17 });
                 }
 
                 if ((this.type === 'zombie' || this.type === 'skeleton') && dist < 2.0) onDamage(ZOMBIE_DAMAGE * delta);
-                if (this.type === 'spider' && dist < 1.6) onDamage(SPIDER_DAMAGE * delta);
+                if (this.type === 'spider') {
+                    const horizontalDist = Math.hypot(pos.x - playerPos.x, pos.z - playerPos.z);
+                    if (horizontalDist < 1.6 && Math.abs(pos.y - playerPos.y) < 2.0) {
+                        onDamage(SPIDER_DAMAGE * delta);
+                    }
+                }
             }
             takeDamage(amount, onKill) {
                 if (this.type === 'octopus') return; // Unsterblich
@@ -1103,6 +1183,7 @@ export class Mob {
                     else if (this.type === 'chicken') { blockType = 23; dropColor = 0xFFEEBB; }
                     else if (this.type === 'zombie') { blockType = 24; dropColor = 0x3a5f0b; }
                     else if (this.type === 'skeleton') { blockType = 31; dropColor = 0xebebeb; }
+                    else if (this.type === 'spider') { blockType = BLOCK_TYPES.STRING; dropColor = 0xF2F2F2; }
                     else if (this.type === 'sheep') { blockType = 25; dropColor = 0xFFB6C1; }
                     else if (this.type === 'turtle') { blockType = 55; dropColor = 0x4A7A3D; }
 
@@ -1114,8 +1195,8 @@ export class Mob {
                         dropMesh.position.copy(this.group.position);
                         dropMesh.position.y += 0.3;
                         this.scene.add(dropMesh);
-                        if (!window.droppedItems) window.droppedItems = [];
-                        window.droppedItems.push({ mesh: dropMesh, velocityY: 2.0, blockType: blockType });
+                        if (!Game.droppedItems) Game.droppedItems = [];
+                        Game.droppedItems.push({ mesh: dropMesh, velocityY: 2.0, blockType: blockType });
                     }
                 }
             }

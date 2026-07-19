@@ -1,31 +1,33 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting } from './crafting.js?v=20260507b';
-import { craftingRecipes } from './recipes.js?v=20260507b';
-import { initRecipeBook } from './recipe_book.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260507b';
+import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260717a';
+import { craftingRecipes } from './recipes.js?v=20260717a';
+import { initRecipeBook } from './recipe_book.js?v=20260718b';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717y';
 import { SoundManager } from './sound.js?v=20260507b';
+import { Game } from './Game.js?v=20260716b';
+import { getToolInfo } from './miningRules.js?v=20260716a';
+import { getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
+import { getFoodInfo } from './foodRules.js?v=20260716a';
+import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
+
+function getDurableItemInfo(type) {
+    return getToolInfo(type) || getSwordInfo(type) || getBowInfo(type);
+}
+
+function isDurableItemType(type) {
+    return getDurableItemInfo(type) !== null;
+}
 
 // Sprint 6: Tooltip-Hint für essbare Items.
 // Quelle der Wahrheit für Hunger-Werte ist PlayerInteraction.handleInteraction (Type-Match-Switch).
 // Hier dupliziert für UI-Anzeige — bei Änderung BEIDE Stellen synchron halten oder nach
 // CONFIG.GAMEPLAY zentralisieren (Future-Work).
-const HUNGER_RESTORES = {
-    17: 5,   // EGG
-    18: 15,  // MILK
-    21: 10,  // FISH
-    22: 15,  // MEAT
-    23: 10,  // CHICKEN
-    24: 5,   // ROTTEN_FLESH (30% Schaden-Risiko!)
-    25: 12,  // MUTTON
-    51: 8,   // BERRIES
-    55: 12   // TURTLE_MEAT
-};
 function buildItemTooltip(name, type) {
     let tip = name;
-    const hunger = HUNGER_RESTORES[type];
-    if (hunger !== undefined) {
-        tip += `\n+${hunger} Hunger`;
-        if (type === 24) tip += ' (30% Risiko: -5 HP!)';
+    const food = getFoodInfo(type);
+    if (food) {
+        tip += `\n+${food.hunger} Hunger`;
+        if (food.damageChance) tip += ` (${Math.round(food.damageChance * 100)}% Risiko: -${food.damage} HP!)`;
     }
     return tip;
 }
@@ -34,6 +36,37 @@ export const inventorySlots = Array.from({ length: 64 }, () => ({ type: 0, count
 export let cursorItem = { type: 0, count: 0 };
 export let selectedSlot = 0;
 export let inventoryOpened = false;
+export let craftingStation = 'inventory';
+
+export function getCraftingStation() {
+    return craftingStation;
+}
+
+function clearItem(item) {
+    item.type = 0;
+    item.count = 0;
+    delete item.durability;
+}
+
+function moveItem(target, source) {
+    target.type = source.type;
+    target.count = source.count;
+    if (Number.isFinite(source.durability)) target.durability = source.durability;
+    else delete target.durability;
+    clearItem(source);
+}
+
+function swapItems(first, second) {
+    const snapshot = { ...first };
+    first.type = second.type;
+    first.count = second.count;
+    if (Number.isFinite(second.durability)) first.durability = second.durability;
+    else delete first.durability;
+    second.type = snapshot.type;
+    second.count = snapshot.count;
+    if (Number.isFinite(snapshot.durability)) second.durability = snapshot.durability;
+    else delete second.durability;
+}
 
 // Temporäre Migrations-Map für altes Speichersystem
 export const oldInventoryMap = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
@@ -56,7 +89,12 @@ const TRANSLATIONS = {
     'WOOD_AXE': 'Holz-Axt', 'STONE_AXE': 'Stein-Axt', 'IRON_AXE': 'Eisen-Axt', 'GOLD_AXE': 'Gold-Axt',
     'WOOD_SHOVEL': 'Holz-Schaufel', 'STONE_SHOVEL': 'Stein-Schaufel', 'IRON_SHOVEL': 'Eisen-Schaufel', 'GOLD_SHOVEL': 'Gold-Schaufel',
     'CHEST': 'Truhe', 'SNOW_BLOCK': 'Schneeblock', 'ICE_BLOCK': 'Eisblock', 'PRESSURE_PLATE': 'Druckplatte', 'MINE_RAIL': 'Minengleis', 'MINE_SUPPORT': 'Minenbalken', 'SANDSTONE_CARVED': 'Gravierter Sandstein',
-    'SPAWNER': 'Mob-Spawner', 'MOSSY_STONE': 'Moosiger Stein', 'COBBLESTONE': 'Bruchstein', 'FIRE': 'Feuer', 'VILLAGE_PATH': 'Dorfweg', 'HAY_BALE': 'Strohballen'
+    'SPAWNER': 'Mob-Spawner', 'MOSSY_STONE': 'Moosiger Stein', 'COBBLESTONE': 'Bruchstein', 'FIRE': 'Feuer', 'VILLAGE_PATH': 'Dorfweg', 'HAY_BALE': 'Strohballen',
+    'WOOD_SWORD': 'Holzschwert', 'STONE_SWORD': 'Steinschwert', 'IRON_SWORD': 'Eisenschwert', 'GOLD_SWORD': 'Goldschwert',
+    'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil',
+    'COOKED_FISH': 'Gebratener Fisch', 'COOKED_MEAT': 'Gebratenes Fleisch', 'COOKED_CHICKEN': 'Gebratenes Hähnchen',
+    'COOKED_MUTTON': 'Gebratenes Hammelfleisch', 'COOKED_TURTLE_MEAT': 'Gebratenes Schildkrötenfleisch',
+    'TORCH': 'Fackel'
 };
 
 
@@ -75,15 +113,107 @@ export function isInventoryOpened() {
 const TOUCH_LONG_PRESS_MS = 420;
 const TOUCH_MOVE_CANCEL_PX = 10;
 
+export function canAddItemToInventory(type, count) {
+    if (type === 0 || count <= 0) return false;
+    if (isDurableItemType(type)) {
+        let freeSlots = 0;
+        for (let i = 0; i < inventorySlots.length; i++) {
+            if (i >= 8 && i <= 15) continue;
+            const slot = inventorySlots[i];
+            if (slot.type === 0 || slot.count <= 0) freeSlots++;
+        }
+        return freeSlots >= count;
+    }
+    let remaining = count;
+    for (let i = 0; i < inventorySlots.length; i++) {
+        if (i >= 8 && i <= 15) continue;
+        const slot = inventorySlots[i];
+        if (slot.type === type) remaining -= Math.max(0, 64 - slot.count);
+        else if (slot.type === 0 || slot.count <= 0) remaining -= 64;
+        if (remaining <= 0) return true;
+    }
+    return false;
+}
+
+export function tryAddItemsToInventory(items) {
+    if (!Array.isArray(items) || items.length === 0) return { added: false, reason: 'invalid-items' };
+    const snapshot = inventorySlots.map(slot => ({ ...slot }));
+
+    for (const item of items) {
+        if (!item || item.type === 0 || item.count <= 0) {
+            for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = snapshot[i];
+            updateInventoryUI();
+            return { added: false, reason: 'invalid-items' };
+        }
+        const result = addItemToInventory(item.type, item.count);
+        if (result.remaining > 0) {
+            for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = snapshot[i];
+            updateInventoryUI();
+            return { added: false, reason: 'inventory-full' };
+        }
+    }
+
+    return { added: true, reason: null };
+}
+
+export function tryExchangeInventory(give, receive) {
+    if (!give || !receive || give.type === 0 || receive.type === 0 || give.count <= 0 || receive.count <= 0) {
+        return { exchanged: false, reason: 'invalid-exchange' };
+    }
+
+    let available = 0;
+    for (let i = 0; i < inventorySlots.length; i++) {
+        if (i >= 8 && i <= 15) continue;
+        if (inventorySlots[i].type === give.type) available += inventorySlots[i].count;
+    }
+    if (available < give.count) return { exchanged: false, reason: 'insufficient-items' };
+
+    const snapshot = inventorySlots.map(slot => ({ ...slot }));
+    let toRemove = give.count;
+    for (let i = 0; i < inventorySlots.length && toRemove > 0; i++) {
+        if (i >= 8 && i <= 15) continue;
+        const slot = inventorySlots[i];
+        if (slot.type !== give.type) continue;
+        const remove = Math.min(slot.count, toRemove);
+        slot.count -= remove;
+        toRemove -= remove;
+        if (slot.count <= 0) inventorySlots[i] = { type: 0, count: 0 };
+    }
+
+    const result = addItemToInventory(receive.type, receive.count);
+    if (result.remaining > 0) {
+        for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = snapshot[i];
+        updateInventoryUI();
+        return { exchanged: false, reason: 'inventory-full' };
+    }
+
+    return { exchanged: true, reason: null };
+}
+
 export function addItemToInventory(type, count) {
-    if (type === 0) return;
+    if (type === 0) return { added: 0, remaining: count };
+    const requestedCount = count;
+    const durableInfo = getDurableItemInfo(type);
+    if (durableInfo) {
+        for (let i = 0; i < inventorySlots.length && count > 0; i++) {
+            if (i >= 8 && i <= 15) continue;
+            if (inventorySlots[i].type !== 0 && inventorySlots[i].count > 0) continue;
+            inventorySlots[i] = { type, count: 1, durability: durableInfo.maxDurability };
+            count--;
+        }
+        updateInventoryUI();
+        return { added: requestedCount - count, remaining: count };
+    }
     for (let i = 0; i < 64; i++) {
         if (i >= 8 && i <= 15) continue; 
         if (inventorySlots[i].type === type && inventorySlots[i].count < 64) {
             const add = Math.min(count, 64 - inventorySlots[i].count);
             inventorySlots[i].count += add;
             count -= add;
-            if (count <= 0) { updateInventoryUI(); return; }
+            if (count <= 0) {
+                updateInventoryUI();
+                return { added: requestedCount, remaining: 0 };
+            }
         }
     }
     for (let i = 0; i < 64; i++) {
@@ -92,22 +222,20 @@ export function addItemToInventory(type, count) {
             const add = Math.min(count, 64);
             inventorySlots[i] = { type: type, count: add };
             count -= add;
-            if (count <= 0) { updateInventoryUI(); return; }
+            if (count <= 0) {
+                updateInventoryUI();
+                return { added: requestedCount, remaining: 0 };
+            }
         }
     }
     updateInventoryUI();
+    return { added: requestedCount - count, remaining: count };
 }
 
 // Erzeugt HTML für ein Block-/Item-Icon (2D flat oder 3D Cube)
 export function createBlockHTML(type) {
-    if (type === 21) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🐟</div>`;
-    if (type === 22) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🥩</div>`;
-    if (type === 23) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍗</div>`;
-    if (type === 24) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🧟</div>`;
-    if (type === 25) return `<div class="flat-icon" style="font-size:24px; display:flex; justify-content:center; align-items:center; width:100%; height:100%; text-shadow:1px 1px 0 #000;">🍖</div>`;
-
     const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
-        || (type >= 60 && type <= 74)); // Kohle, Barren, Werkzeuge als 2D-Icons
+        || (type >= 60 && type <= 74) || (type >= 89 && type <= 101)); // Kohle, Barren, Werkzeuge, Waffen, Nahrung und Fackel als 2D-Icons
     let texIdx = 0;
     if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
     const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
@@ -120,6 +248,36 @@ export function createBlockHTML(type) {
 export function getItemName(type) {
     const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === type) || '';
     return TRANSLATIONS[bName] || bName;
+}
+
+function buildSlotLabel(kind, index, item) {
+    const prefix = `${kind} Slot ${index + 1}`;
+    if (!item || item.count <= 0) return `${prefix} leer`;
+    return `${prefix} ${getItemName(item.type)} x${item.count}`;
+}
+
+function updateDurabilityBar(slot, item) {
+    let track = slot.querySelector('.durability-track');
+    const durableInfo = item && item.count > 0 ? getDurableItemInfo(item.type) : null;
+    if (!durableInfo) {
+        if (track) track.remove();
+        return false;
+    }
+
+    if (!track) {
+        track = document.createElement('span');
+        track.className = 'durability-track';
+        const fill = document.createElement('span');
+        fill.className = 'durability-fill';
+        track.appendChild(fill);
+        slot.appendChild(track);
+    }
+    const durability = Number.isFinite(item.durability) ? item.durability : durableInfo.maxDurability;
+    const ratio = Math.max(0, Math.min(1, durability / durableInfo.maxDurability));
+    track.querySelector('.durability-fill').style.width = `${Math.round(ratio * 100)}%`;
+    track.classList.toggle('low', ratio <= 0.15);
+    track.title = `Haltbarkeit ${durability}/${durableInfo.maxDurability}`;
+    return true;
 }
 
 export function updateInventoryUI() {
@@ -141,16 +299,25 @@ export function updateInventoryUI() {
             slot.dataset.initialized = 'true';
         }
         if (item && item.count > 0) {
-            icon.style.display = 'flex'; count.style.display = 'block'; name.style.display = 'block';
-            icon.innerHTML = createBlockHTML(item.type); icon.style.background = 'none'; icon.style.backgroundColor = 'transparent';
+            const durable = updateDurabilityBar(slot, item);
+            icon.style.display = 'flex'; count.style.display = durable ? 'none' : 'block'; name.style.display = 'block';
+            if (icon.dataset.itemType !== String(item.type) || !icon.firstElementChild) {
+                icon.innerHTML = createBlockHTML(item.type);
+                icon.dataset.itemType = String(item.type);
+            }
+            icon.style.background = 'none'; icon.style.backgroundColor = 'transparent';
             if (count.textContent !== String(item.count)) count.textContent = item.count;
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
             const translatedName = TRANSLATIONS[bName] ? TRANSLATIONS[bName].toUpperCase() : bName.toUpperCase();
             if (name.textContent !== translatedName) name.textContent = translatedName;
             slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
-            icon.style.display = 'none'; count.style.display = 'none'; name.style.display = 'none'; slot.title = '';
+            updateDurabilityBar(slot, null);
+            icon.style.display = 'none'; count.style.display = 'none'; name.style.display = 'none'; slot.title = buildSlotLabel('Hotbar', i, item);
         }
+        slot.setAttribute('aria-label', buildSlotLabel('Hotbar', i, item));
+        slot.setAttribute('role', 'button');
+        slot.tabIndex = 0;
         if (i === selectedSlot) { if (!slot.classList.contains('active')) slot.classList.add('active'); } else { if (slot.classList.contains('active')) slot.classList.remove('active'); }
     });
 
@@ -158,6 +325,7 @@ export function updateInventoryUI() {
     gridSlots.forEach((slot) => {
         const sType = slot.dataset.slottype;
         const i = parseInt(slot.dataset.index);
+        if (!sType || Number.isNaN(i)) return;
         let item = null;
         if (sType === 'inventory') item = inventorySlots[i];
         else if (sType === 'crafting') item = craftingGridData[i];
@@ -181,16 +349,27 @@ export function updateInventoryUI() {
         const count = slot.querySelector('.slot-count');
 
         if (item && item.count > 0) {
-            icon.style.display = 'flex'; count.style.display = 'block';
-            icon.innerHTML = createBlockHTML(item.type);
+            const durable = updateDurabilityBar(slot, item);
+            icon.style.display = 'flex'; count.style.display = durable ? 'none' : 'block';
+            if (icon.dataset.itemType !== String(item.type) || !icon.firstElementChild) {
+                icon.innerHTML = createBlockHTML(item.type);
+                icon.dataset.itemType = String(item.type);
+            }
             if (count.textContent !== String(item.count)) count.textContent = item.count;
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
             slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
         } else {
+            updateDurabilityBar(slot, null);
             icon.style.display = 'none'; count.style.display = 'none';
-            icon.innerHTML = ''; slot.title = '';
+            icon.innerHTML = '';
+            delete icon.dataset.itemType;
+            slot.title = buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item);
         }
+        slot.setAttribute('aria-label', buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, item));
     });
+
+    const craftButton = document.getElementById('crafting-create-btn');
+    if (craftButton) craftButton.disabled = craftingResultData.count <= 0;
 }
 
 function handleSlotClick(e, sType, index) {
@@ -203,71 +382,59 @@ function handleSlotClick(e, sType, index) {
     
     if (!itemObj) return;
 
-    if (sType === 'result') {
-        if (itemObj.count > 0 && (cursorItem.count === 0 || (cursorItem.type === itemObj.type && cursorItem.count + itemObj.count <= 64))) {
-            if (e.button === 0 || e.button === 2) {
-                if (cursorItem.count === 0) cursorItem.type = itemObj.type;
-                cursorItem.count += itemObj.count;
-                itemObj.count = 0;
-                itemObj.type = 0;
-
-                for (let i = 0; i < 9; i++) {
-                    if (craftingGridData[i] && craftingGridData[i].count > 0) {
-                        craftingGridData[i].count--;
-                        if (craftingGridData[i].count <= 0) craftingGridData[i].type = 0;
-                    }
-                }
-                checkCrafting();
-                updateInventoryUI();
-                // Crafting-Click: dig_wood bei hoher Pitch klingt wie ein Werkbank-Klick.
-                // Vorher: step_grass — semantisch falsch (Schritte beim Craften?).
-                SoundManager.playSound('dig_wood', 0.4, 1.8);
-            }
-        }
+    if (sType === 'result') return;
+    if (sType === 'crafting' && cursorItem.count > 0 && isDurableItemType(cursorItem.type)) {
+        setCraftingStatus('Werkzeuge und Waffen sind keine Bastelzutaten.', 'error');
         return;
     }
 
     if (e.button === 0) { 
         if (cursorItem.count === 0) {
             if (itemObj.count > 0) {
-                cursorItem.type = itemObj.type; cursorItem.count = itemObj.count;
-                itemObj.type = 0; itemObj.count = 0;
+                moveItem(cursorItem, itemObj);
             }
         } else {
             if (itemObj.count === 0) {
-                itemObj.type = cursorItem.type; itemObj.count = cursorItem.count;
-                cursorItem.type = 0; cursorItem.count = 0;
-            } else if (itemObj.type === cursorItem.type) {
+                moveItem(itemObj, cursorItem);
+            } else if (itemObj.type === cursorItem.type && !isDurableItemType(itemObj.type)) {
                 const space = 64 - itemObj.count;
                 if (space > 0) {
                     const add = Math.min(space, cursorItem.count);
                     itemObj.count += add;
                     cursorItem.count -= add;
-                    if (cursorItem.count <= 0) cursorItem.type = 0;
+                    if (cursorItem.count <= 0) clearItem(cursorItem);
                 }
             } else {
-                const tempType = itemObj.type, tempCount = itemObj.count;
-                itemObj.type = cursorItem.type; itemObj.count = cursorItem.count;
-                cursorItem.type = tempType; cursorItem.count = tempCount;
+                swapItems(itemObj, cursorItem);
             }
         }
     } else if (e.button === 2) { 
         if (cursorItem.count === 0) {
             if (itemObj.count > 0) {
-                const half = Math.ceil(itemObj.count / 2);
-                cursorItem.type = itemObj.type; cursorItem.count = half;
-                itemObj.count -= half;
-                if (itemObj.count <= 0) itemObj.type = 0;
+                if (isDurableItemType(itemObj.type)) {
+                    moveItem(cursorItem, itemObj);
+                } else {
+                    const half = Math.ceil(itemObj.count / 2);
+                    cursorItem.type = itemObj.type;
+                    cursorItem.count = half;
+                    itemObj.count -= half;
+                    if (itemObj.count <= 0) clearItem(itemObj);
+                }
             }
         } else {
             if (itemObj.count === 0) {
-                itemObj.type = cursorItem.type; itemObj.count = 1;
-                cursorItem.count--;
-                if (cursorItem.count <= 0) cursorItem.type = 0;
-            } else if (itemObj.type === cursorItem.type && itemObj.count < 64) {
+                if (isDurableItemType(cursorItem.type)) {
+                    moveItem(itemObj, cursorItem);
+                } else {
+                    itemObj.type = cursorItem.type;
+                    itemObj.count = 1;
+                    cursorItem.count--;
+                    if (cursorItem.count <= 0) clearItem(cursorItem);
+                }
+            } else if (itemObj.type === cursorItem.type && !isDurableItemType(itemObj.type) && itemObj.count < 64) {
                 itemObj.count++;
                 cursorItem.count--;
-                if (cursorItem.count <= 0) cursorItem.type = 0;
+                if (cursorItem.count <= 0) clearItem(cursorItem);
             }
         }
     }
@@ -293,6 +460,9 @@ export function createSlotElement(i, sType = 'inventory') {
     slot.className = 'inv-slot';
     slot.dataset.index = i;
     slot.dataset.slottype = sType;
+    slot.setAttribute('role', 'button');
+    slot.tabIndex = 0;
+    slot.setAttribute('aria-label', buildSlotLabel(sType === 'inventory' ? 'Inventar' : sType === 'crafting' ? 'Crafting' : 'Ergebnis', i, null));
     
     const iconContainer = document.createElement('div');
     iconContainer.className = 'slot-icon'; iconContainer.style.position = 'absolute'; iconContainer.style.left = '14px'; iconContainer.style.top = '14px'; iconContainer.style.transform = 'translateZ(10px)';
@@ -378,14 +548,28 @@ export function createSlotElement(i, sType = 'inventory') {
 
 export function initInventoryGrid() {
     const grid = document.getElementById('inventory-grid');
-    grid.innerHTML = '';
-    
     const cGrid = document.getElementById('crafting-grid');
     const cResult = document.getElementById('crafting-result');
+    const isWorkbench = craftingStation === 'workbench';
+    const expectedCraftingSlots = isWorkbench ? 9 : 4;
+    const gridReady = grid.dataset.craftingStation === craftingStation
+        && grid.querySelectorAll('.inv-slot').length === 56
+        && cGrid.querySelectorAll('.inv-slot').length === expectedCraftingSlots
+        && cResult.querySelectorAll('.inv-slot').length === 1;
+    if (gridReady) return;
+
+    grid.innerHTML = '';
     cGrid.innerHTML = ''; cResult.innerHTML = '';
-    
-    for (let i = 0; i < 9; i++) cGrid.appendChild(createSlotElement(i, 'crafting'));
+
+    setCraftingGridSize(isWorkbench ? 3 : 2);
+    cGrid.classList.toggle('inventory-crafting', !isWorkbench);
+    cGrid.classList.toggle('workbench-crafting', isWorkbench);
+    const craftingIndices = isWorkbench ? [0, 1, 2, 3, 4, 5, 6, 7, 8] : [0, 1, 3, 4];
+    for (const index of craftingIndices) cGrid.appendChild(createSlotElement(index, 'crafting'));
     cResult.appendChild(createSlotElement(0, 'result'));
+
+    const label = document.getElementById('crafting-label');
+    if (label) label.textContent = isWorkbench ? 'Werkbank (3×3)' : 'Im Inventar (2×2)';
 
     const hbTitle = document.createElement('div');
     hbTitle.className = 'inv-section-title';
@@ -408,50 +592,253 @@ export function initInventoryGrid() {
     for (let i = 16; i < 64; i++) {
         grid.appendChild(createSlotElement(i, 'inventory'));
     }
+    grid.dataset.craftingStation = craftingStation;
+}
+
+function getRecipeGrid(recipe) {
+    const grid = Array(9).fill(0);
+    if (recipe.kind === 'shapeless') {
+        const slots = craftingStation === 'workbench'
+            ? [0, 1, 2, 3, 4, 5, 6, 7, 8]
+            : [0, 1, 3, 4];
+        recipe.ingredients.slice(0, slots.length).forEach((type, index) => grid[slots[index]] = type);
+    } else if (recipe.gridSize === 3) {
+        recipe.pattern.slice(0, 9).forEach((type, index) => grid[index] = type);
+    } else {
+        const slots = [0, 1, 3, 4];
+        recipe.pattern.slice(0, 4).forEach((type, index) => grid[slots[index]] = type);
+    }
+    return grid;
+}
+
+function getActiveCraftingIndices() {
+    return craftingStation === 'workbench'
+        ? [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        : [0, 1, 3, 4];
+}
+
+function getMissingRecipeItems(recipe) {
+    const required = new Map();
+    for (const type of getRecipeGrid(recipe)) {
+        if (type !== 0) required.set(type, (required.get(type) || 0) + 1);
+    }
+
+    const available = new Map();
+    for (let i = 0; i < inventorySlots.length; i++) {
+        if (i >= 8 && i <= 15) continue;
+        const item = inventorySlots[i];
+        if (item && item.type !== 0 && item.count > 0) {
+            available.set(item.type, (available.get(item.type) || 0) + item.count);
+        }
+    }
+    for (const item of craftingGridData) {
+        if (item && item.type !== 0 && item.count > 0) {
+            available.set(item.type, (available.get(item.type) || 0) + item.count);
+        }
+    }
+
+    const missing = [];
+    for (const [type, count] of required) {
+        const missingCount = count - (available.get(type) || 0);
+        if (missingCount > 0) missing.push({ type, count: missingCount });
+    }
+    return missing;
+}
+
+function formatMissingItems(missing) {
+    return `Fehlt: ${missing.map(item => `${item.count}× ${getItemName(item.type)}`).join(', ')}.`;
+}
+
+function getRecipeLockReason(recipe) {
+    if (recipe.gridSize === 3 && craftingStation !== 'workbench') return 'Werkbank erforderlich.';
+    const missing = getMissingRecipeItems(recipe);
+    return missing.length > 0 ? formatMissingItems(missing) : '';
+}
+
+function removeInventoryItems(type, count) {
+    let remaining = count;
+    for (let i = 0; i < inventorySlots.length && remaining > 0; i++) {
+        if (i >= 8 && i <= 15) continue;
+        const slot = inventorySlots[i];
+        if (slot.type !== type || slot.count <= 0) continue;
+        const removed = Math.min(slot.count, remaining);
+        slot.count -= removed;
+        remaining -= removed;
+        if (slot.count <= 0) inventorySlots[i] = { type: 0, count: 0 };
+    }
+    return remaining === 0;
+}
+
+function tryFillRecipeFromInventory(recipe) {
+    const lockReason = getRecipeLockReason(recipe);
+    if (lockReason) return { filled: false, message: lockReason };
+
+    const inventorySnapshot = inventorySlots.map(slot => ({ ...slot }));
+    const craftingSnapshot = craftingGridData.map(slot => ({ ...slot }));
+    const recipeGrid = getRecipeGrid(recipe);
+    const required = new Map();
+
+    recipeGrid.forEach(type => {
+        if (type !== 0) required.set(type, (required.get(type) || 0) + 1);
+    });
+
+    let canFill = true;
+    for (const item of craftingGridData) {
+        if (!item || item.type === 0 || item.count <= 0) continue;
+        const used = Math.min(item.count, required.get(item.type) || 0);
+        if (used > 0) required.set(item.type, required.get(item.type) - used);
+        const leftover = item.count - used;
+        if (leftover > 0 && addItemToInventory(item.type, leftover).remaining > 0) {
+            canFill = false;
+            break;
+        }
+    }
+
+    if (canFill) {
+        canFill = [...required].every(([type, count]) => count === 0 || removeInventoryItems(type, count));
+    }
+
+    if (!canFill) {
+        for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = inventorySnapshot[i];
+        for (let i = 0; i < craftingGridData.length; i++) craftingGridData[i] = craftingSnapshot[i];
+        updateInventoryUI();
+        return { filled: false, message: 'Kein Platz für vorhandene Bastelzutaten.' };
+    }
+
+    recipeGrid.forEach((type, index) => {
+        craftingGridData[index] = type === 0 ? { type: 0, count: 0 } : { type, count: 1 };
+    });
+    checkCrafting();
+    updateInventoryUI();
+    return { filled: true, message: 'Rezept eingesetzt.' };
+}
+
+function setCraftingStatus(message, state = '') {
+    const status = document.getElementById('crafting-status');
+    if (!status) return;
+    status.textContent = message;
+    status.classList.toggle('success', state === 'success');
+    status.classList.toggle('error', state === 'error');
+}
+
+export function craftCurrentRecipe() {
+    if (craftingResultData.type === 0 || craftingResultData.count <= 0) {
+        setCraftingStatus('Lege ein gültiges Rezept ein.', 'error');
+        return { crafted: false, reason: 'no-recipe' };
+    }
+
+    const inventorySnapshot = inventorySlots.map(slot => ({ ...slot }));
+    const craftingSnapshot = craftingGridData.map(slot => ({ ...slot }));
+    const output = { ...craftingResultData };
+    const addResult = addItemToInventory(output.type, output.count);
+    if (addResult.remaining > 0) {
+        for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = inventorySnapshot[i];
+        for (let i = 0; i < craftingGridData.length; i++) craftingGridData[i] = craftingSnapshot[i];
+        checkCrafting();
+        updateInventoryUI();
+        setCraftingStatus('Inventar voll – nichts wurde verbraucht.', 'error');
+        return { crafted: false, reason: 'inventory-full' };
+    }
+
+    for (const index of getActiveCraftingIndices()) {
+        const item = craftingGridData[index];
+        if (!item || item.count <= 0) continue;
+        item.count--;
+        if (item.count <= 0) craftingGridData[index] = { type: 0, count: 0 };
+    }
+    checkCrafting();
+    updateInventoryUI();
+    setCraftingStatus(`${getItemName(output.type)} hergestellt.`, 'success');
+    SoundManager.playSound('dig_wood', 0.4, 1.8);
+    return { crafted: true, reason: null };
+}
+
+function returnCraftingItemsToInventory() {
+    const inventorySnapshot = inventorySlots.map(slot => ({ ...slot }));
+    const craftingSnapshot = craftingGridData.map(slot => ({ ...slot }));
+    for (let i = 0; i < craftingGridData.length; i++) {
+        const item = craftingGridData[i];
+        if (!item || item.type === 0 || item.count <= 0) continue;
+        const result = addItemToInventory(item.type, item.count);
+        if (result.remaining > 0) {
+            for (let j = 0; j < inventorySlots.length; j++) inventorySlots[j] = inventorySnapshot[j];
+            for (let j = 0; j < craftingGridData.length; j++) craftingGridData[j] = craftingSnapshot[j];
+            checkCrafting();
+            updateInventoryUI();
+            return false;
+        }
+        craftingGridData[i] = { type: 0, count: 0 };
+    }
+    checkCrafting();
+    updateInventoryUI();
+    return true;
+}
+
+function renderRecipeBook() {
+    const onRecipeClick = (recipe) => {
+        const result = tryFillRecipeFromInventory(recipe);
+        setCraftingStatus(result.message, result.filled ? 'success' : 'error');
+    };
+    initRecipeBook(
+        atlasDataURL,
+        BLOCK_TEX,
+        craftingRecipes,
+        BLOCK_TYPES,
+        TRANSLATIONS,
+        onRecipeClick,
+        { getLockReason: getRecipeLockReason }
+    );
+}
+
+export function prepareInventoryUI() {
+    if (!document.getElementById('inventory-overlay')) return;
+    initInventoryGrid();
+    renderRecipeBook();
+    updateInventoryUI();
+}
+
+function openCraftingOverlay(station, gameStarted, spawning, controls) {
+    if (!gameStarted || spawning) return false;
+    craftingStation = station;
+    inventoryOpened = true;
+    setCraftingGridSize(station === 'workbench' ? 3 : 2);
+    const overlay = document.getElementById('inventory-overlay');
+    overlay.style.display = 'flex';
+    activateDialog(overlay, '#inventory-close-btn');
+    if (!Game.touchActive) controls.unlock();
+    initInventoryGrid();
+    setCraftingStatus(
+        station === 'workbench'
+            ? '3×3-Werkbank bereit. Wähle ein Rezept.'
+            : '2×2-Crafting. Für Werkzeuge brauchst du eine Werkbank.'
+    );
+    renderRecipeBook();
+    updateInventoryUI();
+    return true;
+}
+
+export function openWorkbenchCrafting(gameStarted, spawning, controls) {
+    return openCraftingOverlay('workbench', gameStarted, spawning, controls);
 }
 
 export function toggleInventory(gameStarted, spawning, controls) {
     if (!gameStarted || spawning) return false;
-    inventoryOpened = !inventoryOpened;
-    
-    // Rezeptbuch initialisieren/umbauen
-    if (inventoryOpened) {
-        const onRecipeClick = (recipe) => {
-            for (let i = 0; i < 9; i++) craftingGridData[i] = { type: 0, count: 0 };
-            if (recipe.kind === 'shapeless') {
-                recipe.ingredients.forEach((type, i) => {
-                    if (i < 9 && type !== 0) craftingGridData[i] = { type, count: 1 };
-                });
-            } else if (recipe.gridSize === 3) {
-                recipe.pattern.forEach((type, i) => {
-                    if (type !== 0) craftingGridData[i] = { type, count: 1 };
-                });
-            } else {
-                // 2×2-Legacy → oben-links im 3×3-Grid (Slots 0,1,3,4)
-                const slots = [0, 1, 3, 4];
-                recipe.pattern.forEach((type, i) => {
-                    if (type !== 0) craftingGridData[slots[i]] = { type, count: 1 };
-                });
-            }
-            checkCrafting();
-            updateInventoryUI();
-        };
-        initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick);
-        if(window.updateRecipeList) window.updateRecipeList();
+    if (!inventoryOpened) return openCraftingOverlay('inventory', gameStarted, spawning, controls);
+
+    if (!returnCraftingItemsToInventory()) {
+        setCraftingStatus('Inventar voll – Bastelzutaten können nicht zurückgelegt werden.', 'error');
+        return true;
     }
-    
-    document.getElementById('inventory-overlay').style.display = inventoryOpened ? 'flex' : 'none';
-    if (inventoryOpened) {
-        if (!window.touchActive) controls.unlock();
-        initInventoryGrid();
-        updateInventoryUI();
-    } else {
-        if (!window.touchActive) {
-            if (typeof window.resumeGame === 'function') window.resumeGame();
-            else controls.lock();
-        }
+    inventoryOpened = false;
+    craftingStation = 'inventory';
+    const overlay = document.getElementById('inventory-overlay');
+    deactivateDialog(overlay);
+    overlay.style.display = 'none';
+    if (!Game.touchActive) {
+        if (typeof window.resumeGame === 'function') window.resumeGame();
+        else controls.lock();
     }
-    return inventoryOpened;
+    return false;
 }
 
 export function setupInventoryEvents() {
@@ -468,6 +855,9 @@ export function setupInventoryEvents() {
             }
         });
     }
+
+    const craftButton = document.getElementById('crafting-create-btn');
+    if (craftButton) craftButton.addEventListener('click', craftCurrentRecipe);
 
     const updateCursorPreview = (e) => {
         if (!inventoryOpened) return;

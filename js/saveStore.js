@@ -1,5 +1,5 @@
 const DB_NAME = 'butzcraft-saves';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'saves';
 const SAFE_SAVE_NAME = /^[A-Za-z0-9 _-]{1,64}$/;
 const RESERVED_WIN_NAMES = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
@@ -24,10 +24,12 @@ function openDb() {
         }
 
         const request = window.indexedDB.open(DB_NAME, DB_VERSION);
-        request.onupgradeneeded = () => {
+        request.onupgradeneeded = (event) => {
             const db = request.result;
             if (!db.objectStoreNames.contains(STORE_NAME)) {
                 db.createObjectStore(STORE_NAME, { keyPath: 'name' });
+            } else if (event.oldVersion < DB_VERSION) {
+                request.transaction.objectStore(STORE_NAME).clear();
             }
         };
         request.onsuccess = () => resolve(request.result);

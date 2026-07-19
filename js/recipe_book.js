@@ -1,6 +1,8 @@
-import { normalizeRecipe } from './recipes.js?v=20260507b';
+import { normalizeRecipe } from './recipes.js?v=20260717a';
 
-export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick) {
+const recipeBookStates = new WeakMap();
+
+export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick, options = {}) {
     const EMOJI_MAP = { 21: '🐟', 22: '🥩', 23: '🍗', 24: '🧟', 25: '🍖' };
 
     const createMiniHTML = (type) => {
@@ -51,6 +53,7 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             recipeBook.id = 'recipe-book';
             recipeBook.innerHTML = `
                 <div id="recipe-book-title" style="color: #ffe066; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;">Rezeptbuch</div>
+                <input id="recipe-search" type="search" aria-label="Rezepte suchen" placeholder="Rezepte suchen…" autocomplete="off">
                 <div id="recipe-list-container"></div>
             `;
 
@@ -70,13 +73,64 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
 
         const container = document.getElementById('recipe-list-container');
         if (!container) return;
-        container.innerHTML = '';
 
         const tooltip = ensureTooltip();
 
-        craftingRecipes.forEach(rawRecipe => {
+        const updateEntryAvailability = (entry, recipe) => {
+            const lockReason = typeof options.getLockReason === 'function'
+                ? options.getLockReason(recipe)
+                : '';
+            entry.classList.toggle('locked', Boolean(lockReason));
+            if (lockReason) entry.setAttribute('aria-disabled', 'true');
+            else entry.removeAttribute('aria-disabled');
+
+            let reasonDiv = entry.querySelector('.recipe-lock-reason');
+            if (!lockReason) {
+                if (reasonDiv) reasonDiv.remove();
+                return;
+            }
+            if (!reasonDiv) {
+                reasonDiv = document.createElement('div');
+                reasonDiv.className = 'recipe-lock-reason';
+                entry.querySelector('.recipe-result-container')?.appendChild(reasonDiv);
+            }
+            reasonDiv.textContent = lockReason;
+        };
+
+        const existingState = recipeBookStates.get(container);
+        if (existingState?.recipes === craftingRecipes) {
+            existingState.onRecipeClick = onRecipeClick;
+            existingState.entries.forEach(({ entry, recipe }) => updateEntryAvailability(entry, recipe));
+            existingState.applyRecipeFilter();
+            return;
+        }
+
+        container.innerHTML = '';
+        const state = {
+            recipes: craftingRecipes,
+            entries: [],
+            onRecipeClick,
+            applyRecipeFilter: () => {}
+        };
+
+        let currentSection = '';
+        const sortedRecipes = [...craftingRecipes].sort((first, second) => {
+            const firstAtWorkbench = normalizeRecipe(first).gridSize === 3 ? 1 : 0;
+            const secondAtWorkbench = normalizeRecipe(second).gridSize === 3 ? 1 : 0;
+            return firstAtWorkbench - secondAtWorkbench;
+        });
+        sortedRecipes.forEach(rawRecipe => {
             const recipe = normalizeRecipe(rawRecipe);
-            const entry = document.createElement('div');
+            const section = recipe.gridSize === 3 ? 'An der Werkbank' : 'Im Inventar';
+            if (section !== currentSection) {
+                const sectionTitle = document.createElement('div');
+                sectionTitle.className = 'recipe-section-title';
+                sectionTitle.textContent = section;
+                container.appendChild(sectionTitle);
+                currentSection = section;
+            }
+            const entry = document.createElement('button');
+            entry.type = 'button';
             entry.className = 'recipe-entry';
 
             // Zutaten-Grid erstellen: Das Rezeptbuch zeigt immer die aktuelle 3x3-Werkbank.
@@ -140,6 +194,7 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             const nameDiv = document.createElement('div');
             nameDiv.className = 'recipe-name';
             nameDiv.textContent = formattedName;
+            entry.dataset.recipeName = formattedName.toLocaleLowerCase('de');
 
             resultContainer.appendChild(resultSlot);
             resultContainer.appendChild(nameDiv);
@@ -147,11 +202,32 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             entry.appendChild(ingredientsDiv);
             entry.appendChild(arrow);
             entry.appendChild(resultContainer);
+            updateEntryAvailability(entry, recipe);
+            state.entries.push({ entry, recipe });
             entry.addEventListener('click', () => {
-                if (onRecipeClick) onRecipeClick(recipe);
+                if (state.onRecipeClick) state.onRecipeClick(recipe);
             });
             container.appendChild(entry);
         });
+
+        const searchInput = document.getElementById('recipe-search');
+        state.applyRecipeFilter = () => {
+            const query = searchInput?.value.trim().toLocaleLowerCase('de') || '';
+            for (const entry of container.querySelectorAll('.recipe-entry')) {
+                entry.hidden = Boolean(query) && !entry.dataset.recipeName.includes(query);
+            }
+            for (const title of container.querySelectorAll('.recipe-section-title')) {
+                let sibling = title.nextElementSibling;
+                let hasVisibleRecipe = false;
+                while (sibling && !sibling.classList.contains('recipe-section-title')) {
+                    if (sibling.classList.contains('recipe-entry') && !sibling.hidden) hasVisibleRecipe = true;
+                    sibling = sibling.nextElementSibling;
+                }
+                title.hidden = !hasVisibleRecipe;
+            }
+        };
+        if (searchInput) searchInput.oninput = state.applyRecipeFilter;
+        state.applyRecipeFilter();
 
         // Tooltip-Events auf dem Container (Event-Delegation)
         container.addEventListener('mouseover', (e) => {
@@ -176,20 +252,9 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             }
         });
 
-        setTimeout(() => {
-            const cArea = document.getElementById('crafting-area');
-            const iGrid = document.getElementById('inventory-grid');
-            const book = document.getElementById('recipe-book');
-            if (cArea && iGrid && book) {
-                const topDist = cArea.offsetTop;
-                const bottomDist = iGrid.offsetTop + iGrid.offsetHeight;
-                if (bottomDist > topDist) {
-                    book.style.marginTop = topDist + 'px';
-                    book.style.height = (bottomDist - topDist) + 'px';
-                }
-            }
-        }, 10);
+        recipeBookStates.set(container, state);
+
     };
 
-    window.updateRecipeList = updateRecipeList;
+    updateRecipeList();
 }

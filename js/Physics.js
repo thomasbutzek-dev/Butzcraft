@@ -4,7 +4,7 @@
 // Statisches Set für O(1)-Lookup statt O(n) Array.includes() pro Aufruf
 // Betten (38, 39) sind begehbar/nicht-solid
 // Vegetation (43-50, 52) ist nicht-solid (durchlaufbar)
-const NON_SOLID = new Set([0, 8, 9, 10, 13, 14, 15, 16, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52]);
+const NON_SOLID = new Set([0, 8, 9, 10, 13, 14, 15, 16, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 80, 101]);
 
 // Türen (33, 34) sind NUR für den Spieler durchlässig
 const DOOR_BLOCKS = new Set([33, 34]);

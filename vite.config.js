@@ -15,7 +15,7 @@ export default defineConfig({
         name: 'butzcraft-engine-script-diagnostics',
         transformIndexHtml(html) {
             return html.replace(
-                /<script type="module" crossorigin src="([^"]*assets\/index-[^"]+\.js)"><\/script>/,
+                /<script type="module" crossorigin src="([^"]*assets\/main-[^"]+\.js)"><\/script>/,
                 `<script type="module" crossorigin src="$1" onload="window.__butzcraftEngineAssetLoaded=true; if (window.__butzcraftStartRequested && !window.__butzcraftGameMainEvaluating && window.__butzcraftRefreshStartStatus) window.__butzcraftRefreshStartStatus('Engine-Datei geladen. Warte auf Ausfuehrung...')" onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('Engine-Datei konnte nicht geladen werden')"></script>`
             );
         }
