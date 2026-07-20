@@ -15,7 +15,7 @@ export const BLOCK_TYPES = {
         WOOD_SWORD: 89, STONE_SWORD: 90, IRON_SWORD: 91, GOLD_SWORD: 92,
         STRING: 93, BOW: 94, ARROW: 95,
         COOKED_FISH: 96, COOKED_MEAT: 97, COOKED_CHICKEN: 98, COOKED_MUTTON: 99, COOKED_TURTLE_MEAT: 100,
-        TORCH: 101
+        TORCH: 101, WOOD_FENCE: 102, WOOD_GATE: 103, VILLAGE_LANTERN: 104
         };
 
         export const BLOCK_COLORS = {
@@ -40,7 +40,8 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.STRING]: 0xF2F2F2, [BLOCK_TYPES.BOW]: 0x8B6B3D, [BLOCK_TYPES.ARROW]: 0xA0A0A0,
             [BLOCK_TYPES.COOKED_FISH]: 0xB9783E, [BLOCK_TYPES.COOKED_MEAT]: 0x8B4513, [BLOCK_TYPES.COOKED_CHICKEN]: 0xC98B52,
             [BLOCK_TYPES.COOKED_MUTTON]: 0xA65A3A, [BLOCK_TYPES.COOKED_TURTLE_MEAT]: 0x6F7A3D,
-            [BLOCK_TYPES.TORCH]: 0xFFB02E
+            [BLOCK_TYPES.TORCH]: 0xFFB02E, [BLOCK_TYPES.WOOD_FENCE]: 0x7A4826,
+            [BLOCK_TYPES.WOOD_GATE]: 0x8B5A2B, [BLOCK_TYPES.VILLAGE_LANTERN]: 0xFFD36A
         };
 
         export const BLOCK_TEX = {
@@ -65,7 +66,8 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.STRING]: 93, [BLOCK_TYPES.BOW]: 94, [BLOCK_TYPES.ARROW]: 95,
             [BLOCK_TYPES.COOKED_FISH]: 96, [BLOCK_TYPES.COOKED_MEAT]: 97, [BLOCK_TYPES.COOKED_CHICKEN]: 98,
             [BLOCK_TYPES.COOKED_MUTTON]: 99, [BLOCK_TYPES.COOKED_TURTLE_MEAT]: 100,
-            [BLOCK_TYPES.TORCH]: 200
+            [BLOCK_TYPES.TORCH]: 200, [BLOCK_TYPES.WOOD_FENCE]: 27,
+            [BLOCK_TYPES.WOOD_GATE]: 27, [BLOCK_TYPES.VILLAGE_LANTERN]: 200
         };
 
 // --- TEXTURE GENERATOR ---
@@ -1483,7 +1485,7 @@ export const BLOCK_TYPES = {
                 }
             }
 
-            atlasDataURL = canvas.toDataURL("image/png");
+            publishAtlasDataURL(canvas);
 
 
             const tex = new THREE.CanvasTexture(canvas);
@@ -1635,12 +1637,41 @@ export const BLOCK_TYPES = {
                     if (equipmentItemImage) copyTiles(equipmentItemImage, equipmentItemReplacements);
                     if (combatFoodItemImage) copyTiles(combatFoodItemImage, combatFoodItemReplacements);
                     if (rawItemImage) copyTiles(rawItemImage, rawItemReplacements);
-                    atlasDataURL = canvas.toDataURL('image/png');
                     tex.needsUpdate = true;
-                    window.dispatchEvent(new CustomEvent('butzcraft:prototype-atlas-ready'));
+                    publishAtlasDataURL(canvas, true);
                 });
             }
             return tex;
         }
+let atlasObjectURL = null;
+let atlasSnapshotVersion = 0;
+
+function publishAtlasDataURL(canvas, prototypeReady = false) {
+    const version = ++atlasSnapshotVersion;
+    const notify = () => {
+        window.dispatchEvent(new CustomEvent('butzcraft:atlas-ready'));
+        if (prototypeReady) window.dispatchEvent(new CustomEvent('butzcraft:prototype-atlas-ready'));
+    };
+    const publishFallback = () => {
+        if (version !== atlasSnapshotVersion) return;
+        atlasDataURL = canvas.toDataURL('image/png');
+        notify();
+    };
+
+    if (typeof canvas.toBlob !== 'function' || typeof URL.createObjectURL !== 'function') {
+        publishFallback();
+        return;
+    }
+
+    canvas.toBlob(blob => {
+        if (!blob || version !== atlasSnapshotVersion) return;
+        const previousURL = atlasObjectURL;
+        atlasObjectURL = URL.createObjectURL(blob);
+        atlasDataURL = atlasObjectURL;
+        notify();
+        if (previousURL) URL.revokeObjectURL(previousURL);
+    }, 'image/png');
+}
+
 export let atlasDataURL = "";
         export const textureAtlas = createTextureAtlas();

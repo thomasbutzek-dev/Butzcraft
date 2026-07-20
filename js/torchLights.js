@@ -21,8 +21,10 @@ export function selectNearestTorchPositions(modifiedBlocks, origin, limit = 8, m
 export function selectNearestLightPositions(modifiedBlocks, fireLightKeys, origin, limit = 8, maxDistance = 32) {
     const maxDistanceSq = maxDistance * maxDistance;
     const matches = [];
-    for (const key in modifiedBlocks) {
-        if (modifiedBlocks[key] !== TORCH_TYPE) continue;
+    const torchKeys = modifiedBlocks instanceof Set
+        ? modifiedBlocks
+        : Object.keys(modifiedBlocks).filter(key => modifiedBlocks[key] === TORCH_TYPE);
+    for (const key of torchKeys) {
         const [x, y, z] = key.split(',').map(Number);
         const dx = x + 0.5 - origin.x;
         const dy = y + 0.72 - origin.y;

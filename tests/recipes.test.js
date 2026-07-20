@@ -147,4 +147,9 @@ describe('matchRecipe – Smoke-Test mit echten Spiel-Rezepten', () => {
         expect(matchRecipe([60, 27, 0, 0], 2, craftingRecipes)).toEqual({ type: 101, count: 4 });
         expect(matchRecipe([0, 27, 60, 0], 2, craftingRecipes)).toEqual({ type: 101, count: 4 });
     });
+
+    it('craftet Zaun und Gatter aus vier Stöcken und zwei Brettern', () => {
+        expect(matchRecipe([27,26,27, 27,26,27, 0,0,0], 3, craftingRecipes)).toEqual({ type: 102, count: 4 });
+        expect(matchRecipe([27,27,27, 26,26,27, 0,0,0], 3, craftingRecipes)).toEqual({ type: 103, count: 1 });
+    });
 });

@@ -2,24 +2,24 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717y';
-        import { World, getBiomeAt, BIOMES } from './world.js?v=20260719a';
-        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260719d';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717z';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260719b';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260719e';
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260717b';
-        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260719a';
+        import { getWorldGenerationLoadNotice, prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260720a';
         import { Game } from './Game.js?v=20260716b'; // Central state container
-        import { Player } from './Player.js?v=20260718d';
+        import { Player } from './Player.js?v=20260719a';
         import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260719b';
+        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260719c';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260719b';
         import { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } from './itemCollection.js?v=20260718c';
         import { getOnboardingProgress } from './onboarding.js?v=20260718f';
         import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260718b';
-        import { findNewGameSpawn } from './newGameSpawn.js?v=20260718a';
+        import { findNewGameSpawn } from './newGameSpawn.js?v=20260719a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260719a';
-        import { WeatherSystem } from './weather.js?v=20260718b';
+        import { WeatherSystem } from './weather.js?v=20260719a';
         import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
         import { NPC } from './npc.js?v=20260719a';
         import { preloadEntityMaterials } from './entityMaterials.js?v=20260719a';
@@ -30,7 +30,7 @@
         import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260719a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
         import { findSafeBedRespawn, normalizeRespawnBed } from './respawn.js?v=20260716a';
-        import { TorchLightSystem, TORCH_TYPE } from './torchLights.js?v=20260718b';
+        import { TorchLightSystem, TORCH_TYPE } from './torchLights.js?v=20260719a';
         import { DamageFeedback } from './damageFeedback.js?v=20260718a';
         import { FrameRateTracker } from './frameRateTracker.js?v=20260718a';
         import { calculateRenderPixelRatio } from './renderResolution.js?v=20260718a';
@@ -44,6 +44,12 @@
         window.getBiomeAt = getBiomeAt;
 
         window._blockTexData = { BLOCK_TEX, atlasDataURL };
+        window.addEventListener('butzcraft:atlas-ready', () => {
+            window._blockTexData.atlasDataURL = atlasDataURL;
+            document.querySelectorAll('.flat-icon, .mc-face, .mini-icon').forEach(element => {
+                element.style.backgroundImage = `url("${atlasDataURL}")`;
+            });
+        });
         
 
 
@@ -73,6 +79,12 @@
         let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
         let torchLightSystem = null;
         let damageFeedback = null;
+
+        function applyPlayerDamage(damage) {
+            if (damage <= 0) return;
+            Game.player.health -= damage;
+            damageFeedback.trigger(damage);
+        }
         const npcs = [];            // Tier 3: NPC-Array
         window.npcs = npcs;
         const minecarts = [];
@@ -98,12 +110,16 @@
 
         // Schwert & Animation
 
+        let blockingOverlayElements = null;
+
         function isBlockingOverlayOpen() {
-            const visible = (id) => {
-                const el = document.getElementById(id);
-                return el && el.style.display !== 'none' && getComputedStyle(el).display !== 'none';
-            };
-            return isInventoryOpened() || visible('trade-overlay') || visible('furnace-overlay') || visible('chest-overlay');
+            if (isInventoryOpened()) return true;
+            blockingOverlayElements ||= [
+                document.getElementById('trade-overlay'),
+                document.getElementById('furnace-overlay'),
+                document.getElementById('chest-overlay')
+            ];
+            return blockingOverlayElements.some(el => el && el.style.display !== 'none');
         }
 
         function shouldUseTouchMode() {
@@ -301,6 +317,8 @@
         let miniObjectiveIndex = 0;
         let currentMiniObjective = null;
         let currentStoryObjective = null;
+        const OBJECTIVE_UPDATE_INTERVAL_MS = 100;
+        let lastObjectiveUpdateAt = 0;
 
         function getControlsHintText() {
             if (shouldUseTouchMode() || window.innerWidth <= 760) {
@@ -440,7 +458,9 @@
             }, OBJECTIVE_COMPLETION_MS);
         }
 
-        function updateFirstObjective() {
+        function updateFirstObjective(force = true, now = performance.now()) {
+            if (!force && now - lastObjectiveUpdateAt < OBJECTIVE_UPDATE_INTERVAL_MS) return;
+            lastObjectiveUpdateAt = now;
             const { advanced, completedObjective } = advanceMiniObjective();
             updateStoryObjectiveFromTime();
             updateInventoryObjective();
@@ -609,6 +629,41 @@
             }
         }
 
+        const DROP_TTL = 90;
+        const DROP_HARD_CAP = 150;
+
+        function updateDroppedItems(items, delta, playerPos) {
+            while (items.length > DROP_HARD_CAP) {
+                disposeDroppedItem(items[0]);
+                items.shift();
+            }
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                const ip = item.mesh.position;
+                item.age = (item.age || 0) + delta;
+                if (item.age > DROP_TTL) {
+                    disposeDroppedItem(item);
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                item.velocityY -= 9.8 * delta;
+                ip.y += item.velocityY * delta;
+                const blockBelow = world.getBlock(Math.floor(ip.x), Math.floor(ip.y - 0.1), Math.floor(ip.z));
+                if (blockBelow !== 0 && blockBelow !== 4 && blockBelow !== 8 && blockBelow !== 9 && item.velocityY < 0) {
+                    ip.y = Math.floor(ip.y - 0.1) + 1.0;
+                    item.velocityY = 0;
+                }
+                updateDroppedItemVisual(item, delta, graphicsPrototype.usesPainterlyTextures);
+
+                const dx = ip.x - playerPos.x;
+                const dz = ip.z - playerPos.z;
+                if (dx * dx + dz * dz < 4 && Math.abs(ip.y - playerPos.y) < 2.5) {
+                    tryCollectDroppedItem(items, i, disposeDroppedItem);
+                }
+            }
+        }
+
         function createOverflowDrop(type, count) {
             const mesh = new THREE.Mesh(
                 new THREE.BoxGeometry(0.25, 0.25, 0.25),
@@ -693,13 +748,19 @@
                 if (projectile && typeof projectile.dispose === 'function') projectile.dispose();
             }
             disposeMinecarts();
+            _spawnedVillageKeys.clear();
             world.fireBlocks.clear();
             world.spawnerMeta = {};
             world.villages = [];
+            world.structures.clear();
+            world.structureChests.clear();
+            world.structureGates.clear();
+            world.structureProgress = {};
         }
 
         window.startNewGame = function() {
             if (gameStarted) return;
+            world.setGenerationVersion(2);
             setActiveCharacterProfile(activeCharacterProfile);
             document.getElementById('start-menu').style.display = 'none';
             document.body.classList.add('game-started');
@@ -722,7 +783,17 @@
         window.loadGame = function(name) {
             SoundManager.init();
             saveRepository.load(name)
-                .then(rawData => {
+                .then(async rawData => {
+                    const worldgenNotice = getWorldGenerationLoadNotice(rawData, name);
+                    if (worldgenNotice) {
+                        try {
+                            await saveRepository.save(worldgenNotice.backupName, rawData);
+                            alert(worldgenNotice.message);
+                        } catch (backupError) {
+                            console.warn('[Save] Legacy-Backup konnte nicht angelegt werden:', backupError);
+                            alert('Dieser Spielstand nutzt die alte Weltgenerierung. Das automatische Backup konnte nicht angelegt werden. Für die neuen großen Minen und Dungeons wird eine neue Welt empfohlen.');
+                        }
+                    }
                     const data = prepareSaveForLoad(rawData);
                     document.getElementById('start-menu').style.display = 'none';
                     document.body.classList.add('game-started');
@@ -733,6 +804,8 @@
                     document.getElementById('save-input').value = name;
 
                     resetRuntimeForLoadedGame();
+                    world.setGenerationVersion(data.worldGenerationVersion);
+                    world.structureProgress = data.structureProgress || {};
 
                     const playerPos = camera.position;
                     playerPos.set(data.pos.x, data.pos.y, data.pos.z);
@@ -766,6 +839,9 @@
                             weatherSystem.loadFireBlocks(data.fireBlocks || {});
                         }
                         world.villages = Array.isArray(data.villages) ? data.villages : [];
+                        for (const village of world.villages) {
+                            _spawnedVillageKeys.add(`${village.cx},${village.cz}`);
+                        }
 
                         // Tier 3: NPCs wiederherstellen
                         // Bestehende NPCs entfernen
@@ -776,11 +852,19 @@
                         if (data.npcs && Array.isArray(data.npcs)) {
                             for (const npcData of data.npcs) {
                                 if (!npcData.isDead) {
-                                    const npc = new NPC(scene, npcData.homeX, npcData.homeY, npcData.homeZ, npcData.professionIdx);
+                                    const npc = new NPC(scene, npcData.homeX, npcData.homeY, npcData.homeZ, npcData.professionIdx, npcData.schedule);
                                     npc.group.position.set(npcData.x, npcData.y, npcData.z);
                                     npc.health = npcData.health;
                                     npcs.push(npc);
                                 }
+                            }
+                        }
+                        if (Array.isArray(data.keptAnimals)) {
+                            for (const animalData of data.keptAnimals) {
+                                const animal = new Mob(scene, animalData.type, animalData.x, animalData.y, animalData.z);
+                                animal.health = animalData.health;
+                                animal.isPenned = true;
+                                mobs.push(animal);
                             }
                         }
                         if (Array.isArray(data.minecarts)) {
@@ -1163,8 +1247,19 @@
                 if (_spawnedVillageKeys.has(vKey)) return; // Doppel-Spawn verhindern
                 _spawnedVillageKeys.add(vKey);
                 for (const house of vInfo.houses) {
-                    const npc = new NPC(scene, house.x, house.y, house.z, house.professionIdx);
-                    npcs.push(npc);
+                    const residentCount = Math.max(1, house.residentCount || 1);
+                    for (let resident = 0; resident < residentCount; resident++) {
+                        const offset = residentCount > 1 ? (resident === 0 ? -0.25 : 0.25) : 0;
+                        const professionIdx = (house.professionIdx + resident) % 4;
+                        const npc = new NPC(scene, house.x + offset, house.y, house.z, professionIdx, {
+                            home: house.home,
+                            door: house.door,
+                            porch: house.porch,
+                            work: house.work,
+                            waypoints: vInfo.waypoints
+                        });
+                        npcs.push(npc);
+                    }
                 }
             });
 
@@ -1491,7 +1586,7 @@
             }
             updateStatsHud(now, playerPos, bAt, weatherIcon);
             updateUI(false, now);
-            updateFirstObjective();
+            updateFirstObjective(false, now);
 
             // 4. SIMULATION (Nur wenn nicht pausiert)
             // Fix: Während spawning=true pausieren wir niemals automatisch
@@ -1529,15 +1624,10 @@
                 }
                 showControlsHintOnceReady();
 
-                // Wrapped onDamage: appliziert Schaden UND triggert Feedback (Flash + Shake).
-                const onPlayerDamage = (d) => {
-                    if (d <= 0) return;
-                    Game.player.health -= d;
-                    damageFeedback.trigger(d);
-                };
+                const heldItemType = inventorySlots[getSelectedSlot()]?.type || 0;
                 mobs.forEach(m => {
                     if ((dayRatio < 0.25 || dayRatio > 0.75) === false && (m.type === 'zombie' || m.type === 'skeleton')) m.isDead = true;
-                    else m.update(delta, playerPos, world, onPlayerDamage, dayRatio);
+                    else m.update(delta, playerPos, world, applyPlayerDamage, dayRatio, now, heldItemType);
                 });
                 for (let i = mobs.length - 1; i >= 0; i--) {
                     if (mobs[i].isDead) {
@@ -1546,7 +1636,7 @@
                         mobs.splice(i, 1);
                     }
                 }
-                updateProjectiles(delta, playerPos, world, onPlayerDamage);
+                updateProjectiles(delta, playerPos, world, applyPlayerDamage);
 
                 // Tier 3: NPC-Update
                 for (let i = npcs.length - 1; i >= 0; i--) {
@@ -1555,7 +1645,7 @@
                         npc.dispose();
                         npcs.splice(i, 1);
                     } else {
-                        npc.update(delta, playerPos, world);
+                        npc.update(delta, playerPos, world, dayRatio);
                     }
                 }
 
@@ -1566,7 +1656,7 @@
                     if (mobs[i].type === 'fish' || mobs[i].type === 'octopus' || mobs[i].type === 'turtle') waterMobsCount++;
                     else if (mobs[i].type === 'geist') geistCount++;
                     else if (mobs[i].type === 'parrot') parrotCount++;
-                    else landMobsCount++;
+                    else if (!mobs[i].isPenned) landMobsCount++;
                 }
                 
                 if ((landMobsCount < MAX_COUNT || waterMobsCount < 15 || parrotCount < 5) && Math.random() < SPAWN_CHANCE) {
@@ -1693,46 +1783,7 @@
                 }
 
                 // Drop-Item-Update mit TTL + Hard-Cap (Sprint 5: Memory-Sicherheit).
-                // - DROP_TTL: nicht-aufgesammelte Drops verschwinden nach 90s (RAM + scene-Mesh-Leak vermeiden)
-                // - DROP_HARD_CAP: globaler Cap. Wenn überschritten → ältester Drop wird entfernt (LRU)
-                const DROP_TTL = 90; // Sekunden
-                const DROP_HARD_CAP = 150;
-                const disposeDrop = (item) => {
-                    if (item.mesh) {
-                        scene.remove(item.mesh);
-                        if (item.mesh.geometry) item.mesh.geometry.dispose();
-                        if (item.mesh.material) {
-                            // Drops verwenden eigene MeshPhongMaterial-Instanzen → safe to dispose
-                            if (Array.isArray(item.mesh.material)) item.mesh.material.forEach(m => m.dispose());
-                            else item.mesh.material.dispose();
-                        }
-                    }
-                };
-                const updateItems = (items) => {
-                    // Hard-Cap durchsetzen: ältester (= [0]) entfernt, bis unter Cap.
-                    while (items.length > DROP_HARD_CAP) {
-                        disposeDrop(items[0]);
-                        items.shift();
-                    }
-                    for (let i = items.length - 1; i >= 0; i--) {
-                        const item = items[i]; const ip = item.mesh.position;
-                        // TTL-Tracking: age in Sekunden; falls fehlt (alter Drop), jetzt initialisieren.
-                        item.age = (item.age || 0) + delta;
-                        if (item.age > DROP_TTL) {
-                            disposeDrop(item);
-                            items.splice(i, 1);
-                            continue;
-                        }
-                        item.velocityY -= 9.8 * delta; ip.y += item.velocityY * delta;
-                        const bB = world.getBlock(Math.floor(ip.x), Math.floor(ip.y - 0.1), Math.floor(ip.z));
-                        if (bB !== 0 && bB !== 4 && bB !== 8 && bB !== 9 && item.velocityY < 0) { ip.y = Math.floor(ip.y - 0.1) + 1.0; item.velocityY = 0; }
-                        updateDroppedItemVisual(item, delta, graphicsPrototype.usesPainterlyTextures);
-                        if (Math.hypot(ip.x - playerPos.x, ip.z - playerPos.z) < 2.0 && Math.abs(ip.y - playerPos.y) < 2.5) {
-                            tryCollectDroppedItem(items, i, disposeDrop);
-                        }
-                    }
-                };
-                updateItems(droppedItems);
+                updateDroppedItems(droppedItems, delta, playerPos);
 
                 // PLAYER PHYSICS / MINECART
                 for (const minecart of minecarts) minecart.update(delta, Input, world);
@@ -1759,7 +1810,7 @@
             world.processPendingMeshResults();
             const selectedItem = inventorySlots[getSelectedSlot()];
             Game.player.updateHeldTorch(Boolean(selectedItem && selectedItem.count > 0 && selectedItem.type === TORCH_TYPE));
-            torchLightSystem.update(delta, world.modifiedBlocks, world.fireLightKeys, playerPos);
+            torchLightSystem.update(delta, world.torchKeys, world.fireLightKeys, playerPos);
             Game.player.updateSword(delta);
             Game.player.updateCharacterModel(delta);
 
@@ -1865,7 +1916,10 @@
                 fireBlocks: weatherSystem ? weatherSystem.saveFireBlocks() : {},
                 villages: world.villages || [],
                 npcs: npcs.filter(n => !n.isDead).map(n => n.serialize()),
+                keptAnimals: mobs.filter(m => !m.isDead && m.isPenned).map(m => m.serialize()),
                 minecarts: minecarts.map(minecart => minecart.serialize()),
+                worldGenerationVersion: world.worldGenerationVersion,
+                structureProgress: world.structureProgress,
                 characterProfile: normalizeCharacterProfile(activeCharacterProfile),
                 thirdPersonCamera: { distance: Game.player.getThirdPersonCameraDistance() }
             });

@@ -24,6 +24,17 @@ const WATER_BLOCKS = new Set([4]);
 const VILLAGER_SKIN_TILE = 11;
 const PROFESSION_TEXTURE_TILES = [12, 13, 14, 15];
 
+export function findNearestFootY(fromY, hasStandSpace, minY = 1, maxY = 63) {
+    const centerY = Math.max(minY, Math.min(maxY, Math.round(fromY)));
+    for (let offset = 0; offset <= 8; offset++) {
+        const candidates = offset === 0 ? [centerY] : [centerY - offset, centerY + offset];
+        for (const footY of candidates) {
+            if (footY >= minY && footY <= maxY && hasStandSpace(footY)) return footY;
+        }
+    }
+    return null;
+}
+
 // NPC-Typen mit unterschiedlichen Farben und Handels-Angeboten
 const NPC_PROFESSIONS = [
     {
@@ -80,7 +91,7 @@ export class NPC {
      * @param {number} z — Welt-Z
      * @param {number} professionIdx — Index in NPC_PROFESSIONS
      */
-    constructor(scene, x, y, z, professionIdx) {
+    constructor(scene, x, y, z, professionIdx, schedule = {}) {
         this.scene = scene;
         this.homeX = x;
         this.homeY = y;
@@ -88,6 +99,13 @@ export class NPC {
         this.professionIdx = professionIdx % NPC_PROFESSIONS.length;
         this.profession = NPC_PROFESSIONS[this.professionIdx];
         this.visualVariant = selectEntityTextureVariant(x, z, this.professionIdx + 31);
+        this.schedule = {
+            home: schedule.home || { x, y, z },
+            door: schedule.door || null,
+            porch: schedule.porch || null,
+            work: schedule.work || null,
+            waypoints: Array.isArray(schedule.waypoints) ? schedule.waypoints : []
+        };
 
         this.isDead = false;
         this.health = 20;
@@ -250,14 +268,7 @@ export class NPC {
     }
 
     _findNearestFootY(world, x, z, fromY) {
-        const startY = Math.min(62, Math.floor(fromY + 3));
-        const endY = Math.max(1, Math.floor(fromY - 8));
-
-        for (let footY = startY + 1; footY >= endY + 1; footY--) {
-            if (this._hasDryStandSpace(world, x, footY, z)) return footY;
-        }
-
-        return null;
+        return findNearestFootY(fromY, footY => this._hasDryStandSpace(world, x, footY, z), 1, 63);
     }
 
     _findSafeHomeFootY(world) {
@@ -295,7 +306,24 @@ export class NPC {
         return false;
     }
 
-    _pickWanderTarget() {
+    _pickWanderTarget(dayRatio = 0.5) {
+        const isNight = dayRatio < 0.23 || dayRatio > 0.77;
+        if (isNight && this.schedule.home) {
+            this.targetX = this.schedule.home.x;
+            this.targetZ = this.schedule.home.z;
+            this.wanderTimer = 4 + Math.random() * 3;
+            return;
+        }
+
+        const scheduledTargets = [this.schedule.work, this.schedule.porch, ...this.schedule.waypoints].filter(Boolean);
+        if (scheduledTargets.length > 0) {
+            const target = scheduledTargets[Math.floor(Math.random() * scheduledTargets.length)];
+            this.targetX = target.x;
+            this.targetZ = target.z;
+            this.wanderTimer = NPC_CFG.WANDER_INTERVAL_MIN + Math.random() * (NPC_CFG.WANDER_INTERVAL_MAX - NPC_CFG.WANDER_INTERVAL_MIN);
+            return;
+        }
+
         const angle = Math.random() * Math.PI * 2;
         const dist = Math.random() * NPC_CFG.WANDER_RADIUS;
         this.targetX = this.homeX + Math.cos(angle) * dist;
@@ -309,7 +337,22 @@ export class NPC {
      * @param {THREE.Vector3} playerPos
      * @param {import('./world.js').World} world
      */
-    update(delta, playerPos, world) {
+    _openDoorAt(world, x, y, z) {
+        const blockX = Math.floor(x);
+        const blockZ = Math.floor(z);
+        for (let blockY = Math.floor(y); blockY <= Math.floor(y) + 1; blockY++) {
+            const block = world.getBlock(blockX, blockY, blockZ);
+            if (block !== 33 && block !== 34 && block !== 103) continue;
+            const baseY = block === 34 ? blockY - 1 : blockY;
+            const nextMetadata = world.getBlockMeta(blockX, baseY, blockZ) | 4;
+            world.setBlockMeta(blockX, baseY, blockZ, nextMetadata);
+            if (block !== 103) world.setBlockMeta(blockX, baseY + 1, blockZ, nextMetadata);
+            return true;
+        }
+        return false;
+    }
+
+    update(delta, playerPos, world, dayRatio = 0.5) {
         if (this.isDead) return;
         this._updateNameTag(playerPos);
 
@@ -319,7 +362,7 @@ export class NPC {
         // Wander-Timer
         this.wanderTimer -= delta;
         if (this.wanderTimer <= 0) {
-            this._pickWanderTarget();
+            this._pickWanderTarget(dayRatio);
         }
 
         // Bewegung zum Ziel
@@ -336,6 +379,8 @@ export class NPC {
             const nextZ = pos.z + nz * speed;
             let moved = false;
 
+            this._openDoorAt(world, nextX, pos.y, nextZ);
+
             if (canStandAt(nextX, pos.z) && !checkNpcCollision({ x: nextX, y: pos.y, z: pos.z })) {
                 pos.x = nextX;
                 moved = true;
@@ -349,7 +394,7 @@ export class NPC {
             if (!moved) {
                 this.velocity.x = 0;
                 this.velocity.z = 0;
-                this._pickWanderTarget();
+                this._pickWanderTarget(dayRatio);
             }
 
             // Blickrichtung
@@ -419,7 +464,8 @@ export class NPC {
             homeZ: this.homeZ,
             professionIdx: this.professionIdx,
             health: this.health,
-            isDead: this.isDead
+            isDead: this.isDead,
+            schedule: this.schedule
         };
     }
 

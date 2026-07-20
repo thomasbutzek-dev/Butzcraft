@@ -27,6 +27,8 @@ export const craftingRecipes = [
     { pattern: [27, 26, 27, 26], result: { type: 33, count: 1 } },   // STICK+PLANKS -> DOOR
     { pattern: [19, 19, 26, 26], result: { type: 38, count: 1 } },   // WOOL+PLANKS -> BED
     { kind: 'shapeless', ingredients: [60, 27], result: { type: 101, count: 4 } }, // KOHLE+STOCK -> 4x FACKEL
+    { kind: 'shaped', gridSize: 3, pattern: [27,26,27, 27,26,27, 0,0,0], result: { type: 102, count: 4 } }, // Fence
+    { kind: 'shaped', gridSize: 3, pattern: [27,27,27, 26,26,27, 0,0,0], result: { type: 103, count: 1 } }, // Gate
 
     // Neue 3×3-Rezepte: Werkzeuge
     // Schema: pattern[0..8] = Zeile0-2, Spalte0-2

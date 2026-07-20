@@ -1,4 +1,4 @@
-import { BLOCK_TYPES } from './blocks.js?v=20260717y';
+import { BLOCK_TYPES } from './blocks.js?v=20260717z';
 
 const STAGES = [
     [BLOCK_TYPES.WOOD, BLOCK_TYPES.JUNGLE_WOOD, BLOCK_TYPES.PALM_WOOD],

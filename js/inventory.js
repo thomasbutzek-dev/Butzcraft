@@ -2,7 +2,7 @@
 import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260717a';
 import { craftingRecipes } from './recipes.js?v=20260717a';
 import { initRecipeBook } from './recipe_book.js?v=20260718b';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717y';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717z';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getToolInfo } from './miningRules.js?v=20260716a';
@@ -94,7 +94,7 @@ const TRANSLATIONS = {
     'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil',
     'COOKED_FISH': 'Gebratener Fisch', 'COOKED_MEAT': 'Gebratenes Fleisch', 'COOKED_CHICKEN': 'Gebratenes Hähnchen',
     'COOKED_MUTTON': 'Gebratenes Hammelfleisch', 'COOKED_TURTLE_MEAT': 'Gebratenes Schildkrötenfleisch',
-    'TORCH': 'Fackel'
+    'TORCH': 'Fackel', 'WOOD_FENCE': 'Holzzaun', 'WOOD_GATE': 'Holzgatter', 'VILLAGE_LANTERN': 'Dorflaterne'
 };
 
 

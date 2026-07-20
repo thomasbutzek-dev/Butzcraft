@@ -3,21 +3,21 @@ import { CONFIG } from '../config.js?v=20260507b';
 import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260719a';
 import { openFurnace } from './furnace.js?v=20260719a';
 import { createBlockHTML, getItemName } from './inventory.js?v=20260719b';
-        import { BLOCK_COLORS } from './blocks.js?v=20260717y';
+        import { BLOCK_COLORS } from './blocks.js?v=20260717z';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260718b';
 import { getAttackProfile, getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
 import { PlayerArrowProjectile } from './playerArrow.js?v=20260716a';
 import { getFoodInfo } from './foodRules.js?v=20260716a';
-import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260718b';
+import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260719a';
 import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
 import { openTradeUI } from './tradeUI.js?v=20260718d';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 const { MAX_HUNGER, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
-const WOOD_BLOCKS = new Set([5, 13, 15]);
-const TORCH_NON_SUPPORT_BLOCKS = new Set([0, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80, 86, TORCH_TYPE]);
+const WOOD_BLOCKS = new Set([5, 13, 15, 102, 103]);
+const TORCH_NON_SUPPORT_BLOCKS = new Set([0, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80, 86, 104, TORCH_TYPE]);
 const MINING_HINT_COOLDOWN_MS = 1800;
 
 export function getBlockBreakParticleProfile(painterly = graphicsPrototype.usesPainterlyTextures, reducedDetail = graphicsPrototype.reducedDetail) {
@@ -370,7 +370,7 @@ export class PlayerInteraction {
         );
 
         this.world.setBlock(bx, by, bz, isNextToWater ? 4 : 0);
-        if (brokenType === TORCH_TYPE) this.world.deleteBlockMeta(bx, by, bz);
+        if (brokenType === TORCH_TYPE || brokenType === 103 || brokenType === 104) this.world.deleteBlockMeta(bx, by, bz);
         this.SoundManager.playDig(brokenType);
         this.spawnBlockBreakParticles(bx, by, bz, brokenType, target.normal);
 
@@ -641,6 +641,25 @@ export class PlayerInteraction {
                 const harvestX = Math.floor(p.x), harvestY = Math.floor(p.y), harvestZ = Math.floor(p.z);
                 const harvestBlock = this.world.getBlock(harvestX, harvestY, harvestZ);
 
+                if (this._tryUnlockStructureGate(harvestX, harvestY, harvestZ)) return;
+
+                if (harvestBlock === 33 || harvestBlock === 34) {
+                    const doorY = harvestBlock === 34 ? harvestY - 1 : harvestY;
+                    const metadata = this.world.getBlockMeta(harvestX, doorY, harvestZ);
+                    const nextMetadata = metadata ^ 4;
+                    this.world.setBlockMeta(harvestX, doorY, harvestZ, nextMetadata);
+                    this.world.setBlockMeta(harvestX, doorY + 1, harvestZ, nextMetadata);
+                    this.SoundManager.playSound('dig_wood', 0.45, nextMetadata & 4 ? 1.15 : 0.9);
+                    return;
+                }
+
+                if (harvestBlock === 103) {
+                    const nextMetadata = this.world.getBlockMeta(harvestX, harvestY, harvestZ) ^ 4;
+                    this.world.setBlockMeta(harvestX, harvestY, harvestZ, nextMetadata);
+                    this.SoundManager.playSound('dig_wood', 0.45, nextMetadata & 4 ? 1.15 : 0.9);
+                    return;
+                }
+
                 if (harvestBlock === 28 || harvestBlock === 36) {
                     if (typeof this.context.openWorkbenchCrafting === 'function') {
                         this.context.openWorkbenchCrafting();
@@ -745,6 +764,13 @@ export class PlayerInteraction {
                         this.showMessage("Kein Platz für die Tür!", "#ff9800", 20);
                         return;
                     }
+                } else if (currentItem.type === 103) {
+                    const fwd = new THREE.Vector3();
+                    this._getAimDirection(fwd);
+                    const rotation = Math.abs(fwd.x) > Math.abs(fwd.z) ? 1 : 0;
+                    this.world.setBlock(px, py, pz, 103);
+                    this.world.setBlockMeta(px, py, pz, rotation);
+                    currentItem.count--;
                 // BETT platzieren: Kopfteil + Fußteil nebeneinander
                 } else if (currentItem.type === 38) {
                     const fwd = new THREE.Vector3();
@@ -797,6 +823,30 @@ export class PlayerInteraction {
         }
     }
 
+    _tryUnlockStructureGate(x, y, z) {
+        const gateInfo = this.world.structureGates?.get(`${x},${y},${z}`);
+        if (!gateInfo) return false;
+        if (!this.world.structureProgress) this.world.structureProgress = {};
+        const progress = this.world.structureProgress[gateInfo.structureId] || {};
+        if (!progress.keyFound) {
+            this.showMessage('Das Tor ist verschlossen. Der Schlüssel liegt im oberen Dungeon.', '#ff9800', 18);
+            return true;
+        }
+
+        const gate = gateInfo.gate;
+        for (let width = -1; width <= 1; width++) {
+            for (let dy = 0; dy <= 2; dy++) {
+                const gx = gate.x + (gate.widthAxis === 'x' ? width : 0);
+                const gz = gate.z + (gate.widthAxis === 'z' ? width : 0);
+                this.world.setBlock(gx, gate.y + dy, gz, 0);
+                this.world.structureGates.delete(`${gx},${gate.y + dy},${gz}`);
+            }
+        }
+        this.world.structureProgress[gateInfo.structureId] = { ...progress, gateOpened: true };
+        this.showMessage('Das Dungeon-Tor öffnet sich.', '#ffe066', 18);
+        return true;
+    }
+
     // Truhe öffnen und Loot lazy generieren
     _openChest(x, y, z) {
         const key = `chest,${x},${y},${z}`;
@@ -804,16 +854,22 @@ export class PlayerInteraction {
         // Auch nach Save/Load wird kein Loot mehr nachgefüllt.
         if (!this.world.lootedChests.has(key)) {
             const biome = window.getBiomeAt ? window.getBiomeAt(x, z) : 'Grasland';
-            const biomeType = classifyChestLoot({
-                x,
-                y,
-                z,
-                biome,
-                villages: this.world.villages || [],
-                getBlock: (bx, by, bz) => this.world.getBlock(bx, by, bz)
-            });
+            const structureChest = this.world.structureChests?.get(key);
+            const biomeType = structureChest?.lootTable || classifyChestLoot({
+                    x,
+                    y,
+                    z,
+                    biome,
+                    villages: this.world.villages || [],
+                    getBlock: (bx, by, bz) => this.world.getBlock(bx, by, bz)
+                });
             this.world.chestContents[key] = rollLoot(biomeType, x * 7013 + y * 3517 + z * 1223);
             this.world.lootedChests.add(key);
+            if (structureChest?.role === 'dungeon_key') {
+                if (!this.world.structureProgress) this.world.structureProgress = {};
+                const progress = this.world.structureProgress[structureChest.structureId] || {};
+                this.world.structureProgress[structureChest.structureId] = { ...progress, keyFound: true };
+            }
             this.showMessage(getLootDiscoveryMessage(biomeType), '#ffe066', 18);
         }
         if (!this.world.chestContents[key]) this.world.chestContents[key] = [];

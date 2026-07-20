@@ -121,6 +121,31 @@ describe('SoundManager music loop', () => {
     });
 });
 
+describe('SoundManager listener updates', () => {
+    afterEach(() => resetSoundManager());
+
+    it('reuses listener vectors across animation frames', () => {
+        const camera = {
+            position: { x: 1, y: 2, z: 3 },
+            quaternion: { x: 0, y: 0, z: 0, w: 1 }
+        };
+        SoundManager.updateListener(camera);
+        const listener = SoundManager.listener;
+        const position = listener.pos;
+        const forward = listener.forward;
+        const right = listener.right;
+
+        camera.position.x = 4;
+        SoundManager.updateListener(camera);
+
+        expect(SoundManager.listener).toBe(listener);
+        expect(SoundManager.listener.pos).toBe(position);
+        expect(SoundManager.listener.forward).toBe(forward);
+        expect(SoundManager.listener.right).toBe(right);
+        expect(SoundManager.listener.pos.x).toBe(4);
+    });
+});
+
 describe('SoundManager looping ambience', () => {
     beforeEach(() => {
         vi.useFakeTimers();

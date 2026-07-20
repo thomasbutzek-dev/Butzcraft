@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs');
@@ -6,6 +7,20 @@ const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const isProduction = process.env.NODE_ENV === 'production';
+const remoteSavesEnabled = process.env.ENABLE_REMOTE_SAVES === 'true' || !isProduction;
+const websiteHosts = new Set(
+    (process.env.WEBSITE_HOSTS || '')
+        .split(',')
+        .map(host => host.trim().toLowerCase())
+        .filter(Boolean)
+);
+const gameOrigin = process.env.GAME_ORIGIN || '';
+app.use(compression());
+
+app.get('/health', (req, res) => {
+    res.json({ status: 'ok' });
+});
 
 // CORS: Nur API-Zugriffe aus lokaler Entwicklung erlauben (anpassbar via ALLOWED_ORIGINS env var, kommagetrennt).
 // Nicht global auf statische Assets anwenden: Vite setzt im Production-Build `crossorigin`
@@ -56,7 +71,14 @@ function resolveSavePath(name) {
 }
 
 // API: Liste der Spielstände
-app.get('/api/saves', (req, res) => {
+function requireRemoteSaves(req, res, next) {
+    if (!remoteSavesEnabled) {
+        return res.status(503).json({ error: 'Remote saves are not enabled' });
+    }
+    next();
+}
+
+app.get('/api/saves', requireRemoteSaves, (req, res) => {
     fs.readdir(savesDir, (err, files) => {
         if (err) return res.status(500).json({ error: err.message });
         const names = files
@@ -68,7 +90,7 @@ app.get('/api/saves', (req, res) => {
 });
 
 // API: Spielstand laden
-app.get('/api/load', (req, res) => {
+app.get('/api/load', requireRemoteSaves, (req, res) => {
     const name = req.query.name;
     if (!name) return res.status(400).json({ error: 'Name missing' });
 
@@ -83,7 +105,7 @@ app.get('/api/load', (req, res) => {
 });
 
 // API: Spielstand speichern
-app.post('/api/save', (req, res) => {
+app.post('/api/save', requireRemoteSaves, (req, res) => {
     const data = req.body;
     if (!data || !data.name || !data.gameData) {
         return res.status(400).json({ error: 'Invalid data' });
@@ -143,7 +165,6 @@ app.post('/api/tester/log', (req, res) => {
 const distDir = path.join(__dirname, 'dist');
 const distAssetsDir = path.join(distDir, 'assets');
 const soundsDir = path.join(__dirname, 'sounds');
-const isProduction = process.env.NODE_ENV === 'production';
 const hasDistIndex = fs.existsSync(path.join(distDir, 'index.html'));
 const hasSoundsDir = fs.existsSync(soundsDir);
 const staticRoots = [];
@@ -175,8 +196,15 @@ const staticOptions = {
     }
 };
 
+app.get('/index.html', (req, res, next) => {
+    if (isProduction && gameOrigin && websiteHosts.has(req.hostname.toLowerCase())) {
+        return res.redirect(302, gameOrigin);
+    }
+    next();
+});
+
 staticRoots.forEach(root => {
-    app.use(express.static(root, staticOptions));
+    app.use(express.static(root, { ...staticOptions, index: false }));
 });
 
 if (hasSoundsDir) {
@@ -188,8 +216,11 @@ app.get('/', (req, res) => {
     if (isProduction && !hasDistIndex) {
         return res.status(503).send('Production build missing. Run npm run build.');
     }
+    const entryFile = isProduction && websiteHosts.has(req.hostname.toLowerCase())
+        ? 'butzcraft-preview.html'
+        : 'index.html';
     const indexPath = hasDistIndex
-        ? path.join(distDir, 'index.html')
+        ? path.join(distDir, entryFile)
         : path.join(__dirname, 'index.html');
     res.sendFile(indexPath);
 });

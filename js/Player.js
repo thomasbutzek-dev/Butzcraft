@@ -4,7 +4,7 @@ import { Physics } from './Physics.js?v=20260717a';
 import { createCharacterModel } from './characterModel.js?v=20260718a';
 import { CharacterAnimator } from './characterAnimator.js';
 import { clampThirdPersonDistance, clampThirdPersonPitch, orbitDirection } from './characterCamera.js';
-import { createTorchModel, TORCH_LIGHT_COLOR } from './torchLights.js?v=20260718b';
+import { createTorchModel, TORCH_LIGHT_COLOR } from './torchLights.js?v=20260719a';
 
 const CAMERA_EXTRA_BLOCKING_BLOCKS = new Set([5, 6, 13, 14, 15, 16]);
 const THIRD_PERSON_CAMERA_CLEARANCE = 0.28;

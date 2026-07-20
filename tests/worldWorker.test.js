@@ -2,7 +2,9 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 
 class FakeWorker {
-    constructor() {
+    constructor(url, options) {
+        this.url = url;
+        this.options = options;
         this.messages = [];
         FakeWorker.instance = this;
     }
@@ -36,6 +38,27 @@ beforeAll(() => {
 });
 
 describe('World worker buffer recycling', () => {
+    it('initializes the module worker with world generation version two', async () => {
+        const { World } = await import('../js/world.js');
+        new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+        const initialization = worker.messages.find(entry => entry.message.type === 'init');
+
+        expect(worker.options).toEqual({ type: 'module' });
+        expect(initialization.message.worldGenerationVersion).toBe(2);
+    }, 15000);
+
+    it('switches the worker back to legacy generation for a legacy save', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+
+        world.setGenerationVersion(1);
+
+        expect(world.worldGenerationVersion).toBe(1);
+        expect(worker.messages.at(-1).message).toEqual({ type: 'worldGenerationVersion', version: 1 });
+    }, 15000);
+
     it('forwards generated minecart data to the game thread', async () => {
         const { World } = await import('../js/world.js');
         const world = new World(new THREE.Scene());
@@ -60,6 +83,51 @@ describe('World worker buffer recycling', () => {
 
         window.removeEventListener('minecartGenerated', onGenerated);
         expect(generated).toEqual([{ id: 'minecart:test', x: 2, y: 20, z: 3 }]);
+    }, 15000);
+
+    it('indexes structure, chest, gate and spawner metadata without duplicates', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+        world.viewCenterX = 0;
+        world.viewCenterZ = 0;
+        world.viewRenderDistance = 1;
+        const structure = {
+            id: 'dungeon:0,0:v2',
+            kind: 'dungeon',
+            gate: { x: 8, y: 18, z: 9, widthAxis: 'z' }
+        };
+        const message = {
+            type: 'terrain',
+            cx: 0,
+            cz: 0,
+            epoch: world.meshEpoch,
+            data: new Uint8Array(16 * 64 * 16),
+            structureInfos: [structure, structure],
+            chestInfos: [{ x: 4, y: 20, z: 5, structureId: structure.id, role: 'dungeon_key', lootTable: 'dungeon_catacomb' }],
+            spawnerInfos: [{ x: 6, y: 19, z: 7, structureId: structure.id, role: 'upper-combat' }]
+        };
+
+        worker.onmessage({ data: message });
+
+        expect([...world.structures.keys()]).toEqual([structure.id]);
+        expect(world.structureChests.get('chest,4,20,5')).toMatchObject({ role: 'dungeon_key' });
+        expect(world.structureGates.get('8,18,9')).toMatchObject({ structureId: structure.id });
+        expect(world.spawnerMeta['6,19,7']).toMatchObject({ structureId: structure.id, role: 'upper-combat' });
+    }, 15000);
+
+    it('keeps ownership of transferred terrain data without copying it', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+        const data = new Uint8Array(16 * 64 * 16);
+        world.viewCenterX = 0;
+        world.viewCenterZ = 0;
+        world.viewRenderDistance = 0;
+
+        worker.onmessage({ data: { type: 'terrain', cx: 0, cz: 0, epoch: world.meshEpoch, data } });
+
+        expect(world.chunks.get('0,0').data).toBe(data);
     }, 15000);
 
     it('reuses a late terrain response as a transferable buffer', async () => {
@@ -112,6 +180,46 @@ describe('World worker buffer recycling', () => {
 });
 
 describe('World mesh result scheduling', () => {
+    it('reuses transferred typed arrays when creating buffer attributes', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const arrays = {
+            pos: new Float32Array([0, 0, 0, 1, 0, 0, 0, 1, 0]),
+            col: new Float32Array([1, 1, 1, 1, 1, 1, 1, 1, 1]),
+            norm: new Float32Array([0, 0, 1, 0, 0, 1, 0, 0, 1]),
+            uv: new Float32Array([0, 0, 1, 0, 0, 1]),
+            sway: new Float32Array([0, 0, 0]),
+            atlasUV: new Float32Array([-1, -1, -1, -1, -1, -1]),
+            idx: new Uint32Array([0, 1, 2])
+        };
+
+        const mesh = world._createMeshFromArrays(arrays, new THREE.MeshBasicMaterial(), 0, 0);
+
+        expect(mesh.geometry.getAttribute('position').array).toBe(arrays.pos);
+        expect(mesh.geometry.getAttribute('color').array).toBe(arrays.col);
+        expect(mesh.geometry.getAttribute('normal').array).toBe(arrays.norm);
+        expect(mesh.geometry.getAttribute('uv').array).toBe(arrays.uv);
+        expect(mesh.geometry.getAttribute('aSway').array).toBe(arrays.sway);
+        expect(mesh.geometry.getAttribute('aAtlasUV').array).toBe(arrays.atlasUV);
+        expect(mesh.geometry.index.array).toBe(arrays.idx);
+    }, 15000);
+
+    it('keeps placed torches in the runtime light index', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const data = new Uint8Array(16 * 64 * 16);
+        world.chunks.set('0,0', { cx: 0, cz: 0, data, mesh: null, waterMesh: null });
+
+        world.setBlock(2, 4, 6, 101, false);
+        expect(world.torchKeys).toEqual(new Set(['2,4,6']));
+
+        world.setBlock(2, 4, 6, 0, false);
+        expect(world.torchKeys.size).toBe(0);
+
+        world.setBlock(3, 5, 6, 104, false);
+        expect(world.torchKeys).toEqual(new Set(['3,5,6']));
+    }, 15000);
+
     it('waits for active-view neighbors before the first mesh build', async () => {
         const { World } = await import('../js/world.js');
         const world = new World(new THREE.Scene());

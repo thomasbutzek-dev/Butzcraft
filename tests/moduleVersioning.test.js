@@ -17,13 +17,13 @@ describe('browser module identity', () => {
             return source.match(/\.\/blocks\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./blocks.js?v=20260717y']));
+        expect(new Set(specifiers)).toEqual(new Set(['./blocks.js?v=20260717z']));
     });
 
     it('cache-busts the browser entry after atlas changes', () => {
         const source = readFileSync('index.html', 'utf8');
 
-        expect(source).toContain('./js/GameMain.js?v=20260719h');
+        expect(source).toContain('./js/GameMain.js?v=20260719k');
     });
 
     it('loads world generation through one versioned URL everywhere', () => {
@@ -33,7 +33,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/world\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260719a']));
+        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260719b']));
     });
 
     it('loads inventory through one versioned URL everywhere', () => {
@@ -123,7 +123,7 @@ describe('browser module identity', () => {
     it('loads player interaction through the current browser URL', () => {
         const source = readFileSync('js/GameMain.js', 'utf8');
 
-        expect(source).toContain('./PlayerInteraction.js?v=20260719b');
+        expect(source).toContain('./PlayerInteraction.js?v=20260719c');
     });
 
     it('loads the graphics variant state through one URL everywhere', () => {
@@ -152,6 +152,6 @@ describe('browser module identity', () => {
             return source.match(/\.\/torchLights\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./torchLights.js?v=20260718b']));
+        expect(new Set(specifiers)).toEqual(new Set(['./torchLights.js?v=20260719a']));
     });
 });

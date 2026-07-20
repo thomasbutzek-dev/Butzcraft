@@ -95,6 +95,7 @@ export class ParticleSystem {
         }
         this.mesh.instanceMatrix.needsUpdate = true;
         if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+        this.mesh.count = 0;
         scene.add(this.mesh);
 
         // Partikel-State
@@ -111,6 +112,7 @@ export class ParticleSystem {
         }
 
         this.intensity = 0;
+        this.activeCount = 0;
     }
 
     /**
@@ -125,17 +127,13 @@ export class ParticleSystem {
         const activeCount = Math.floor(this.count * intensity);
         const r = this.spawnRadius;
 
-        for (let i = 0; i < this.count; i++) {
-            const p = this.particles[i];
+        if (activeCount < this.activeCount) {
+            for (let i = activeCount; i < this.activeCount; i++) this.particles[i].alive = false;
+        }
+        this.mesh.count = activeCount;
 
-            if (i >= activeCount) {
-                // Überschüssige Partikel deaktivieren
-                if (p.alive) {
-                    p.alive = false;
-                    this._hideParticle(i, p);
-                }
-                continue;
-            }
+        for (let i = 0; i < activeCount; i++) {
+            const p = this.particles[i];
 
             if (!p.alive) {
                 // Partikel neu spawnen
@@ -196,13 +194,18 @@ export class ParticleSystem {
                 _dummy.rotation.set(0, this.painterly ? p.phase * 0.08 : 0, this.painterly ? p.vx * -0.035 : 0);
             } else {
                 _dummy.scale.setScalar(p.scale);
-                _dummy.rotation.set(0, this.painterly ? p.phase : 0, (this.painterly ? this.elapsed * 0.55 : performance.now() * 0.001) + p.phase);
+                _dummy.rotation.set(0, this.painterly ? p.phase : 0, this.elapsed * (this.painterly ? 0.55 : 1) + p.phase);
             }
             _dummy.updateMatrix();
             this.mesh.setMatrixAt(i, _dummy.matrix);
         }
 
-        this.mesh.instanceMatrix.needsUpdate = true;
+        this.activeCount = activeCount;
+        if (activeCount > 0) {
+            this.mesh.instanceMatrix.clearUpdateRanges();
+            this.mesh.instanceMatrix.addUpdateRange(0, activeCount * 16);
+            this.mesh.instanceMatrix.needsUpdate = true;
+        }
     }
 
     _hideParticle(index, particle) {
