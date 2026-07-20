@@ -137,6 +137,24 @@ describe('recipe book initialization', () => {
         );
 
         expect(document.querySelector('.recipe-name').textContent).toBe('Verstärkter Dorfzaun');
+        expect(document.querySelector('[data-recipe-icon="fence"]')).not.toBeNull();
         expect(document.querySelector('.recipe-entry').classList.contains('locked')).toBe(true);
+    });
+
+    it('uses distinct silhouettes for fence and gate outputs', () => {
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 26: 2, 27: 3, 102: 4, 103: 4 },
+            [
+                { category: 'Bauen', kind: 'shaped', gridSize: 3, pattern: [27,26,27, 27,26,27, 0,0,0], result: { type: 102, count: 4 } },
+                { category: 'Bauen', kind: 'shaped', gridSize: 3, pattern: [27,27,27, 26,26,27, 0,0,0], result: { type: 103, count: 1 } }
+            ],
+            { PLANKS: 26, STICK: 27, WOOD_FENCE: 102, WOOD_GATE: 103 },
+            { PLANKS: 'Holzbretter', STICK: 'Stock', WOOD_FENCE: 'Holzzaun', WOOD_GATE: 'Holzgatter' },
+            vi.fn()
+        );
+
+        expect(document.querySelectorAll('[data-recipe-icon="fence"]')).toHaveLength(1);
+        expect(document.querySelectorAll('[data-recipe-icon="gate"]')).toHaveLength(1);
     });
 });

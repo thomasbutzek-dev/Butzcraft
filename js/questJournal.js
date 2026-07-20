@@ -1,4 +1,4 @@
-import { inventorySlots } from './inventory.js?v=20260721b';
+import { inventorySlots } from './inventory.js?v=20260721c';
 import { abandonSideQuest, getSideQuestProgress, getTrustTier } from './quests.js?v=20260721b';
 import { getCompassGuidance, resolveHomeTarget } from './questNavigation.js?v=20260720q';
 

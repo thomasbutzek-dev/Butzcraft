@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260719a';
-import { openFurnace } from './furnace.js?v=20260719a';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260721b';
+import { openFurnace } from './furnace.js?v=20260721c';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260721c';
         import { BLOCK_COLORS } from './blocks.js?v=20260717z';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260718b';
@@ -11,7 +11,7 @@ import { PlayerArrowProjectile } from './playerArrow.js?v=20260720q';
 import { getFoodInfo } from './foodRules.js?v=20260716a';
 import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260719a';
 import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-import { openTradeUI } from './tradeUI.js?v=20260721b';
+import { openTradeUI } from './tradeUI.js?v=20260721c';
 import { STORY_EVENTS } from './storyProgress.js?v=20260721b';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 

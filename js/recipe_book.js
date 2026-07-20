@@ -9,6 +9,12 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
     const createMiniHTML = (type) => {
         if (type === 0) return '';
         if (EMOJI_MAP[type]) return `<span class="mini-emoji">${EMOJI_MAP[type]}</span>`;
+        if (type === BLOCK_TYPES.WOOD_FENCE) {
+            return '<div class="mini-structure-icon mini-fence-icon" data-recipe-icon="fence" aria-hidden="true"></div>';
+        }
+        if (type === BLOCK_TYPES.WOOD_GATE) {
+            return '<div class="mini-structure-icon mini-gate-icon" data-recipe-icon="gate" aria-hidden="true"></div>';
+        }
         let texIdx = 0;
         if (type === 17) texIdx = 21;
         else if (type === 18) texIdx = 23;
