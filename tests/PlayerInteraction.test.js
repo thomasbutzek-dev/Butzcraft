@@ -208,7 +208,7 @@ describe('PlayerInteraction through the Game seam', () => {
 
             expect(inventorySlots[1]).toEqual({ type: 95, count: 1 });
             expect(inventorySlots[0].durability).toBe(4);
-            expect(mob.takeDamage).toHaveBeenCalledWith(6);
+            expect(mob.takeDamage).toHaveBeenCalledWith(6, expect.any(Function));
             expect(context.updateInventoryUI).toHaveBeenCalled();
             expect(Game.player.startBowAnimation).toHaveBeenCalledWith(expect.objectContaining({ damage: 6 }));
         } finally {

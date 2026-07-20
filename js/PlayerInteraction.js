@@ -2,16 +2,17 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260719a';
 import { openFurnace } from './furnace.js?v=20260719a';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260719b';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260720q';
         import { BLOCK_COLORS } from './blocks.js?v=20260717z';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260718b';
 import { getAttackProfile, getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
-import { PlayerArrowProjectile } from './playerArrow.js?v=20260716a';
+import { PlayerArrowProjectile } from './playerArrow.js?v=20260720q';
 import { getFoodInfo } from './foodRules.js?v=20260716a';
 import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260719a';
 import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-import { openTradeUI } from './tradeUI.js?v=20260718d';
+import { openTradeUI } from './tradeUI.js?v=20260720q';
+import { STORY_EVENTS } from './storyProgress.js?v=20260720q';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 const { MAX_HUNGER, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
@@ -514,7 +515,7 @@ export class PlayerInteraction {
         this._setAimRay();
 
         // 0. NPCs prüfen (Tier 3: Handel)
-        const activeNpcs = (window.npcs || []).filter(n => !n.isDead);
+        const activeNpcs = (window.npcs || []).filter(n => !n.isDead && !n.isUnconscious);
         if (activeNpcs.length > 0) {
             const npcMeshes = activeNpcs.map(n => n.group);
             const npcHits = this.raycaster.intersectObjects(npcMeshes, true);
@@ -555,10 +556,20 @@ export class PlayerInteraction {
                     this.attackReadyAt = now + attack.cooldown * 1000;
                     this.lastAttackCooldown = attack.cooldown;
                     this._setAttackCooldown(0, true);
-                    hitMob.takeDamage(attack.damage, (amount) => {
+                    hitMob.takeDamage(attack.damage, (killedMob) => {
                         if (hitMob.type === 'pig') {
                             Game.player.hunger = Math.min(MAX_HUNGER, Game.player.hunger + HUNGER_GAIN_PIG);
                         }
+                        window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+                            detail: {
+                                type: 'hunt',
+                                mobType: killedMob.type,
+                                position: {
+                                    x: killedMob.group.position.x,
+                                    z: killedMob.group.position.z
+                                }
+                            }
+                        }));
                     });
                     if (attack.usesDurability) this._wearWeapon(currentItem, swordInfo, 'Schwert');
                 } else if (e.button === 2 && hitMob.type === 'cow') { // Melken
@@ -712,6 +723,7 @@ export class PlayerInteraction {
                 
                 p.add(h.face.normal.clone().multiplyScalar(0.5));
                 let px = Math.floor(p.x), py = Math.floor(p.y), pz = Math.floor(p.z);
+                const placedType = currentItem.type;
                 
                 // Kollisions-Check
                 const pPos = this.camera.position;
@@ -813,6 +825,9 @@ export class PlayerInteraction {
                     this.world.setBlock(px, py, pz, currentItem.type);
                     currentItem.count--;
                 }
+                window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+                    detail: { type: 'place', itemType: placedType, position: { x: px, y: py, z: pz } }
+                }));
                 // Place-Sound: Dig-Sound bei höherer Pitch klingt wie "Setz"-Klang.
                 // Vorher gab es gar keinen Sound beim Bauen (im Gegensatz zum Abbauen).
                 this.SoundManager.playSound('dig_' + this.SoundManager.getSoundCategory(currentItem.type), 0.5, 1.4);
@@ -843,6 +858,10 @@ export class PlayerInteraction {
             }
         }
         this.world.structureProgress[gateInfo.structureId] = { ...progress, gateOpened: true };
+        window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+            detail: { type: 'structure', structureKind: 'dungeon-gate', structureId: gateInfo.structureId }
+        }));
+        window.dispatchEvent(new CustomEvent(STORY_EVENTS.DUNGEON_GATE_OPENED));
         this.showMessage('Das Dungeon-Tor öffnet sich.', '#ffe066', 18);
         return true;
     }
@@ -850,11 +869,20 @@ export class PlayerInteraction {
     // Truhe öffnen und Loot lazy generieren
     _openChest(x, y, z) {
         const key = `chest,${x},${y},${z}`;
+        const structureChest = this.world.structureChests?.get(key);
+        const wasLooted = this.world.lootedChests.has(key);
+        if (wasLooted && structureChest?.role === 'dungeon_reward' && typeof window.tryActivateBloodMoonRitual === 'function') {
+            const result = window.tryActivateBloodMoonRitual({
+                structureId: structureChest.structureId,
+                position: { x, y: y + 1.5, z }
+            });
+            if (result?.message) this.showMessage(result.message, result.ok ? '#ff647c' : '#ffe066', 18);
+            if (result?.ok) return;
+        }
         // Loot nur einmal generieren: lootedChests merkt sich alle je geöffneten Kisten.
         // Auch nach Save/Load wird kein Loot mehr nachgefüllt.
-        if (!this.world.lootedChests.has(key)) {
+        if (!wasLooted) {
             const biome = window.getBiomeAt ? window.getBiomeAt(x, z) : 'Grasland';
-            const structureChest = this.world.structureChests?.get(key);
             const biomeType = structureChest?.lootTable || classifyChestLoot({
                     x,
                     y,
@@ -869,6 +897,23 @@ export class PlayerInteraction {
                 if (!this.world.structureProgress) this.world.structureProgress = {};
                 const progress = this.world.structureProgress[structureChest.structureId] || {};
                 this.world.structureProgress[structureChest.structureId] = { ...progress, keyFound: true };
+                window.dispatchEvent(new CustomEvent(STORY_EVENTS.DUNGEON_KEY_FOUND));
+            }
+            if (structureChest?.role === 'mine_reward' || structureChest?.role === 'dungeon_reward') {
+                window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+                    detail: {
+                        type: 'structure',
+                        structureKind: structureChest.role === 'mine_reward' ? 'mine' : 'dungeon',
+                        structureId: structureChest.structureId,
+                        position: { x, y, z }
+                    }
+                }));
+                const storyEvent = structureChest.role === 'mine_reward'
+                    ? STORY_EVENTS.MINE_COMPLETED
+                    : STORY_EVENTS.DUNGEON_COMPLETED;
+                window.dispatchEvent(new CustomEvent(storyEvent, {
+                    detail: { structureId: structureChest.structureId, position: { x, y, z } }
+                }));
             }
             this.showMessage(getLootDiscoveryMessage(biomeType), '#ffe066', 18);
         }

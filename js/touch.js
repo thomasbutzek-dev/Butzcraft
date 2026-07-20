@@ -95,6 +95,7 @@ export function initTouchControls(ctx) {
         </div>
         <div id="touch-button-stack">
             <button id="touch-btn-inv" class="touch-btn touch-btn-small" aria-label="Inventar">📦</button>
+            <button id="touch-btn-journal" class="touch-btn touch-btn-small" aria-label="Questjournal">Q</button>
             <button id="touch-btn-place" class="touch-btn" aria-label="Bauen">▣</button>
             <button id="touch-btn-jump" class="touch-btn touch-btn-primary" aria-label="Springen">⤒</button>
         </div>
@@ -186,6 +187,7 @@ function _injectTouchStyles() {
         }
         .touch-btn:active { background: rgba(255,255,255,0.4); }
         #touch-btn-inv { grid-column: 1; }
+        #touch-btn-journal { grid-column: 1; grid-row: 2; }
         #touch-btn-place { grid-column: 2; }
         #touch-btn-jump { grid-column: 2; grid-row: 2; }
         @media (orientation: portrait) and (max-width: 560px) {
@@ -424,6 +426,7 @@ function _bindActionButtons(ctx) {
     const jumpBtn = document.getElementById('touch-btn-jump');
     const placeBtn = document.getElementById('touch-btn-place');
     const invBtn = document.getElementById('touch-btn-inv');
+    const journalBtn = document.getElementById('touch-btn-journal');
     const pauseBtn = document.getElementById('touch-btn-pause');
     const pauseOverlay = document.getElementById('instructions');
 
@@ -454,6 +457,12 @@ function _bindActionButtons(ctx) {
             e.preventDefault();
             const evt = new KeyboardEvent('keydown', { code: 'KeyE', key: 'e', bubbles: true });
             window.dispatchEvent(evt);
+        }, { passive: false });
+    }
+    if (journalBtn) {
+        journalBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ', key: 'j', bubbles: true }));
         }, { passive: false });
     }
 

@@ -98,6 +98,11 @@ export class NPC {
         this.homeZ = z;
         this.professionIdx = professionIdx % NPC_PROFESSIONS.length;
         this.profession = NPC_PROFESSIONS[this.professionIdx];
+        this.villageId = typeof schedule.villageId === 'string' ? schedule.villageId : null;
+        this.id = typeof schedule.npcId === 'string' ? schedule.npcId : null;
+        this.displayName = typeof schedule.displayName === 'string' ? schedule.displayName : this.profession.name;
+        this.isEssential = Boolean(schedule.essential);
+        this.isUnconscious = false;
         this.visualVariant = selectEntityTextureVariant(x, z, this.professionIdx + 31);
         this.schedule = {
             home: schedule.home || { x, y, z },
@@ -190,7 +195,7 @@ export class NPC {
         this.group.add(this.rightLeg);
 
         // Namens-Schild über dem Kopf
-        this._createNameTag(prof.name);
+        this._createNameTag(`${this.displayName} · ${prof.name}`);
 
         this.mesh = this.group; // Für Raycasting
     }
@@ -355,6 +360,15 @@ export class NPC {
     update(delta, playerPos, world, dayRatio = 0.5) {
         if (this.isDead) return;
         this._updateNameTag(playerPos);
+        if (this.isUnconscious) {
+            if (dayRatio >= 0.25 && dayRatio <= 0.35) {
+                this.isUnconscious = false;
+                this.health = 20;
+                this.group.position.set(this.homeX, this.homeY, this.homeZ);
+            } else {
+                return;
+            }
+        }
 
         const pos = this.group.position;
         this._resolveGround(world, true);
@@ -447,7 +461,13 @@ export class NPC {
         });
 
         if (this.health <= 0) {
-            this.isDead = true;
+            if (this.isEssential) {
+                this.health = 1;
+                this.isUnconscious = true;
+                this.velocity.set(0, 0, 0);
+            } else {
+                this.isDead = true;
+            }
         }
     }
 
@@ -463,6 +483,11 @@ export class NPC {
             homeY: this.homeY,
             homeZ: this.homeZ,
             professionIdx: this.professionIdx,
+            villageId: this.villageId,
+            id: this.id,
+            displayName: this.displayName,
+            isEssential: this.isEssential,
+            isUnconscious: this.isUnconscious,
             health: this.health,
             isDead: this.isDead,
             schedule: this.schedule

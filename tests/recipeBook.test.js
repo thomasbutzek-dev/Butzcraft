@@ -99,4 +99,24 @@ describe('recipe book initialization', () => {
         expect(firstEntry.classList.contains('locked')).toBe(false);
         expect(firstEntry.querySelector('.recipe-lock-reason')).toBeNull();
     });
+
+    it('filters recipes with the agreed category tabs', () => {
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 26: 2, 27: 3, 63: 4 },
+            [
+                { category: 'Versorgung', pattern: [26, 0, 0, 0], result: { type: 27, count: 4 } },
+                { category: 'Werkzeuge', kind: 'shaped', gridSize: 3, pattern: [26, 26, 26, 0, 27, 0, 0, 27, 0], result: { type: 63, count: 1 } }
+            ],
+            { PLANKS: 26, STICK: 27, WOOD_PICKAXE: 63 },
+            { PLANKS: 'Holzbretter', STICK: 'Stock', WOOD_PICKAXE: 'Holz-Spitzhacke' },
+            vi.fn()
+        );
+
+        expect([...document.querySelectorAll('.recipe-category-tab')].map(tab => tab.textContent)).toEqual([
+            'Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Versorgung'
+        ]);
+        document.querySelector('[data-category="Werkzeuge"]').click();
+        expect([...document.querySelectorAll('.recipe-entry')].map(entry => entry.hidden)).toEqual([true, false]);
+    });
 });

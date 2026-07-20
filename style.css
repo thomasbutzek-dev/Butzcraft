@@ -1252,6 +1252,29 @@ body { user-select: none; -webkit-user-select: none; }
     color: rgba(255, 255, 255, 0.55);
 }
 
+#recipe-category-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.recipe-category-tab {
+    padding: 5px 8px;
+    border: 1px solid rgba(255, 224, 102, 0.35);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.25);
+    color: #ddd;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+.recipe-category-tab[aria-selected="true"] {
+    border-color: #ffe066;
+    background: rgba(255, 224, 102, 0.18);
+    color: #ffe066;
+}
+
 #recipe-list-container {
     flex: 1;
     overflow-y: auto;
@@ -1261,6 +1284,104 @@ body { user-select: none; -webkit-user-select: none; }
 #recipe-list-container > [hidden] {
     display: none;
 }
+
+#quest-compass {
+    position: fixed;
+    top: max(14px, env(safe-area-inset-top));
+    left: 50%;
+    z-index: 120;
+    transform: translateX(-50%);
+    display: grid;
+    grid-template-columns: auto auto;
+    gap: 2px 8px;
+    align-items: center;
+    padding: 8px 13px;
+    border: 1px solid rgba(255, 224, 102, 0.45);
+    border-radius: 4px;
+    background: rgba(18, 18, 14, 0.78);
+    color: #fff4bd;
+    pointer-events: none;
+}
+
+#quest-compass[hidden] { display: none; }
+.quest-compass-arrow { grid-row: span 2; font-size: 25px; transform-origin: center; }
+.quest-compass-distance { color: #ddd; font-size: 12px; }
+
+#boss-status {
+    position: fixed;
+    top: 82px;
+    left: 50%;
+    z-index: 119;
+    width: min(440px, 72vw);
+    transform: translateX(-50%);
+    color: #ffd7dc;
+    text-align: center;
+    text-shadow: 0 2px 4px #000;
+}
+
+#boss-status[hidden] { display: none; }
+.boss-status-track {
+    height: 12px;
+    margin-top: 5px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 215, 220, 0.72);
+    border-radius: 4px;
+    background: rgba(20, 0, 4, 0.82);
+}
+
+#boss-status-fill {
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, #671020, #e22f50);
+    transition: width 0.18s linear;
+}
+
+#inventory-view-tabs {
+    display: flex;
+    gap: 6px;
+}
+
+#inventory-view-tabs button,
+.quest-journal-button {
+    padding: 6px 10px;
+    border: 1px solid rgba(255, 224, 102, 0.4);
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.28);
+    color: #eee;
+    cursor: pointer;
+}
+
+#inventory-view-tabs button[aria-selected="true"] {
+    border-color: #ffe066;
+    color: #ffe066;
+}
+
+#inventory-overlay.quest-view #recipe-book,
+#inventory-overlay.quest-view #inventory-objective,
+#inventory-overlay.quest-view #crafting-label,
+#inventory-overlay.quest-view #crafting-area,
+#inventory-overlay.quest-view #crafting-status,
+#inventory-overlay.quest-view #inventory-grid,
+#inventory-overlay.quest-view #inventory-main-content > p {
+    display: none !important;
+}
+
+#inventory-overlay.quest-view #inventory-main-content {
+    width: min(760px, calc(100vw - 40px));
+}
+
+#quest-journal {
+    overflow-y: auto;
+    padding: 6px 2px 18px;
+}
+
+#quest-journal[hidden] { display: none; }
+#quest-journal h2 { margin: 15px 0 7px; color: #ffe066; font-size: 14px; }
+.quest-journal-card { display: grid; gap: 5px; margin-bottom: 7px; padding: 10px; border: 1px solid rgba(255,255,255,0.16); background: rgba(0,0,0,0.2); }
+.quest-journal-card span, .quest-journal-empty, #quest-journal-home { color: #ccc; font-size: 13px; }
+.quest-journal-actions { display: flex; gap: 6px; }
+.quest-journal-button.danger { border-color: rgba(255, 100, 100, 0.45); color: #ffb0a8; }
+.quest-journal-button:disabled { opacity: 0.55; cursor: default; }
 
 .recipe-entry {
     width: 100%;

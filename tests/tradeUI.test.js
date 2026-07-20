@@ -32,6 +32,8 @@ beforeEach(() => {
     }
     window.addItemToInventory = inventory.addItemToInventory;
     window.updateInventoryUI = () => {};
+    delete window.getQuestState;
+    delete window.getQuestDayCount;
 });
 
 describe('NPC trade transactions', () => {
@@ -107,6 +109,68 @@ describe('NPC trade transactions', () => {
         document.querySelector('.quest-row .trade-btn').click();
 
         expect(listener).toHaveBeenCalledOnce();
+        expect(inventory.inventorySlots.some(slot => slot.type === 61 && slot.count === 1)).toBe(true);
+    });
+
+    it('uses the local village trust price for normal trades', () => {
+        inventory.inventorySlots[0] = { type: 60, count: 10 };
+        window.getQuestState = () => ({
+            activeSideQuests: [],
+            villages: { 'village:1,2': { trust: 3, offers: [] } }
+        });
+        const npc = {
+            villageId: 'village:1,2',
+            displayName: 'Hagen',
+            professionIdx: 0,
+            profession: {
+                name: 'Schmied', quest: null,
+                trades: [{ give: { type: 60, count: 10 }, receive: { type: 61, count: 1 } }]
+            }
+        };
+
+        openTradeUI(npc, { unlock() {} });
+        expect(document.querySelector('.trade-label').textContent).toContain('9×');
+        document.querySelector('.trade-btn').click();
+
+        expect(inventory.inventorySlots[0]).toEqual({ type: 60, count: 1 });
+        expect(inventory.inventorySlots.some(slot => slot.type === 61 && slot.count === 1)).toBe(true);
+    });
+
+    it('accepts and turns in a generated village delivery quest', () => {
+        const questState = {
+            trackedTarget: { kind: 'main' },
+            completedQuestIds: [],
+            abandonedQuestIds: [],
+            activeSideQuests: [],
+            villages: {
+                'village:1,2': {
+                    id: 'village:1,2', trust: 0, nextOfferRefreshDay: 3,
+                    offers: [{
+                        id: 'coal-help', villageId: 'village:1,2', professionIdx: 0,
+                        title: 'Kohle für die Werkstatt',
+                        objective: { type: 'delivery', itemType: 60, required: 4, current: 0 },
+                        reward: { type: 61, count: 1 }, trustReward: 2
+                    }]
+                }
+            }
+        };
+        window.getQuestState = () => questState;
+        window.getQuestDayCount = () => 2;
+        const npc = {
+            villageId: 'village:1,2', displayName: 'Hagen', professionIdx: 0,
+            profession: { name: 'Schmied', quest: null, trades: [] }
+        };
+
+        openTradeUI(npc, { unlock() {} });
+        document.querySelector('.quest-offer-row .trade-btn').click();
+        expect(questState.activeSideQuests).toHaveLength(1);
+
+        inventory.inventorySlots[0] = { type: 60, count: 4 };
+        openTradeUI(npc, { unlock() {} });
+        document.querySelector('.quest-active-row .trade-btn').click();
+
+        expect(questState.activeSideQuests).toEqual([]);
+        expect(questState.villages['village:1,2'].trust).toBe(2);
         expect(inventory.inventorySlots.some(slot => slot.type === 61 && slot.count === 1)).toBe(true);
     });
 });

@@ -1,7 +1,13 @@
 export const STORY_EVENTS = Object.freeze({
     VILLAGER_MET: 'butzcraft:villager-met',
     QUEST_COMPLETED: 'butzcraft:quest-completed',
-    BLOOD_MOON_SURVIVED: 'butzcraft:blood-moon-survived'
+    BLOOD_MOON_SURVIVED: 'butzcraft:blood-moon-survived',
+    MINE_COMPLETED: 'butzcraft:mine-completed',
+    DUNGEON_KEY_FOUND: 'butzcraft:dungeon-key-found',
+    DUNGEON_GATE_OPENED: 'butzcraft:dungeon-gate-opened',
+    DUNGEON_COMPLETED: 'butzcraft:dungeon-completed',
+    RITUAL_ACTIVATED: 'butzcraft:ritual-activated',
+    BOSS_DEFEATED: 'butzcraft:boss-defeated'
 });
 
 const STORY_OBJECTIVES = [
@@ -30,10 +36,46 @@ const STORY_OBJECTIVES = [
         touchHint: 'Jede dritte Nacht wird gefährlich. Nimm Essen mit und sichere deinen Unterschlupf.'
     },
     {
-        label: 'Freie Reise',
-        text: 'Schreibe deine eigene Geschichte',
-        hint: 'Erkunde neue Dörfer, Ruinen und Höhlen oder baue dir ein dauerhaftes Zuhause.',
-        touchHint: 'Erkunde neue Dörfer, Ruinen und Höhlen oder baue dir ein dauerhaftes Zuhause.'
+        label: 'Spuren in der Tiefe',
+        text: 'Durchsuche eine große Mine',
+        hint: 'Folge Mineneingängen und Schienen bis zur Belohnungskammer.',
+        touchHint: 'Folge Mineneingängen und Schienen bis zur Belohnungskammer.'
+    },
+    {
+        label: 'Die versiegelte Tiefe',
+        text: 'Finde den Schlüssel im oberen Dungeon',
+        hint: 'Ein verwitterter Steinmarker zeigt einen Dungeonzugang. Durchsuche zuerst die obere Ebene.',
+        touchHint: 'Ein verwitterter Steinmarker zeigt einen Dungeonzugang. Durchsuche zuerst die obere Ebene.'
+    },
+    {
+        label: 'Die versiegelte Tiefe',
+        text: 'Öffne das Tor zur unteren Ebene',
+        hint: 'Kehre mit dem gefundenen Schlüssel zum verschlossenen Dungeon-Tor zurück.',
+        touchHint: 'Kehre mit dem gefundenen Schlüssel zum verschlossenen Dungeon-Tor zurück.'
+    },
+    {
+        label: 'Die Blutmondquelle',
+        text: 'Erreiche die Endkammer',
+        hint: 'Überwinde die Spawner und öffne die Belohnungstruhe hinter dem Tor.',
+        touchHint: 'Überwinde die Spawner und öffne die Belohnungstruhe hinter dem Tor.'
+    },
+    {
+        label: 'Die Blutmondquelle',
+        text: 'Aktiviere das Blutmondritual',
+        hint: 'Untersuche den Ritualkern an der Belohnungstruhe erneut und bereite dich auf einen schweren Kampf vor.',
+        touchHint: 'Untersuche den Ritualkern an der Belohnungstruhe erneut und bereite dich auf einen schweren Kampf vor.'
+    },
+    {
+        label: 'Wächter der Quelle',
+        text: 'Besiege den Blutmondwächter',
+        hint: 'Weiche seinen Angriffen aus und beseitige beschworene Gegner. Eisen-Ausrüstung und Nahrung werden empfohlen.',
+        touchHint: 'Weiche seinen Angriffen aus und beseitige beschworene Gegner. Eisen-Ausrüstung und Nahrung werden empfohlen.'
+    },
+    {
+        label: 'Neue Gefahren',
+        text: 'Stärke die Dörfer und jage Blutmondechos',
+        hint: 'Neue Dorfaufträge, stärkere Blutmonde und seltene Boss-Echos erwarten dich.',
+        touchHint: 'Neue Dorfaufträge, stärkere Blutmonde und seltene Boss-Echos erwarten dich.'
     }
 ].map((objective, index, objectives) => ({
     ...objective,
@@ -46,6 +88,12 @@ const EXPECTED_EVENT_BY_INDEX = [
     STORY_EVENTS.VILLAGER_MET,
     STORY_EVENTS.QUEST_COMPLETED,
     STORY_EVENTS.BLOOD_MOON_SURVIVED,
+    STORY_EVENTS.MINE_COMPLETED,
+    STORY_EVENTS.DUNGEON_KEY_FOUND,
+    STORY_EVENTS.DUNGEON_GATE_OPENED,
+    STORY_EVENTS.DUNGEON_COMPLETED,
+    STORY_EVENTS.RITUAL_ACTIVATED,
+    STORY_EVENTS.BOSS_DEFEATED,
     null
 ];
 

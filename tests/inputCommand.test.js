@@ -38,6 +38,8 @@ describe('resolveUiInputCommand', () => {
         expect(resolveUiInputCommand({ ...clearState, code: 'Tab', paused: false })).toBe('pause');
         expect(resolveUiInputCommand({ ...clearState, code: 'Escape', paused: true })).toBe('resume');
         expect(resolveUiInputCommand({ ...clearState, code: 'KeyE', paused: false })).toBe('toggle-inventory');
+        expect(resolveUiInputCommand({ ...clearState, code: 'KeyJ', paused: false })).toBe('open-journal');
+        expect(resolveUiInputCommand({ ...clearState, code: 'KeyJ', inventoryOpen: true })).toBe('open-journal');
     });
 
     it('ignores unrelated keys', () => {

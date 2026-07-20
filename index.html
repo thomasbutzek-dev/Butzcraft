@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260719b">
+    <link rel="stylesheet" href="style.css?v=20260720q">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -275,6 +275,15 @@
                 <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
             </div>
         </div>
+        <div id="quest-compass" role="status" aria-live="polite" hidden>
+            <span class="quest-compass-arrow" aria-hidden="true">↑</span>
+            <strong class="quest-compass-label"></strong>
+            <span class="quest-compass-distance"></span>
+        </div>
+        <div id="boss-status" role="status" aria-live="polite" hidden>
+            <strong id="boss-status-label">Blutmondwächter</strong>
+            <div class="boss-status-track"><div id="boss-status-fill"></div></div>
+        </div>
         <div id="instructions" role="dialog" aria-modal="true" aria-labelledby="pause-title" aria-hidden="true">
             <img src="logo.png" alt="BUTZCRAFT" style="width: 200px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">
             <h1 id="pause-title">Pause</h1>
@@ -361,12 +370,17 @@
     <div id="inventory-overlay" role="dialog" aria-modal="true" aria-labelledby="inventory-title" aria-hidden="true">
         <div id="recipe-book">
             <div id="recipe-book-title">Rezeptbuch</div>
+            <div id="recipe-category-tabs" role="tablist" aria-label="Rezeptkategorien"></div>
             <input id="recipe-search" type="search" aria-label="Rezepte suchen" placeholder="Rezepte suchen…" autocomplete="off">
             <div id="recipe-list-container"></div>
         </div>
         <div id="inventory-main-content">
         <div id="inventory-header">
-            <div id="inventory-title">Inventar</div>
+            <h2 id="inventory-title">Inventar</h2>
+            <div id="inventory-view-tabs" role="tablist" aria-label="Inventaransicht">
+                <button id="inventory-view-tab" type="button" role="tab" aria-selected="true">Inventar</button>
+                <button id="quest-view-tab" type="button" role="tab" aria-selected="false">Questjournal</button>
+            </div>
             <button
                 id="inventory-close-btn"
                 type="button"
@@ -381,6 +395,12 @@
             </div>
             <strong id="inventory-objective-text"></strong>
             <div id="inventory-objective-hint"></div>
+        </div>
+        <div id="quest-journal" hidden>
+            <section><h2>Hauptquest</h2><div id="quest-journal-main"></div></section>
+            <section><h2>Nebenquests</h2><div id="quest-journal-side"></div></section>
+            <section><h2>Dörfer</h2><div id="quest-journal-villages"></div></section>
+            <section><h2>Orientierung</h2><div id="quest-journal-home"></div></section>
         </div>
 
         <!-- NEUES CRAFTING AREA (3×3) -->
@@ -476,7 +496,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260719k"
+        src="./js/GameMain.js?v=20260720q"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

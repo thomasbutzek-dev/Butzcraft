@@ -16,9 +16,10 @@
 
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { normalizeCharacterProfile } from './characterProfile.js?v=20260602a';
+import { createQuestState, normalizeQuestState } from './quests.js?v=20260720q';
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 13;
+export const CURRENT_SAVE_VERSION = 14;
 export const CURRENT_WORLD_GENERATION_VERSION = 2;
 
 export function getWorldGenerationLoadNotice(rawData, saveName) {
@@ -164,6 +165,11 @@ function migrateV12toV13(data) {
     return data;
 }
 
+function migrateV13toV14(data) {
+    data.questState = normalizeQuestState(data.questState, data.storyObjectiveIndex);
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
@@ -178,7 +184,8 @@ const MIGRATIONS = {
     10: migrateV9toV10,
     11: migrateV10toV11,
     12: migrateV11toV12,
-    13: migrateV12toV13
+    13: migrateV12toV13,
+    14: migrateV13toV14
 };
 
 function normalizeCharacterSettings(data) {
@@ -211,6 +218,11 @@ function normalizeWorldGeneration(data) {
     return data;
 }
 
+function normalizeQuestProgress(data) {
+    data.questState = normalizeQuestState(data.questState || createQuestState(data.storyObjectiveIndex), data.storyObjectiveIndex);
+    return data;
+}
+
 /**
  * Wendet alle nötigen Migrations an, damit das Save-Object die CURRENT_SAVE_VERSION hat.
  * Idempotent: bereits aktuelle Saves werden unverändert zurückgegeben.
@@ -232,7 +244,7 @@ export function migrateSave(data) {
         v = next;
     }
     data.version = v;
-    return normalizeWorldGeneration(normalizeCharacterSettings(normalizeInventory(data)));
+    return normalizeQuestProgress(normalizeWorldGeneration(normalizeCharacterSettings(normalizeInventory(data))));
 }
 
 export function prepareSaveForLoad(rawData) {
@@ -269,6 +281,7 @@ export function stampSaveVersion(data) {
         if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {
             data.structureProgress = {};
         }
+        data.questState = normalizeQuestState(data.questState || createQuestState(data.storyObjectiveIndex), data.storyObjectiveIndex);
     }
     return data;
 }

@@ -1231,6 +1231,7 @@ export class Mob {
                         if (!Game.droppedItems) Game.droppedItems = [];
                         Game.droppedItems.push({ mesh: dropMesh, velocityY: 2.0, blockType: blockType });
                     }
+                    if (typeof onKill === 'function') onKill(this);
                 }
             }
         }

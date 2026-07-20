@@ -15,6 +15,18 @@ import {
     CURRENT_SAVE_VERSION
 } from '../js/saveMigrations.js';
 
+describe('migrateSave - v13 to v14 (quest state)', () => {
+    it('preserves the existing journey index in the new quest state', () => {
+        const migrated = migrateSave({ version: 13, inventory: [], storyObjectiveIndex: 3 });
+
+        expect(migrated.questState).toEqual(expect.objectContaining({
+            mainQuestIndex: 3,
+            activeSideQuests: [],
+            villages: {}
+        }));
+    });
+});
+
 describe('migrateSave – v12 → v13 (Tierhaltung)', () => {
     it('initialisiert gespeicherte Gehegetiere für ältere Spielstände', () => {
         const migrated = migrateSave({ version: 12, inventory: [] });

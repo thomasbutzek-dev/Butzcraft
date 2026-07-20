@@ -1,7 +1,7 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260717a';
-import { craftingRecipes } from './recipes.js?v=20260717a';
-import { initRecipeBook } from './recipe_book.js?v=20260718b';
+import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260720q';
+import { craftingRecipes } from './recipes.js?v=20260720q';
+import { initRecipeBook } from './recipe_book.js?v=20260720q';
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717z';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
@@ -750,6 +750,9 @@ export function craftCurrentRecipe() {
     updateInventoryUI();
     setCraftingStatus(`${getItemName(output.type)} hergestellt.`, 'success');
     SoundManager.playSound('dig_wood', 0.4, 1.8);
+    window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+        detail: { type: 'craft', itemType: output.type, count: output.count }
+    }));
     return { crafted: true, reason: null };
 }
 
@@ -804,6 +807,7 @@ function openCraftingOverlay(station, gameStarted, spawning, controls) {
     setCraftingGridSize(station === 'workbench' ? 3 : 2);
     const overlay = document.getElementById('inventory-overlay');
     overlay.style.display = 'flex';
+    window.showInventoryPanel?.('inventory');
     activateDialog(overlay, '#inventory-close-btn');
     if (!Game.touchActive) controls.unlock();
     initInventoryGrid();
