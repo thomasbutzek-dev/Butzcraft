@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readChunkWorkerSource } from './chunkWorkerSource.js';
 
 describe('village roads', () => {
-    const source = readFileSync('js/chunkWorker.js', 'utf8');
+    const source = readChunkWorkerSource();
 
     it('berechnet Dorf-Kandidaten unabhaengig fuer Doerfer und Wege', () => {
         expect(source).toContain('function getVillageCandidate');
-        expect(source).toContain('const village = getVillageCandidate(scx, scz)');
+        expect(source).toContain('const village = getVillageCandidate(scx, scz, WORLD_GENERATION_VERSION)');
     });
 
     it('verbindet nahe Doerfer mit chunkuebergreifenden Wegen', () => {

@@ -16,9 +16,21 @@
 
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { normalizeCharacterProfile } from './characterProfile.js?v=20260602a';
+import { createQuestState, normalizeQuestState } from './quests.js?v=20260721b';
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 11;
+export const CURRENT_SAVE_VERSION = 14;
+export const CURRENT_WORLD_GENERATION_VERSION = 2;
+
+export function getWorldGenerationLoadNotice(rawData, saveName) {
+    if (rawData?.worldGenerationVersion === CURRENT_WORLD_GENERATION_VERSION) return null;
+    const suffix = ' - Worldgen 1 Backup';
+    const baseName = String(saveName || 'Legacy World').slice(0, 64 - suffix.length).trimEnd();
+    return {
+        backupName: `${baseName}${suffix}`,
+        message: 'Dieser Spielstand nutzt die alte Weltgenerierung. Eine Sicherung wurde angelegt. Für die neuen großen Minen und Dungeons wird eine neue Welt empfohlen.'
+    };
+}
 
 // Migration v0 → v1: Inventory-Format vom Objekt {type: count} auf Array<{type, count}>
 const OLD_INVENTORY_MAP = { 1: 0, 2: 1, 3: 2, 7: 3, 5: 4, 6: 5, 11: 6, 12: 7, 15: 8, 16: 9, 17: 10, 18: 11 };
@@ -138,6 +150,26 @@ function migrateV10toV11(data) {
     return data;
 }
 
+function migrateV11toV12(data) {
+    if (data.worldGenerationVersion !== 1 && data.worldGenerationVersion !== 2) {
+        data.worldGenerationVersion = 1;
+    }
+    if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {
+        data.structureProgress = {};
+    }
+    return data;
+}
+
+function migrateV12toV13(data) {
+    if (!Array.isArray(data.keptAnimals)) data.keptAnimals = [];
+    return data;
+}
+
+function migrateV13toV14(data) {
+    data.questState = normalizeQuestState(data.questState, data.storyObjectiveIndex);
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
@@ -150,7 +182,10 @@ const MIGRATIONS = {
     8: migrateV7toV8,
     9: migrateV8toV9,
     10: migrateV9toV10,
-    11: migrateV10toV11
+    11: migrateV10toV11,
+    12: migrateV11toV12,
+    13: migrateV12toV13,
+    14: migrateV13toV14
 };
 
 function normalizeCharacterSettings(data) {
@@ -170,6 +205,21 @@ function normalizeInventory(data) {
         const slot = data.inventory[i];
         if (!slot || typeof slot !== 'object') data.inventory[i] = { type: 0, count: 0 };
     }
+    return data;
+}
+
+function normalizeWorldGeneration(data) {
+    if (data.worldGenerationVersion !== 1 && data.worldGenerationVersion !== 2) {
+        data.worldGenerationVersion = CURRENT_WORLD_GENERATION_VERSION;
+    }
+    if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {
+        data.structureProgress = {};
+    }
+    return data;
+}
+
+function normalizeQuestProgress(data) {
+    data.questState = normalizeQuestState(data.questState || createQuestState(data.storyObjectiveIndex), data.storyObjectiveIndex);
     return data;
 }
 
@@ -194,7 +244,7 @@ export function migrateSave(data) {
         v = next;
     }
     data.version = v;
-    return normalizeCharacterSettings(normalizeInventory(data));
+    return normalizeQuestProgress(normalizeWorldGeneration(normalizeCharacterSettings(normalizeInventory(data))));
 }
 
 export function prepareSaveForLoad(rawData) {
@@ -223,6 +273,15 @@ export function prepareSaveForLoad(rawData) {
  * Stempelt ein neues Save-Object mit der aktuellen Version, vor dem Schreiben.
  */
 export function stampSaveVersion(data) {
-    if (data && typeof data === 'object') data.version = CURRENT_SAVE_VERSION;
+    if (data && typeof data === 'object') {
+        data.version = CURRENT_SAVE_VERSION;
+        if (data.worldGenerationVersion !== 1 && data.worldGenerationVersion !== 2) {
+            data.worldGenerationVersion = CURRENT_WORLD_GENERATION_VERSION;
+        }
+        if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {
+            data.structureProgress = {};
+        }
+        data.questState = normalizeQuestState(data.questState || createQuestState(data.storyObjectiveIndex), data.storyObjectiveIndex);
+    }
     return data;
 }

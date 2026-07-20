@@ -7,10 +7,13 @@ import { describe, it, expect } from 'vitest';
 import { Physics } from '../js/Physics.js';
 
 // Mini-World-Mock: Map<"x,y,z", blockType>. Default 0 (Luft).
-function mockWorld(blocks = {}) {
+function mockWorld(blocks = {}, metadata = {}) {
     return {
         getBlock(x, y, z) {
             return blocks[`${x},${y},${z}`] ?? 0;
+        },
+        getBlockMeta(x, y, z) {
+            return metadata[`${x},${y},${z}`] ?? 0;
         }
     };
 }
@@ -36,10 +39,19 @@ describe('Physics.isSolid', () => {
         expect(Physics.isSolid(w, 0, 0, 0, true)).toBe(true);
     });
 
-    it('Türen (33, 34) sind durchlässig für Spieler, solide für Mobs', () => {
-        const w = mockWorld({ '0,0,0': 33 });
-        expect(Physics.isSolid(w, 0, 0, 0, false)).toBe(false);
-        expect(Physics.isSolid(w, 0, 0, 0, true)).toBe(true);
+    it('geschlossene Türen blockieren und geöffnete Türen lassen Spieler und Mobs passieren', () => {
+        const closed = mockWorld({ '0,0,0': 33 });
+        const open = mockWorld({ '0,0,0': 33 }, { '0,0,0': 4 });
+        expect(Physics.isSolid(closed, 0, 0, 0, false)).toBe(true);
+        expect(Physics.isSolid(closed, 0, 0, 0, true)).toBe(true);
+        expect(Physics.isSolid(open, 0, 0, 0, false)).toBe(false);
+        expect(Physics.isSolid(open, 0, 0, 0, true)).toBe(false);
+    });
+
+    it('Zäune blockieren und nur geöffnete Gatter sind durchlässig', () => {
+        expect(Physics.isSolid(mockWorld({ '0,0,0': 102 }), 0, 0, 0)).toBe(true);
+        expect(Physics.isSolid(mockWorld({ '0,0,0': 103 }), 0, 0, 0)).toBe(true);
+        expect(Physics.isSolid(mockWorld({ '0,0,0': 103 }, { '0,0,0': 4 }), 0, 0, 0)).toBe(false);
     });
 
     it('Pflanzen (44=hohes Gras) sind nicht solide', () => {

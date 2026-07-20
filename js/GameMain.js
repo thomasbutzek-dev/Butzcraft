@@ -2,39 +2,42 @@
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717y';
-        import { World, getBiomeAt, BIOMES } from './world.js?v=20260719a';
-        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260719d';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717z';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260721b';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260720q';
+        import { BloodMoonBoss } from './bloodMoonBoss.js?v=20260720a';
 
         import { Input } from './Input.js?v=20260507b';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260717b';
-        import { prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260719a';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260720q';
+        import { getWorldGenerationLoadNotice, prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260720q';
         import { Game } from './Game.js?v=20260716b'; // Central state container
-        import { Player } from './Player.js?v=20260718d';
+        import { Player } from './Player.js?v=20260719a';
         import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260719b';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260719b';
-        import { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } from './itemCollection.js?v=20260718c';
+        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260721c';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260721c';
+        import { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } from './itemCollection.js?v=20260721c';
         import { getOnboardingProgress } from './onboarding.js?v=20260718f';
-        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260718b';
-        import { findNewGameSpawn } from './newGameSpawn.js?v=20260718a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260719a';
-        import { WeatherSystem } from './weather.js?v=20260718b';
+        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260721b';
+        import { applyQuestEvent, createQuestState, ensureVillageState, getNpcIdentity, getVillageId, grantQuestItem, hasQuestItems, normalizeQuestState, refreshVillageOffers } from './quests.js?v=20260721b';
+        import { findNewGameSpawn } from './newGameSpawn.js?v=20260719a';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260721c';
+        import { WeatherSystem } from './weather.js?v=20260719a';
         import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-        import { NPC } from './npc.js?v=20260719a';
+        import { NPC } from './npc.js?v=20260720q';
         import { preloadEntityMaterials } from './entityMaterials.js?v=20260719a';
         import { Minecart } from './minecart.js?v=20260719a';
-        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260718d';
+        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260721c';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260718b';
         import { SaveRepository } from './saveRepository.js?v=20260718a';
         import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260719a';
         import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
         import { findSafeBedRespawn, normalizeRespawnBed } from './respawn.js?v=20260716a';
-        import { TorchLightSystem, TORCH_TYPE } from './torchLights.js?v=20260718b';
+        import { TorchLightSystem, TORCH_TYPE } from './torchLights.js?v=20260719a';
         import { DamageFeedback } from './damageFeedback.js?v=20260718a';
         import { FrameRateTracker } from './frameRateTracker.js?v=20260718a';
         import { calculateRenderPixelRatio } from './renderResolution.js?v=20260718a';
-        import { resolveUiInputCommand } from './inputCommand.js?v=20260718a';
+        import { resolveUiInputCommand } from './inputCommand.js?v=20260720q';
+        import { initQuestJournal, showInventoryPanel, updateQuestCompass } from './questJournal.js?v=20260721c';
         import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
@@ -44,6 +47,12 @@
         window.getBiomeAt = getBiomeAt;
 
         window._blockTexData = { BLOCK_TEX, atlasDataURL };
+        window.addEventListener('butzcraft:atlas-ready', () => {
+            window._blockTexData.atlasDataURL = atlasDataURL;
+            document.querySelectorAll('.flat-icon, .mc-face, .mini-icon').forEach(element => {
+                element.style.backgroundImage = `url("${atlasDataURL}")`;
+            });
+        });
         
 
 
@@ -66,6 +75,9 @@
         let pendingBloodMoonRewardDay = -1;
         let lastBloodMoonRewardRetry = 0;
         let storyObjectiveIndex = 0;
+        let questState = createQuestState();
+        let activeBloodMoonBoss = null;
+        let bossEncounterCounter = 0;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
         Game.droppedItems = [];
@@ -73,8 +85,126 @@
         let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
         let torchLightSystem = null;
         let damageFeedback = null;
+
+        function applyPlayerDamage(damage) {
+            if (damage <= 0) return;
+            Game.player.health -= damage;
+            damageFeedback.trigger(damage);
+        }
         const npcs = [];            // Tier 3: NPC-Array
         window.npcs = npcs;
+        window.getQuestState = () => questState;
+        window.getQuestDayCount = () => Math.floor(time / DAY_DURATION);
+        window.getHighestVillageTrust = () => Math.max(0, ...Object.values(questState.villages || {}).map(village => Number(village.trust) || 0));
+        window.getCurrentStoryObjective = () => currentStoryObjective;
+        window.getQuestNavigationContext = () => {
+            const playerPosition = controls?.getObject?.()?.position || null;
+            const villages = Object.values(questState.villages || {});
+            const homeVillage = villages.find(village => village.id === questState.homeVillageId);
+            const fallbackVillage = villages[0];
+            let mainTarget = homeVillage?.center || fallbackVillage?.center || null;
+            const desiredStructureKind = storyObjectiveIndex === 4 ? 'mine' : (storyObjectiveIndex >= 5 && storyObjectiveIndex <= 9 ? 'dungeon' : null);
+            if (desiredStructureKind && playerPosition && world?.structures) {
+                const nearestStructure = [...world.structures.values()]
+                    .filter(structure => structure.kind === desiredStructureKind && Number.isFinite(structure.x) && Number.isFinite(structure.z))
+                    .sort((first, second) => (
+                        (first.x - playerPosition.x) ** 2 + (first.z - playerPosition.z) ** 2
+                    ) - (
+                        (second.x - playerPosition.x) ** 2 + (second.z - playerPosition.z) ** 2
+                    ))[0];
+                if (nearestStructure) {
+                    mainTarget = {
+                        x: nearestStructure.x,
+                        z: nearestStructure.z,
+                        discovered: storyObjectiveIndex > 5,
+                        searchRadius: 90
+                    };
+                }
+            }
+            return {
+                playerPosition,
+                respawnBed,
+                world,
+                headingDegrees: camera?.rotation?.y ? camera.rotation.y * 180 / Math.PI : 0,
+                mainTarget
+            };
+        };
+
+        function resetBloodMoonEncounter() {
+            if (!activeBloodMoonBoss) return;
+            const encounterId = activeBloodMoonBoss.bossEncounterId;
+            for (const mob of mobs) {
+                if (mob === activeBloodMoonBoss || mob.bossEncounterId === encounterId) mob.isDead = true;
+            }
+            activeBloodMoonBoss = null;
+            questState.storyFlags.bossActive = false;
+        }
+
+        function spawnBloodMoonBoss(position, echo = false) {
+            const encounterId = `blood-moon:${++bossEncounterCounter}`;
+            const summonMinions = (bossPosition, phase) => {
+                const count = Math.min(3, phase);
+                for (let index = 0; index < count; index++) {
+                    const angle = index / count * Math.PI * 2;
+                    const summon = new Mob(
+                        scene,
+                        phase >= 2 && index % 2 ? 'skeleton' : 'zombie',
+                        bossPosition.x + Math.cos(angle) * 3,
+                        bossPosition.y,
+                        bossPosition.z + Math.sin(angle) * 3
+                    );
+                    summon.bossEncounterId = encounterId;
+                    mobs.push(summon);
+                }
+            };
+            const boss = new BloodMoonBoss(scene, new THREE.Vector3(position.x, position.y, position.z), {
+                echo,
+                onSummon: summonMinions,
+                onDefeated: defeatedBoss => {
+                    for (const mob of mobs) {
+                        if (mob !== defeatedBoss && mob.bossEncounterId === encounterId) mob.isDead = true;
+                    }
+                    activeBloodMoonBoss = null;
+                    questState.storyFlags.bossActive = false;
+                    questState.storyFlags.bossDefeated = true;
+                    window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+                        detail: { type: 'boss', bossType: defeatedBoss.type, count: 1 }
+                    }));
+                    window.dispatchEvent(new CustomEvent(STORY_EVENTS.BOSS_DEFEATED, {
+                        detail: { echo: defeatedBoss.echo }
+                    }));
+                }
+            });
+            boss.bossEncounterId = encounterId;
+            activeBloodMoonBoss = boss;
+            questState.storyFlags.bossActive = true;
+            mobs.push(boss);
+            return boss;
+        }
+
+        window.tryActivateBloodMoonRitual = ({ position, structureId } = {}) => {
+            updateStoryObjectiveFromTime();
+            if (activeBloodMoonBoss && !activeBloodMoonBoss.isDead) {
+                return { ok: false, message: 'Der Blutmondwächter ist bereits erwacht.' };
+            }
+            if (storyObjectiveIndex < 8) {
+                return { ok: false, message: 'Der Ritualstein bleibt still.' };
+            }
+            if (!hasQuestItems(questState, { deepCrystal: 1, bloodSeal: 1 })) {
+                return { ok: false, message: 'Tiefenkristall und Blutsiegel fehlen.' };
+            }
+            if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y) || !Number.isFinite(position.z)) {
+                return { ok: false, message: 'Der Ritualort ist nicht mehr erreichbar.' };
+            }
+            if (storyObjectiveIndex === 8) handleStoryEvent(STORY_EVENTS.RITUAL_ACTIVATED);
+            const echo = storyObjectiveIndex >= 10;
+            questState.storyFlags.ritualSite = { structureId, position: { ...position } };
+            spawnBloodMoonBoss(position, echo);
+            return {
+                ok: true,
+                message: echo ? 'Ein Blutmondecho erhebt sich!' : 'Der Blutmondwächter erwacht!'
+            };
+        };
         const minecarts = [];
         const spawnedMinecartKeys = new Set();
         let activeMinecart = null;
@@ -98,12 +228,16 @@
 
         // Schwert & Animation
 
+        let blockingOverlayElements = null;
+
         function isBlockingOverlayOpen() {
-            const visible = (id) => {
-                const el = document.getElementById(id);
-                return el && el.style.display !== 'none' && getComputedStyle(el).display !== 'none';
-            };
-            return isInventoryOpened() || visible('trade-overlay') || visible('furnace-overlay') || visible('chest-overlay');
+            if (isInventoryOpened()) return true;
+            blockingOverlayElements ||= [
+                document.getElementById('trade-overlay'),
+                document.getElementById('furnace-overlay'),
+                document.getElementById('chest-overlay')
+            ];
+            return blockingOverlayElements.some(el => el && el.style.display !== 'none');
         }
 
         function shouldUseTouchMode() {
@@ -231,7 +365,7 @@
                     e.code === 'KeyW' || e.code === 'KeyA' || e.code === 'KeyS' || e.code === 'KeyD' ||
                     e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight' ||
                     e.code === 'ControlLeft' || e.code === 'ControlRight' ||
-                    e.code === 'KeyE' || e.code === 'KeyQ' || e.code === 'Tab' ||
+                    e.code === 'KeyE' || e.code === 'KeyJ' || e.code === 'KeyQ' || e.code === 'Tab' ||
                     (e.key >= '1' && e.key <= '8')
                 )
             );
@@ -301,6 +435,8 @@
         let miniObjectiveIndex = 0;
         let currentMiniObjective = null;
         let currentStoryObjective = null;
+        const OBJECTIVE_UPDATE_INTERVAL_MS = 100;
+        let lastObjectiveUpdateAt = 0;
 
         function getControlsHintText() {
             if (shouldUseTouchMode() || window.innerWidth <= 760) {
@@ -440,10 +576,13 @@
             }, OBJECTIVE_COMPLETION_MS);
         }
 
-        function updateFirstObjective() {
+        function updateFirstObjective(force = true, now = performance.now()) {
+            if (!force && now - lastObjectiveUpdateAt < OBJECTIVE_UPDATE_INTERVAL_MS) return;
+            lastObjectiveUpdateAt = now;
             const { advanced, completedObjective } = advanceMiniObjective();
             updateStoryObjectiveFromTime();
             updateInventoryObjective();
+            updateQuestCompass();
             const controlsHint = document.getElementById('controls-hint');
             const controlsHintVisible = controlsHint && controlsHint.classList.contains('visible');
             if (!gameStarted || spawning || manuallyPaused || isBlockingOverlayOpen() || controlsHintVisible) {
@@ -470,6 +609,7 @@
                 villages: world?.villages || []
             });
             storyObjectiveIndex = progress.index;
+            questState.mainQuestIndex = storyObjectiveIndex;
             currentStoryObjective = progress.objective;
         }
 
@@ -478,13 +618,45 @@
             const nextIndex = advanceStoryProgress(storyObjectiveIndex, eventName);
             if (nextIndex === storyObjectiveIndex) return;
             storyObjectiveIndex = nextIndex;
+            questState.mainQuestIndex = storyObjectiveIndex;
             updateStoryObjectiveFromTime();
             updateFirstObjective();
         }
 
-        window.addEventListener(STORY_EVENTS.VILLAGER_MET, () => handleStoryEvent(STORY_EVENTS.VILLAGER_MET));
+        window.addEventListener(STORY_EVENTS.VILLAGER_MET, (event) => {
+            const npc = event.detail?.npc;
+            if (npc?.villageId) {
+                const village = world?.villages?.find(candidate => getVillageId(candidate) === npc.villageId);
+                if (village) ensureVillageState(questState, village, Math.floor(time / DAY_DURATION));
+                if (!questState.homeVillageId) questState.homeVillageId = npc.villageId;
+            }
+            handleStoryEvent(STORY_EVENTS.VILLAGER_MET);
+        });
         window.addEventListener(STORY_EVENTS.QUEST_COMPLETED, () => handleStoryEvent(STORY_EVENTS.QUEST_COMPLETED));
         window.addEventListener(STORY_EVENTS.BLOOD_MOON_SURVIVED, () => handleStoryEvent(STORY_EVENTS.BLOOD_MOON_SURVIVED));
+        window.addEventListener(STORY_EVENTS.MINE_COMPLETED, () => {
+            grantQuestItem(questState, 'deepCrystal');
+            handleStoryEvent(STORY_EVENTS.MINE_COMPLETED);
+        });
+        window.addEventListener(STORY_EVENTS.DUNGEON_KEY_FOUND, () => handleStoryEvent(STORY_EVENTS.DUNGEON_KEY_FOUND));
+        window.addEventListener(STORY_EVENTS.DUNGEON_GATE_OPENED, () => handleStoryEvent(STORY_EVENTS.DUNGEON_GATE_OPENED));
+        window.addEventListener(STORY_EVENTS.DUNGEON_COMPLETED, (event) => {
+            grantQuestItem(questState, 'bloodSeal');
+            if (event.detail?.position) {
+                questState.storyFlags.ritualSite = {
+                    structureId: event.detail.structureId,
+                    position: { ...event.detail.position }
+                };
+            }
+            handleStoryEvent(STORY_EVENTS.DUNGEON_COMPLETED);
+        });
+        window.addEventListener(STORY_EVENTS.RITUAL_ACTIVATED, () => handleStoryEvent(STORY_EVENTS.RITUAL_ACTIVATED));
+        window.addEventListener(STORY_EVENTS.BOSS_DEFEATED, () => handleStoryEvent(STORY_EVENTS.BOSS_DEFEATED));
+        window.addEventListener('butzcraft:quest-action', (event) => {
+            if (!event.detail) return;
+            applyQuestEvent(questState, event.detail);
+            updateFirstObjective();
+        });
 
         function resetControlsHintForRun(restoredObjectiveIndex = 0, restoredStoryObjectiveIndex = 0) {
             controlsHintShownForRun = false;
@@ -609,6 +781,41 @@
             }
         }
 
+        const DROP_TTL = 90;
+        const DROP_HARD_CAP = 150;
+
+        function updateDroppedItems(items, delta, playerPos) {
+            while (items.length > DROP_HARD_CAP) {
+                disposeDroppedItem(items[0]);
+                items.shift();
+            }
+            for (let i = items.length - 1; i >= 0; i--) {
+                const item = items[i];
+                const ip = item.mesh.position;
+                item.age = (item.age || 0) + delta;
+                if (item.age > DROP_TTL) {
+                    disposeDroppedItem(item);
+                    items.splice(i, 1);
+                    continue;
+                }
+
+                item.velocityY -= 9.8 * delta;
+                ip.y += item.velocityY * delta;
+                const blockBelow = world.getBlock(Math.floor(ip.x), Math.floor(ip.y - 0.1), Math.floor(ip.z));
+                if (blockBelow !== 0 && blockBelow !== 4 && blockBelow !== 8 && blockBelow !== 9 && item.velocityY < 0) {
+                    ip.y = Math.floor(ip.y - 0.1) + 1.0;
+                    item.velocityY = 0;
+                }
+                updateDroppedItemVisual(item, delta, graphicsPrototype.usesPainterlyTextures);
+
+                const dx = ip.x - playerPos.x;
+                const dz = ip.z - playerPos.z;
+                if (dx * dx + dz * dz < 4 && Math.abs(ip.y - playerPos.y) < 2.5) {
+                    tryCollectDroppedItem(items, i, disposeDroppedItem);
+                }
+            }
+        }
+
         function createOverflowDrop(type, count) {
             const mesh = new THREE.Mesh(
                 new THREE.BoxGeometry(0.25, 0.25, 0.25),
@@ -682,6 +889,7 @@
         }
 
         function resetRuntimeForLoadedGame() {
+            activeBloodMoonBoss = null;
             while (mobs.length > 0) {
                 const mob = mobs.pop();
                 if (mob && typeof mob.dispose === 'function') mob.dispose();
@@ -693,18 +901,27 @@
                 if (projectile && typeof projectile.dispose === 'function') projectile.dispose();
             }
             disposeMinecarts();
+            _spawnedVillageKeys.clear();
             world.fireBlocks.clear();
             world.spawnerMeta = {};
             world.villages = [];
+            world.structures.clear();
+            world.structureChests.clear();
+            world.structureGates.clear();
+            world.structureAltars.clear();
+            world.structureProgress = {};
         }
 
         window.startNewGame = function() {
             if (gameStarted) return;
+            world.setGenerationVersion(2);
             setActiveCharacterProfile(activeCharacterProfile);
             document.getElementById('start-menu').style.display = 'none';
             document.body.classList.add('game-started');
             currentSaveName = null;
             respawnBed = null;
+            questState = createQuestState();
+            activeBloodMoonBoss = null;
             SoundManager.init();
             manuallyPaused = false;
             lockControlsForDesktop();
@@ -722,7 +939,17 @@
         window.loadGame = function(name) {
             SoundManager.init();
             saveRepository.load(name)
-                .then(rawData => {
+                .then(async rawData => {
+                    const worldgenNotice = getWorldGenerationLoadNotice(rawData, name);
+                    if (worldgenNotice) {
+                        try {
+                            await saveRepository.save(worldgenNotice.backupName, rawData);
+                            alert(worldgenNotice.message);
+                        } catch (backupError) {
+                            console.warn('[Save] Legacy-Backup konnte nicht angelegt werden:', backupError);
+                            alert('Dieser Spielstand nutzt die alte Weltgenerierung. Das automatische Backup konnte nicht angelegt werden. Für die neuen großen Minen und Dungeons wird eine neue Welt empfohlen.');
+                        }
+                    }
                     const data = prepareSaveForLoad(rawData);
                     document.getElementById('start-menu').style.display = 'none';
                     document.body.classList.add('game-started');
@@ -733,6 +960,8 @@
                     document.getElementById('save-input').value = name;
 
                     resetRuntimeForLoadedGame();
+                    world.setGenerationVersion(data.worldGenerationVersion);
+                    world.structureProgress = data.structureProgress || {};
 
                     const playerPos = camera.position;
                     playerPos.set(data.pos.x, data.pos.y, data.pos.z);
@@ -742,11 +971,13 @@
                     Game.player.setThirdPersonCameraDistance(data.thirdPersonCamera?.distance);
                     time = data.time;
                     respawnBed = normalizeRespawnBed(data.respawnBed);
+                    questState = normalizeQuestState(data.questState, data.storyObjectiveIndex);
+                    questState.storyFlags.bossActive = false;
                     spawning = false;
 
                     // migrateSave liefert immer exakt 64 Slots und ersetzt damit den vorherigen Inventarstand vollständig.
                     data.inventory.forEach((item, i) => inventorySlots[i] = item);
-                    resetControlsHintForRun(data.onboardingObjectiveIndex, data.storyObjectiveIndex);
+                    resetControlsHintForRun(data.onboardingObjectiveIndex, questState.mainQuestIndex);
                     
                     collectedWool = data.collectedWool || 0;
                     lastBloodMoonRewardDay = typeof data.lastBloodMoonRewardDay === 'number' ? data.lastBloodMoonRewardDay : -1;
@@ -766,6 +997,10 @@
                             weatherSystem.loadFireBlocks(data.fireBlocks || {});
                         }
                         world.villages = Array.isArray(data.villages) ? data.villages : [];
+                        for (const village of world.villages) {
+                            _spawnedVillageKeys.add(`${village.cx},${village.cz}`);
+                            refreshVillageOffers(questState, village, Math.floor(time / DAY_DURATION));
+                        }
 
                         // Tier 3: NPCs wiederherstellen
                         // Bestehende NPCs entfernen
@@ -776,11 +1011,26 @@
                         if (data.npcs && Array.isArray(data.npcs)) {
                             for (const npcData of data.npcs) {
                                 if (!npcData.isDead) {
-                                    const npc = new NPC(scene, npcData.homeX, npcData.homeY, npcData.homeZ, npcData.professionIdx);
+                                    const npc = new NPC(scene, npcData.homeX, npcData.homeY, npcData.homeZ, npcData.professionIdx, {
+                                        ...(npcData.schedule || {}),
+                                        villageId: npcData.villageId,
+                                        npcId: npcData.id,
+                                        displayName: npcData.displayName,
+                                        essential: npcData.isEssential
+                                    });
                                     npc.group.position.set(npcData.x, npcData.y, npcData.z);
                                     npc.health = npcData.health;
+                                    npc.isUnconscious = Boolean(npcData.isUnconscious);
                                     npcs.push(npc);
                                 }
+                            }
+                        }
+                        if (Array.isArray(data.keptAnimals)) {
+                            for (const animalData of data.keptAnimals) {
+                                const animal = new Mob(scene, animalData.type, animalData.x, animalData.y, animalData.z);
+                                animal.health = animalData.health;
+                                animal.isPenned = true;
+                                mobs.push(animal);
                             }
                         }
                         if (Array.isArray(data.minecarts)) {
@@ -801,6 +1051,9 @@
         const DOM = {
             healthFill: document.getElementById('health-fill'),
             hungerFill: document.getElementById('hunger-fill'),
+            bossStatus: document.getElementById('boss-status'),
+            bossStatusLabel: document.getElementById('boss-status-label'),
+            bossStatusFill: document.getElementById('boss-status-fill'),
             worldTimeInfo: document.getElementById('world-time-info'),
             fpsSummary: document.getElementById('fps-summary'),
             stats: document.getElementById('stats'),
@@ -877,7 +1130,7 @@
             const playerPos = controls.getObject().position;
             const hostileNearby = mobs.some(m => (
                 !m.isDead &&
-                (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'spider' || m.type === 'geist') &&
+                (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'spider' || m.type === 'geist' || m.isBoss) &&
                 m.group.position.distanceTo(playerPos) < 12
             ));
             const blockReason = getSleepBlockReason(dayRatio, isBloodMoonNight, hostileNearby);
@@ -904,6 +1157,7 @@
             const point = findSafeBedRespawn(world, respawnBed);
             if (!point) return false;
 
+            resetBloodMoonEncounter();
             controls.getObject().position.set(point.x, point.y, point.z);
             Game.player.velocity.set(0, 0, 0);
             velocity.set(0, 0, 0);
@@ -930,6 +1184,7 @@
                 Input.init(isInventoryOpened);
                 setupInventoryEvents();
                 prepareInventoryUI();
+                initQuestJournal();
                 init();
                 window.__butzcraftGameMainReady = true;
                 window.__butzcraftGameMainEvaluating = false;
@@ -1162,9 +1417,30 @@
                 const vKey = `${vInfo.cx},${vInfo.cz}`;
                 if (_spawnedVillageKeys.has(vKey)) return; // Doppel-Spawn verhindern
                 _spawnedVillageKeys.add(vKey);
-                for (const house of vInfo.houses) {
-                    const npc = new NPC(scene, house.x, house.y, house.z, house.professionIdx);
-                    npcs.push(npc);
+                const villageId = getVillageId(vInfo);
+                ensureVillageState(questState, vInfo, Math.floor(time / DAY_DURATION));
+                const protectedProfessions = new Set();
+                for (const [houseIndex, house] of vInfo.houses.entries()) {
+                    const residentCount = Math.max(1, house.residentCount || 1);
+                    for (let resident = 0; resident < residentCount; resident++) {
+                        const offset = residentCount > 1 ? (resident === 0 ? -0.25 : 0.25) : 0;
+                        const professionIdx = (house.professionIdx + resident) % 4;
+                        const identity = getNpcIdentity(villageId, professionIdx, houseIndex * 2 + resident);
+                        const essential = !protectedProfessions.has(professionIdx);
+                        if (essential) protectedProfessions.add(professionIdx);
+                        const npc = new NPC(scene, house.x + offset, house.y, house.z, professionIdx, {
+                            home: house.home,
+                            door: house.door,
+                            porch: house.porch,
+                            work: house.work,
+                            waypoints: vInfo.waypoints,
+                            villageId,
+                            npcId: identity.id,
+                            displayName: identity.name,
+                            essential
+                        });
+                        npcs.push(npc);
+                    }
                 }
             });
 
@@ -1286,6 +1562,9 @@
                     if (uiCommand === 'close-inventory' || uiCommand === 'toggle-inventory') {
                         if (window.playerInteraction) window.playerInteraction.cancelMining();
                         toggleInventory(gameStarted, spawning, controls);
+                    } else if (uiCommand === 'open-journal') {
+                        if (!isInventoryOpened()) toggleInventory(gameStarted, spawning, controls);
+                        showInventoryPanel('quests');
                     } else if (uiCommand === 'close-furnace') {
                         window.closeFurnace && window.closeFurnace();
                     } else if (uiCommand === 'close-chest') {
@@ -1344,6 +1623,14 @@
                 lastUiUpdateAt = now;
                 DOM.healthFill.style.width = Math.max(0, Game.player.health) + '%';
                 DOM.hungerFill.style.width = Math.max(0, Game.player.hunger) + '%';
+                if (DOM.bossStatus) {
+                    const bossVisible = activeBloodMoonBoss && !activeBloodMoonBoss.isDead;
+                    DOM.bossStatus.hidden = !bossVisible;
+                    if (bossVisible) {
+                        DOM.bossStatusLabel.textContent = activeBloodMoonBoss.echo ? 'Blutmondecho' : 'Blutmondwächter';
+                        DOM.bossStatusFill.style.width = `${Math.max(0, activeBloodMoonBoss.health / activeBloodMoonBoss.maxHealth * 100)}%`;
+                    }
+                }
                 const tm = Math.floor((time / DAY_DURATION) * 1440), hh = Math.floor(tm / 60) % 24, mm = tm % 60, dd = Math.floor(time / DAY_DURATION) + 1;
                 const dayRatioUI = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
                 const dayCountUI = Math.floor(time / DAY_DURATION);
@@ -1491,7 +1778,7 @@
             }
             updateStatsHud(now, playerPos, bAt, weatherIcon);
             updateUI(false, now);
-            updateFirstObjective();
+            updateFirstObjective(false, now);
 
             // 4. SIMULATION (Nur wenn nicht pausiert)
             // Fix: Während spawning=true pausieren wir niemals automatisch
@@ -1501,7 +1788,15 @@
                 const previousDayCount = Math.floor(time / DAY_DURATION);
                 time += delta * getDayCycleSpeed(dayRatio);
                 const currentDayCount = Math.floor(time / DAY_DURATION);
-                if (currentDayCount > previousDayCount) grantBloodMoonReward(previousDayCount);
+                if (currentDayCount > previousDayCount) {
+                    grantBloodMoonReward(previousDayCount);
+                    for (const village of world.villages || []) {
+                        const villageId = getVillageId(village);
+                        if (villageId && questState.villages?.[villageId]) {
+                            refreshVillageOffers(questState, village, currentDayCount);
+                        }
+                    }
+                }
                 if (pendingBloodMoonRewardDay >= 0 && now - lastBloodMoonRewardRetry >= 1000) {
                     lastBloodMoonRewardRetry = now;
                     grantBloodMoonReward(pendingBloodMoonRewardDay, false);
@@ -1529,15 +1824,10 @@
                 }
                 showControlsHintOnceReady();
 
-                // Wrapped onDamage: appliziert Schaden UND triggert Feedback (Flash + Shake).
-                const onPlayerDamage = (d) => {
-                    if (d <= 0) return;
-                    Game.player.health -= d;
-                    damageFeedback.trigger(d);
-                };
+                const heldItemType = inventorySlots[getSelectedSlot()]?.type || 0;
                 mobs.forEach(m => {
                     if ((dayRatio < 0.25 || dayRatio > 0.75) === false && (m.type === 'zombie' || m.type === 'skeleton')) m.isDead = true;
-                    else m.update(delta, playerPos, world, onPlayerDamage, dayRatio);
+                    else m.update(delta, playerPos, world, applyPlayerDamage, dayRatio, now, heldItemType);
                 });
                 for (let i = mobs.length - 1; i >= 0; i--) {
                     if (mobs[i].isDead) {
@@ -1546,7 +1836,7 @@
                         mobs.splice(i, 1);
                     }
                 }
-                updateProjectiles(delta, playerPos, world, onPlayerDamage);
+                updateProjectiles(delta, playerPos, world, applyPlayerDamage);
 
                 // Tier 3: NPC-Update
                 for (let i = npcs.length - 1; i >= 0; i--) {
@@ -1555,7 +1845,7 @@
                         npc.dispose();
                         npcs.splice(i, 1);
                     } else {
-                        npc.update(delta, playerPos, world);
+                        npc.update(delta, playerPos, world, dayRatio);
                     }
                 }
 
@@ -1566,7 +1856,7 @@
                     if (mobs[i].type === 'fish' || mobs[i].type === 'octopus' || mobs[i].type === 'turtle') waterMobsCount++;
                     else if (mobs[i].type === 'geist') geistCount++;
                     else if (mobs[i].type === 'parrot') parrotCount++;
-                    else landMobsCount++;
+                    else if (!mobs[i].isPenned) landMobsCount++;
                 }
                 
                 if ((landMobsCount < MAX_COUNT || waterMobsCount < 15 || parrotCount < 5) && Math.random() < SPAWN_CHANCE) {
@@ -1693,46 +1983,7 @@
                 }
 
                 // Drop-Item-Update mit TTL + Hard-Cap (Sprint 5: Memory-Sicherheit).
-                // - DROP_TTL: nicht-aufgesammelte Drops verschwinden nach 90s (RAM + scene-Mesh-Leak vermeiden)
-                // - DROP_HARD_CAP: globaler Cap. Wenn überschritten → ältester Drop wird entfernt (LRU)
-                const DROP_TTL = 90; // Sekunden
-                const DROP_HARD_CAP = 150;
-                const disposeDrop = (item) => {
-                    if (item.mesh) {
-                        scene.remove(item.mesh);
-                        if (item.mesh.geometry) item.mesh.geometry.dispose();
-                        if (item.mesh.material) {
-                            // Drops verwenden eigene MeshPhongMaterial-Instanzen → safe to dispose
-                            if (Array.isArray(item.mesh.material)) item.mesh.material.forEach(m => m.dispose());
-                            else item.mesh.material.dispose();
-                        }
-                    }
-                };
-                const updateItems = (items) => {
-                    // Hard-Cap durchsetzen: ältester (= [0]) entfernt, bis unter Cap.
-                    while (items.length > DROP_HARD_CAP) {
-                        disposeDrop(items[0]);
-                        items.shift();
-                    }
-                    for (let i = items.length - 1; i >= 0; i--) {
-                        const item = items[i]; const ip = item.mesh.position;
-                        // TTL-Tracking: age in Sekunden; falls fehlt (alter Drop), jetzt initialisieren.
-                        item.age = (item.age || 0) + delta;
-                        if (item.age > DROP_TTL) {
-                            disposeDrop(item);
-                            items.splice(i, 1);
-                            continue;
-                        }
-                        item.velocityY -= 9.8 * delta; ip.y += item.velocityY * delta;
-                        const bB = world.getBlock(Math.floor(ip.x), Math.floor(ip.y - 0.1), Math.floor(ip.z));
-                        if (bB !== 0 && bB !== 4 && bB !== 8 && bB !== 9 && item.velocityY < 0) { ip.y = Math.floor(ip.y - 0.1) + 1.0; item.velocityY = 0; }
-                        updateDroppedItemVisual(item, delta, graphicsPrototype.usesPainterlyTextures);
-                        if (Math.hypot(ip.x - playerPos.x, ip.z - playerPos.z) < 2.0 && Math.abs(ip.y - playerPos.y) < 2.5) {
-                            tryCollectDroppedItem(items, i, disposeDrop);
-                        }
-                    }
-                };
-                updateItems(droppedItems);
+                updateDroppedItems(droppedItems, delta, playerPos);
 
                 // PLAYER PHYSICS / MINECART
                 for (const minecart of minecarts) minecart.update(delta, Input, world);
@@ -1759,7 +2010,7 @@
             world.processPendingMeshResults();
             const selectedItem = inventorySlots[getSelectedSlot()];
             Game.player.updateHeldTorch(Boolean(selectedItem && selectedItem.count > 0 && selectedItem.type === TORCH_TYPE));
-            torchLightSystem.update(delta, world.modifiedBlocks, world.fireLightKeys, playerPos);
+            torchLightSystem.update(delta, world.torchKeys, world.fireLightKeys, playerPos);
             Game.player.updateSword(delta);
             Game.player.updateCharacterModel(delta);
 
@@ -1865,7 +2116,11 @@
                 fireBlocks: weatherSystem ? weatherSystem.saveFireBlocks() : {},
                 villages: world.villages || [],
                 npcs: npcs.filter(n => !n.isDead).map(n => n.serialize()),
+                keptAnimals: mobs.filter(m => !m.isDead && m.isPenned).map(m => m.serialize()),
                 minecarts: minecarts.map(minecart => minecart.serialize()),
+                worldGenerationVersion: world.worldGenerationVersion,
+                structureProgress: world.structureProgress,
+                questState: questState,
                 characterProfile: normalizeCharacterProfile(activeCharacterProfile),
                 thirdPersonCamera: { distance: Game.player.getThirdPersonCameraDistance() }
             });

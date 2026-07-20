@@ -14,7 +14,7 @@ describe('long-term story progress', () => {
                 label: 'Deine Reise',
                 text: 'Überstehe deine erste Nacht',
                 step: 1,
-                total: 5
+                total: 11
             })
         });
     });
@@ -48,17 +48,23 @@ describe('long-term story progress', () => {
         expect(advanceStoryProgress(1, STORY_EVENTS.VILLAGER_MET)).toBe(2);
         expect(advanceStoryProgress(2, STORY_EVENTS.QUEST_COMPLETED)).toBe(3);
         expect(advanceStoryProgress(3, STORY_EVENTS.BLOOD_MOON_SURVIVED)).toBe(4);
+        expect(advanceStoryProgress(4, STORY_EVENTS.MINE_COMPLETED)).toBe(5);
+        expect(advanceStoryProgress(5, STORY_EVENTS.DUNGEON_KEY_FOUND)).toBe(6);
+        expect(advanceStoryProgress(6, STORY_EVENTS.DUNGEON_GATE_OPENED)).toBe(7);
+        expect(advanceStoryProgress(7, STORY_EVENTS.DUNGEON_COMPLETED)).toBe(8);
+        expect(advanceStoryProgress(8, STORY_EVENTS.RITUAL_ACTIVATED)).toBe(9);
+        expect(advanceStoryProgress(9, STORY_EVENTS.BOSS_DEFEATED)).toBe(10);
     });
 
-    it('never regresses restored progress and opens the sandbox epilogue after the blood moon', () => {
+    it('never regresses restored progress and opens the endgame after the boss', () => {
         expect(getStoryProgress(3, { dayCount: 0 }).index).toBe(3);
-        expect(getStoryProgress(4, { dayCount: 10 })).toEqual({
-            index: 4,
+        expect(getStoryProgress(10, { dayCount: 10 })).toEqual({
+            index: 10,
             objective: expect.objectContaining({
-                label: 'Freie Reise',
-                text: 'Schreibe deine eigene Geschichte',
-                step: 5,
-                total: 5
+                label: 'Neue Gefahren',
+                text: 'Stärke die Dörfer und jage Blutmondechos',
+                step: 11,
+                total: 11
             })
         });
     });

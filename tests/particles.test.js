@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { blocksPrecipitation, findPrecipitationImpactY, getPrecipitationVisualProfile } from '../js/particles.js';
+import { describe, it, expect, vi } from 'vitest';
+import * as THREE from 'three';
+import { ParticleSystem, blocksPrecipitation, findPrecipitationImpactY, getPrecipitationVisualProfile } from '../js/particles.js';
 
 describe('precipitation collision helpers', () => {
     it('lets precipitation pass through air, water and clouds only', () => {
@@ -39,6 +40,24 @@ describe('painterly precipitation', () => {
         expect(rain.colors.length).toBeGreaterThan(1);
         expect(snow.colors.length).toBeGreaterThan(1);
         expect(snow.scaleRange).toBeGreaterThan(0);
+    });
+
+    it('updates and uploads only currently visible instances', () => {
+        const particles = new ParticleSystem(new THREE.Scene(), 'rain', 10);
+        const setMatrixAt = vi.spyOn(particles.mesh, 'setMatrixAt');
+
+        particles.update(1 / 60, new THREE.Vector3(0, 20, 0), 0.3);
+        const expectedActiveCount = Math.floor(particles.count * 0.3);
+
+        expect(particles.mesh.count).toBe(expectedActiveCount);
+        expect(particles.activeCount).toBe(expectedActiveCount);
+        expect(setMatrixAt).toHaveBeenCalledTimes(expectedActiveCount);
+        expect(particles.mesh.instanceMatrix.updateRanges).toEqual([{ start: 0, count: expectedActiveCount * 16 }]);
+
+        setMatrixAt.mockClear();
+        particles.update(1 / 60, new THREE.Vector3(0, 20, 0), 0);
+        expect(particles.mesh.count).toBe(0);
+        expect(setMatrixAt).not.toHaveBeenCalled();
     });
 
 });

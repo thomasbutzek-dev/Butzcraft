@@ -58,9 +58,17 @@ export class PlayerArrowProjectile {
             for (const mob of mobs) {
                 if (!mob || mob.isDead || !mob.mesh) continue;
                 mob.mesh.getWorldPosition(this._target);
-                this._target.y += 0.8;
-                if (this.mesh.position.distanceToSquared(this._target) > 1) continue;
-                mob.takeDamage(this.damage);
+                this._target.y += Number(mob.hitHeight) || 0.8;
+                if (this.mesh.position.distanceToSquared(this._target) > (Number(mob.hitRadiusSquared) || 1)) continue;
+                mob.takeDamage(this.damage, (killedMob) => {
+                    window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+                        detail: {
+                            type: 'hunt',
+                            mobType: killedMob.type,
+                            position: { x: killedMob.group.position.x, z: killedMob.group.position.z }
+                        }
+                    }));
+                });
                 this.dispose();
                 return;
             }

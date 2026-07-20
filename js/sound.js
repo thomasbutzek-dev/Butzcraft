@@ -71,9 +71,16 @@ export const SoundManager = {
         if (!cameraOrObject) { this.listener = null; return; }
         const pos = cameraOrObject.position;
         if (!pos) return;
+        const listener = this.listener || (this.listener = {
+            pos: { x: 0, y: 0, z: 0 },
+            forward: { x: 0, y: 0, z: -1 },
+            right: { x: 1, y: 0, z: 0 }
+        });
         // Vorwärts- und Rechts-Vektor aus Quaternion ableiten
-        const forward = { x: 0, y: 0, z: -1 };
-        const right = { x: 1, y: 0, z: 0 };
+        const forward = listener.forward;
+        const right = listener.right;
+        forward.x = 0; forward.y = 0; forward.z = -1;
+        right.x = 1; right.y = 0; right.z = 0;
         if (cameraOrObject.quaternion) {
             const q = cameraOrObject.quaternion;
             // Quaternion * (0,0,-1)
@@ -87,7 +94,9 @@ export const SoundManager = {
             const rz = 2 * (q.x * q.z - q.w * q.y);
             right.x = rx; right.y = ry; right.z = rz;
         }
-        this.listener = { pos: { x: pos.x, y: pos.y, z: pos.z }, forward, right };
+        listener.pos.x = pos.x;
+        listener.pos.y = pos.y;
+        listener.pos.z = pos.z;
     },
 
     /**

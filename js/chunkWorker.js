@@ -4,17 +4,20 @@
 // Läuft komplett off-main-thread für ruckelfreies Gameplay.
 // ============================================================
 
+import { generateUndergroundStructures } from './undergroundStructures.js?v=20260721b';
+
 let CHUNK_SIZE = 16, CHUNK_HEIGHT = 64, WATER_LEVEL = 32, CLOUD_HEIGHT = 50;
 let BLOCK_COLORS = {};
 let BLOCK_TEX = {};
 let GRAPHICS_VARIANT = 'A';
 let REDUCED_GRAPHICS_DETAIL = false;
+let WORLD_GENERATION_VERSION = 1;
 
 const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW: 'Schneefeld', PLAINS: 'Grasland' };
 
 // Transparente/Nicht-solide Block-IDs (Faces gegen diese werden gezeichnet)
 // 79=Druckplatte, 80=Minengleis: dünn, Nachbarn sollen sichtbar sein
-const TRANSPARENT_IDS = new Set([0, -1, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80, 86, 101]);
+const TRANSPARENT_IDS = new Set([0, -1, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80, 86, 101, 102, 103, 104]);
 
 // 2D-Pflanzen (Stern-Mesh statt Würfel)
 const PLANT_2D_IDS = new Set([9, 10, 27, 43, 44, 46, 47, 48, 49, 50, 52, 54, 86]);
@@ -295,7 +298,9 @@ function getTransitionSurfaceBlock(wx, wz, biome, baseBlock) {
 function getTerrainHeightAt(wx, wz) {
     const biome = getBiomeAt(wx, wz);
     const humidity = (Math.sin(wx * 0.01 + 500) + Math.cos(wz * 0.01 + 500)) * 0.5;
-    const oceanFactor = Math.max(0, Math.min(1, (-0.15 - humidity) / 0.4));
+    const oceanFactor = biome === BIOMES.OCEAN
+        ? Math.max(0, Math.min(1, (-0.15 - humidity) / 0.4))
+        : 0;
     let baseH = noise2D(wx, wz) + 38;
     baseH -= oceanFactor * 22;
     if (biome === BIOMES.DESERT) baseH += Math.sin(wx * 0.2) * 2;
@@ -1025,21 +1030,36 @@ function spawnDungeonMarker(data, x, surfaceY, z) {
 
 // NPC-Dorf: Generiert ein kleines Dorf mit Häusern, Brunnen, Wegen
 // Gibt villageData zurück (für NPC-Spawning im Main-Thread)
-function getVillagePlacement(wx, wz, biome) {
+function getVillagePlacement(wx, wz, biome, generationVersion = 2) {
     let minH = Infinity, maxH = -Infinity;
-    for (let dx = -12; dx <= 12; dx += 4) {
-        for (let dz = -12; dz <= 12; dz += 4) {
+    let biomeSamples = 0, totalSamples = 0;
+    const heights = [];
+    const radius = generationVersion >= 2 ? 30 : 12;
+    const step = generationVersion >= 2 ? 6 : 4;
+    for (let dx = -radius; dx <= radius; dx += step) {
+        for (let dz = -radius; dz <= radius; dz += step) {
             const sx = wx + dx;
             const sz = wz + dz;
-            if (getBiomeAt(sx, sz) !== biome) return null;
+            totalSamples++;
+            if (getBiomeAt(sx, sz) === biome) biomeSamples++;
             const h = getTerrainHeightAt(sx, sz);
             if (h <= WATER_LEVEL + 1) return null;
+            heights.push(h);
             minH = Math.min(minH, h);
             maxH = Math.max(maxH, h);
         }
     }
-    if (maxH - minH > 6) return null;
-    return { baseY: maxH };
+    if (generationVersion >= 2 && biomeSamples / totalSamples < 0.72) return null;
+    if (generationVersion < 2 && biomeSamples !== totalSamples) return null;
+    if (generationVersion < 2) {
+        if (maxH - minH > 6) return null;
+        return { baseY: maxH };
+    }
+    heights.sort((a, b) => a - b);
+    const lowY = heights[Math.floor(heights.length * 0.1)];
+    const highY = heights[Math.floor(heights.length * 0.9)];
+    if (highY - lowY > 10) return null;
+    return { baseY: heights[Math.floor(heights.length * 0.75)] };
 }
 
 const VILLAGE_ROAD_MAX_DISTANCE = 180;
@@ -1052,7 +1072,7 @@ function getVillagePathBlockForBiome(biome) {
     return 87;
 }
 
-function getVillageCandidate(scx, scz) {
+function getVillageCandidate(scx, scz, generationVersion = WORLD_GENERATION_VERSION) {
     const rng = mulberry32(scx * 55103 + scz * 97127 + 424242);
     if (rng() >= 0.04) return null;
 
@@ -1064,7 +1084,7 @@ function getVillageCandidate(scx, scz) {
     const biome = getBiomeAt(x, z);
     if (biome !== BIOMES.PLAINS && biome !== BIOMES.DESERT && biome !== BIOMES.SNOW) return null;
 
-    const placement = getVillagePlacement(x, z, biome);
+    const placement = getVillagePlacement(x, z, biome, generationVersion);
     if (!placement) return null;
 
     return {
@@ -1198,7 +1218,49 @@ const VILLAGE_LAYOUTS = {
     }
 };
 
-function createVillagePlan(rng, biome) {
+const V2_VILLAGE_LAYOUTS = {
+    farmstead: {
+        center: 'well',
+        landmark: ['townHall', 'hall'],
+        positions: [
+            [-22, -18], [8, -20], [-26, 5], [10, 11], [-5, -28],
+            [22, -4], [-12, 1], [-7, 17], [22, 17]
+        ],
+        types: [
+            ['farmhouse', 'home'], ['barn', 'storage'], ['workshop', 'workshop'],
+            ['bakery', 'trade'], ['stable', 'special'], ['cottage', 'home'],
+            ['granary', 'storage'], ['orchardHouse', 'special']
+        ]
+    },
+    courtyard: {
+        center: 'market',
+        landmark: ['caravanserai', 'hall'],
+        positions: [
+            [-17, -16], [-4, -16], [9, -16], [-17, 4], [-4, 4],
+            [9, 4], [-27, -5], [20, -5], [-4, 16]
+        ],
+        types: [
+            ['courtyardHome', 'home'], ['storehouse', 'storage'], ['smithy', 'workshop'],
+            ['marketStall', 'trade'], ['shrine', 'special'], ['merchantHome', 'home'],
+            ['warehouse', 'storage'], ['teaCourt', 'special']
+        ]
+    },
+    shelteredLine: {
+        center: 'hearth',
+        landmark: ['longhouse', 'hall'],
+        positions: [
+            [-36, -5], [-23, -5], [-10, -5], [3, -5], [16, -5],
+            [29, -5], [-29, 8], [-3, 8], [23, 8]
+        ],
+        types: [
+            ['insulatedHome', 'home'], ['foodStore', 'storage'], ['toolmaker', 'workshop'],
+            ['tradingPost', 'trade'], ['warmingHut', 'special'], ['snowCottage', 'home'],
+            ['coldStore', 'storage'], ['watchHut', 'special']
+        ]
+    }
+};
+
+function createLegacyVillagePlan(rng, biome) {
     const layout = biome === BIOMES.DESERT ? 'courtyard' : (biome === BIOMES.SNOW ? 'shelteredLine' : 'farmstead');
     const template = VILLAGE_LAYOUTS[layout];
     const professionByPurpose = { home: 1, storage: 1, workshop: 0, trade: 2, hall: 3, special: 1 };
@@ -1228,9 +1290,82 @@ function createVillagePlan(rng, biome) {
     return { layout, center: template.center, buildings };
 }
 
-function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS, variant = 0) {
-    const plan = createVillagePlan(rng, biome);
-    const villageInfo = { cx: 0, cz: 0, layout: plan.layout, center: plan.center, houses: [] };
+function createVillagePlan(rng, biome, generationVersion = 2) {
+    if (generationVersion < 2) return createLegacyVillagePlan(rng, biome);
+    const layout = biome === BIOMES.DESERT ? 'courtyard' : (biome === BIOMES.SNOW ? 'shelteredLine' : 'farmstead');
+    const template = V2_VILLAGE_LAYOUTS[layout];
+    const professionByPurpose = { home: 1, storage: 1, workshop: 0, trade: 2, hall: 3, special: 1 };
+    const buildingCount = 6 + Math.floor(rng() * 4);
+    const roles = template.types.map(([type, purpose]) => ({ type, purpose }));
+    for (let i = roles.length - 1; i > 0; i--) {
+        const j = Math.floor(rng() * (i + 1));
+        [roles[i], roles[j]] = [roles[j], roles[i]];
+    }
+
+    const buildings = template.positions.slice(0, buildingCount).map(([baseDx, baseDz], index) => {
+        const isLandmark = index === 0;
+        const [landmarkType, landmarkPurpose] = template.landmark;
+        const role = isLandmark
+            ? { type: landmarkType, purpose: landmarkPurpose }
+            : roles[(index - 1) % roles.length];
+        const isLarge = role.purpose === 'storage' || role.purpose === 'hall';
+        const width = isLandmark ? 11 : (isLarge ? 9 : 7);
+        const depth = isLandmark ? (layout === 'shelteredLine' ? 9 : 12) : (isLarge ? 10 : 8);
+        const residentCount = isLandmark || role.purpose === 'home' ? 2 : 1;
+        const jitterX = layout === 'courtyard' ? 0 : Math.floor(rng() * 3) - 1;
+        const jitterZ = layout === 'courtyard' ? 0 : Math.floor(rng() * 3) - 1;
+        return {
+            dx: baseDx + jitterX,
+            dz: baseDz + jitterZ,
+            width,
+            depth,
+            stories: isLandmark ? 2 : 1,
+            isLandmark,
+            residentCount,
+            type: role.type,
+            purpose: role.purpose,
+            professionIdx: professionByPurpose[role.purpose]
+        };
+    });
+    const penDirections = [
+        { side: 'right', rect: building => ({ x: building.dx + building.width + 2, z: building.dz + 1, width: 6, depth: 5 }) },
+        { side: 'left', rect: building => ({ x: building.dx - 8, z: building.dz + 1, width: 6, depth: 5 }) },
+        { side: 'back', rect: building => ({ x: building.dx + 1, z: building.dz + building.depth + 2, width: 6, depth: 5 }) },
+        { side: 'front', rect: building => ({ x: building.dx + 1, z: building.dz - 7, width: 6, depth: 5 }) }
+    ];
+    for (const building of buildings.filter(entry => entry.purpose === 'storage' || entry.purpose === 'special')) {
+        const direction = penDirections.find(({ rect }) => {
+            const pen = rect(building);
+            return buildings.every(other => other === building ||
+                pen.x + pen.width <= other.dx || other.dx + other.width <= pen.x ||
+                pen.z + pen.depth <= other.dz || other.dz + other.depth <= pen.z);
+        });
+        if (!direction) continue;
+        building.hasPen = true;
+        building.penSide = direction.side;
+        break;
+    }
+
+    return {
+        layout,
+        center: template.center,
+        buildings,
+        residentCount: buildings.reduce((sum, building) => sum + building.residentCount, 0)
+    };
+}
+
+function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS, variant = 0, generationVersion = 2) {
+    const plan = createVillagePlan(rng, biome, generationVersion);
+    const villageInfo = {
+        cx: 0,
+        cz: 0,
+        layout: plan.layout,
+        center: plan.center,
+        generationVersion,
+        residentCount: plan.residentCount || plan.buildings.length,
+        houses: [],
+        waypoints: []
+    };
     const styleKey = biome === BIOMES.DESERT ? 'desert' : (biome === BIOMES.SNOW ? 'snow' : (variant === 1 ? 'plainsFarm' : 'plainsClassic'));
     const styles = {
         plainsClassic: {
@@ -1251,6 +1386,21 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         }
     };
     const style = styles[styleKey];
+    const worldOffsetX = worldX - x;
+    const worldOffsetZ = worldZ - z;
+    const clearAbove = (localX, localZ, fromY, height = 10) => {
+        for (let py = fromY; py <= Math.min(CHUNK_HEIGHT - 1, fromY + height); py++) {
+            setBlockLocal(data, localX, py, localZ, 0);
+        }
+    };
+    const placeSupportedSurface = (localX, localZ, targetFootY, topBlock = style.path) => {
+        const terrainFootY = getTerrainHeightAt(localX + worldOffsetX, localZ + worldOffsetZ);
+        for (let py = Math.min(terrainFootY, targetFootY) - 1; py < targetFootY - 1; py++) {
+            setBlockLocal(data, localX, py, localZ, style.foundation);
+        }
+        setBlockLocal(data, localX, targetFootY - 1, localZ, topBlock);
+        clearAbove(localX, localZ, targetFootY, 3);
+    };
     const getFootprintBaseY = (startWorldX, startWorldZ, width, depth) => {
         let baseY = y - 1;
         for (let dx = 0; dx < width; dx++) {
@@ -1264,11 +1414,26 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
     const drawVillageCenter = () => {
         for (let dx = -3; dx <= 3; dx++) {
             for (let dz = -3; dz <= 3; dz++) {
-                setBlockLocal(data, x + dx, y - 1, z + dz, style.path);
-                setBlockLocal(data, x + dx, y, z + dz, 0);
-                setBlockLocal(data, x + dx, y + 1, z + dz, 0);
+                if (generationVersion >= 2) {
+                    placeSupportedSurface(x + dx, z + dz, y, style.path);
+                } else {
+                    setBlockLocal(data, x + dx, y - 1, z + dz, style.path);
+                    setBlockLocal(data, x + dx, y, z + dz, 0);
+                    setBlockLocal(data, x + dx, y + 1, z + dz, 0);
+                }
             }
         }
+        if (generationVersion >= 2) {
+            for (const [lampX, lampZ] of [[-4, -4], [4, -4], [-4, 4], [4, 4]]) {
+                placeSupportedSurface(x + lampX, z + lampZ, y, style.path);
+                setBlockLocal(data, x + lampX, y, z + lampZ, 102);
+                setBlockLocal(data, x + lampX, y + 1, z + lampZ, 104);
+            }
+            for (const [benchX, benchZ] of [[-3, 0], [3, 0]]) {
+                setBlockLocal(data, x + benchX, y, z + benchZ, 26);
+            }
+        }
+        villageInfo.waypoints.push({ x, y, z, role: 'center' });
 
         if (plan.center === 'market') {
             for (const [mx, mz] of [[-3, -3], [2, -3], [-3, 2], [2, 2]]) {
@@ -1351,6 +1516,58 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         }
     };
 
+    const drawSupportedPath = (startX, startZ, endX, endZ, startY, endY) => {
+        const dx = endX - startX;
+        const dz = endZ - startZ;
+        const steps = Math.max(Math.abs(dx), Math.abs(dz));
+        const widthAlongX = Math.abs(dz) >= Math.abs(dx);
+        let previousY = startY;
+        for (let step = 0; step <= steps; step++) {
+            const t = steps > 0 ? step / steps : 0;
+            const pathX = Math.round(startX + dx * t);
+            const pathZ = Math.round(startZ + dz * t);
+            const terrainY = getTerrainHeightAt(pathX + worldOffsetX, pathZ + worldOffsetZ);
+            const intendedY = Math.round(startY + (endY - startY) * t);
+            const desiredY = Math.max(terrainY, intendedY);
+            const targetY = Math.max(previousY - 1, Math.min(previousY + 1, desiredY));
+            for (let width = 0; width <= 1; width++) {
+                const px = pathX + (widthAlongX ? width : 0);
+                const pz = pathZ + (widthAlongX ? 0 : width);
+                placeSupportedSurface(px, pz, targetY, style.path);
+            }
+            previousY = targetY;
+        }
+    };
+
+    const decorateVillageExterior = (startX, startZ, floorY, width, depth, building) => {
+        const accentZ = startZ + Math.min(depth - 2, 2);
+        setBlockLocal(data, startX - 1, floorY, accentZ, building.purpose === 'storage' ? 88 : 75);
+
+        if (!building.hasPen) return;
+        const penX = building.penSide === 'left' ? startX - 8 : startX + (building.penSide === 'right' ? width + 2 : 1);
+        const penZ = building.penSide === 'front' ? startZ - 7 : startZ + (building.penSide === 'back' ? depth + 2 : 1);
+        const penWidth = 6;
+        const penDepth = 5;
+        for (let dx = 0; dx < penWidth; dx++) {
+            for (let dz = 0; dz < penDepth; dz++) {
+                placeSupportedSurface(penX + dx, penZ + dz, floorY + 1, biome === BIOMES.DESERT ? 7 : (biome === BIOMES.SNOW ? 11 : 1));
+                const edge = dx === 0 || dx === penWidth - 1 || dz === 0 || dz === penDepth - 1;
+                if (!edge) continue;
+                const isGate = dz === 0 && dx === Math.floor(penWidth / 2);
+                setBlockLocal(data, penX + dx, floorY + 1, penZ + dz, isGate ? 103 : 102);
+            }
+        }
+        if (biome === BIOMES.PLAINS) {
+            setBlockLocal(data, penX + 2, floorY + 1, penZ + 2, 43);
+            setBlockLocal(data, penX + 4, floorY + 1, penZ + 2, 88);
+        } else if (biome === BIOMES.DESERT) {
+            setBlockLocal(data, penX + 3, floorY + 1, penZ + 2, 46);
+            setBlockLocal(data, penX + 4, floorY + 1, penZ + 2, 75);
+        } else {
+            setBlockLocal(data, penX + 3, floorY + 1, penZ + 2, 88);
+        }
+    };
+
     // Houses follow the biome-specific village plan.
     const buildIglooHouse = (hx, hz, houseW, houseD, ho, houseWorldX, houseWorldZ, building) => {
         const r = building.purpose === 'hall' ? 4 : 3;
@@ -1399,21 +1616,30 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
             setBlockLocal(data, cx0, floorY + 1, doorZ + dirZ * dz, 0);
             setBlockLocal(data, cx0, floorY + 2, doorZ + dirZ * dz, 0);
         }
-        setBlockLocal(data, cx0, floorY + 1, doorZ, 0);
-        setBlockLocal(data, cx0, floorY + 2, doorZ, 0);
+        setBlockLocal(data, cx0, floorY + 1, doorZ, generationVersion >= 2 ? 33 : 0);
+        setBlockLocal(data, cx0, floorY + 2, doorZ, generationVersion >= 2 ? 34 : 0);
         setBlockLocal(data, cx0, floorY, porchZ, style.path);
         setBlockLocal(data, cx0, floorY + 1, porchZ, 0);
         setBlockLocal(data, cx0, floorY + 2, porchZ, 0);
         decorateVillageBuilding(cx0 - r, cz0 - r, floorY, r * 2 + 1, r * 2 + 1, building);
+        if (generationVersion >= 2) decorateVillageExterior(cx0 - r, cz0 - r, floorY, r * 2 + 1, r * 2 + 1, building);
 
+        const home = { x: cx0, y: floorY + 1, z: cz0 };
+        const door = { x: cx0, y: floorY + 1, z: doorZ };
+        const porch = { x: cx0, y: floorY + 1, z: porchZ };
         villageInfo.houses.push({
-            x: cx0,
-            y: floorY + 1,
-            z: cz0,
+            ...home,
             type: building.type,
             purpose: building.purpose,
-            professionIdx: building.professionIdx
+            professionIdx: building.professionIdx,
+            residentCount: building.residentCount || 1,
+            isLandmark: !!building.isLandmark,
+            home,
+            door,
+            porch,
+            work: { ...home }
         });
+        villageInfo.waypoints.push({ ...porch, role: 'porch' });
         return { pathStartX: cx0, pathStartZ: porchZ, floorY };
     };
 
@@ -1424,11 +1650,11 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         const hx = x + ho.dx, hz = z + ho.dz;
         const houseW = building.width;
         const houseD = building.depth;
-        const houseH = 4;
+        const houseH = building.stories === 2 ? 7 : 4;
         const houseWorldX = worldX + ho.dx;
         const houseWorldZ = worldZ + ho.dz;
 
-        if (style.igloo) {
+        if (style.igloo && (generationVersion < 2 || !building.isLandmark)) {
             const igloo = buildIglooHouse(hx, hz, houseW, houseD, ho, houseWorldX, houseWorldZ, building);
             const pathStartX = igloo.pathStartX;
             const pathStartZ = igloo.pathStartZ;
@@ -1436,24 +1662,26 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
             const toCenterZ = z - pathStartZ;
             const pathEndX = Math.abs(toCenterX) >= Math.abs(toCenterZ) ? x - Math.sign(toCenterX || 1) * 3 : x;
             const pathEndZ = Math.abs(toCenterX) >= Math.abs(toCenterZ) ? z : z - Math.sign(toCenterZ || 1) * 3;
-            const steps = Math.max(Math.abs(pathStartX - pathEndX), Math.abs(pathStartZ - pathEndZ));
-            for (let s = 0; s <= steps; s++) {
-                const t = steps > 0 ? s / steps : 0;
-                const px = Math.round(pathStartX + (pathEndX - pathStartX) * t);
-                const pz = Math.round(pathStartZ + (pathEndZ - pathStartZ) * t);
-                const pathWorldX = px + (worldX - x);
-                const pathWorldZ = pz + (worldZ - z);
-                const pathY = Math.max(y, Math.min(igloo.floorY, getTerrainHeightAt(pathWorldX, pathWorldZ)));
-                setBlockLocal(data, px, pathY - 1, pz, style.path);
-                setBlockLocal(data, px, pathY, pz, 0);
-                setBlockLocal(data, px, pathY + 1, pz, 0);
+            if (generationVersion >= 2) {
+                drawSupportedPath(pathStartX, pathStartZ, pathEndX, pathEndZ, igloo.floorY + 1, y);
+            } else {
+                const steps = Math.max(Math.abs(pathStartX - pathEndX), Math.abs(pathStartZ - pathEndZ));
+                for (let step = 0; step <= steps; step++) {
+                    const t = steps > 0 ? step / steps : 0;
+                    const pathX = Math.round(pathStartX + (pathEndX - pathStartX) * t);
+                    const pathZ = Math.round(pathStartZ + (pathEndZ - pathStartZ) * t);
+                    const pathY = Math.max(y, Math.min(igloo.floorY, getTerrainHeightAt(pathX + worldOffsetX, pathZ + worldOffsetZ)));
+                    setBlockLocal(data, pathX, pathY - 1, pathZ, style.path);
+                    setBlockLocal(data, pathX, pathY, pathZ, 0);
+                    setBlockLocal(data, pathX, pathY + 1, pathZ, 0);
+                }
             }
             continue;
         }
 
         const floorY = getFootprintBaseY(houseWorldX, houseWorldZ, houseW, houseD);
         const wallY = floorY + 1;
-        const roofY = wallY + houseH - 1;
+        const roofY = wallY + houseH - (generationVersion >= 2 ? 0 : 1);
 
         // Boden: Planken auf eigener Haus-Hoehe, damit Hang-Haeuser nicht im Terrain versinken.
         for (let dx = 0; dx < houseW; dx++) {
@@ -1464,6 +1692,7 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
                 }
                 setBlockLocal(data, hx + dx, floorY - 1, hz + dz, style.foundation); // COBBLESTONE Fundament
                 setBlockLocal(data, hx + dx, floorY, hz + dz, style.floor); // PLANKS Boden
+                if (generationVersion >= 2) clearAbove(hx + dx, hz + dz, wallY, houseH + 6);
             }
         }
 
@@ -1472,14 +1701,13 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
             for (let dx = 0; dx < houseW; dx++) {
                 for (let dz = 0; dz < houseD; dz++) {
                     const isEdge = (dx === 0 || dx === houseW - 1 || dz === 0 || dz === houseD - 1);
-                    if (dy === houseH - 1) {
-                        // Dach: Cobblestone
+                    if (generationVersion < 2 && dy === houseH - 1) {
                         setBlockLocal(data, hx + dx, wallY + dy, hz + dz, style.roof);
                     } else if (isEdge) {
-                        // Fenster in der Mitte der Wände (y=1)
                         const isMidX = dx > 1 && dx < houseW - 2;
                         const isMidZ = dz > 1 && dz < houseD - 2;
-                        if (dy === 1 && ((dx === 0 || dx === houseW - 1) && isMidZ || (dz === 0 || dz === houseD - 1) && isMidX)) {
+                        const windowLevel = dy === 1 || (generationVersion >= 2 && building.stories === 2 && dy === 5);
+                        if (windowLevel && ((dx === 0 || dx === houseW - 1) && isMidZ || (dz === 0 || dz === houseD - 1) && isMidX)) {
                             setBlockLocal(data, hx + dx, wallY + dy, hz + dz, 32); // GLASS
                         } else {
                             setBlockLocal(data, hx + dx, wallY + dy, hz + dz, style.wall); // PLANKS
@@ -1492,6 +1720,15 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
             }
         }
 
+        if (generationVersion >= 2 && building.stories === 2) {
+            for (let dx = 1; dx < houseW - 1; dx++) {
+                for (let dz = 1; dz < houseD - 1; dz++) {
+                    const stairOpening = dx === Math.floor(houseW / 2) && dz >= houseD - 3;
+                    if (!stairOpening) setBlockLocal(data, hx + dx, floorY + 4, hz + dz, style.floor);
+                }
+            }
+        }
+
         // Eckpfeiler und Dachüberstand geben den Häusern eine klarere Silhouette.
         const corners = [[0, 0], [houseW - 1, 0], [0, houseD - 1], [houseW - 1, houseD - 1]];
         for (const [cx0, cz0] of corners) {
@@ -1499,23 +1736,55 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
                 setBlockLocal(data, hx + cx0, py, hz + cz0, style.post); // WOOD
             }
         }
-        for (let dx = -1; dx <= houseW; dx++) {
-            for (let dz = -1; dz <= houseD; dz++) {
-                const isOverhang = dx === -1 || dx === houseW || dz === -1 || dz === houseD;
-                if (isOverhang) setBlockLocal(data, hx + dx, roofY, hz + dz, style.roofEdge); // COBBLESTONE Dachkante
+        const roofLayers = generationVersion >= 2 ? Math.ceil(Math.min(houseW, houseD) / 2) : 0;
+        if (generationVersion >= 2) {
+            for (let layer = 0; layer < roofLayers; layer++) {
+                const minX = -1 + layer;
+                const maxX = houseW - layer;
+                const minZ = -1 + layer;
+                const maxZ = houseD - layer;
+                if (minX > maxX || minZ > maxZ) break;
+                for (let dx = minX; dx <= maxX; dx++) {
+                    for (let dz = minZ; dz <= maxZ; dz++) {
+                        const edge = dx === minX || dx === maxX || dz === minZ || dz === maxZ;
+                        if (edge || layer === roofLayers - 1) {
+                            setBlockLocal(data, hx + dx, roofY + layer, hz + dz, layer === 0 ? style.roofEdge : style.roof);
+                        }
+                    }
+                }
+            }
+        } else {
+            for (let dx = -1; dx <= houseW; dx++) {
+                for (let dz = -1; dz <= houseD; dz++) {
+                    const isOverhang = dx === -1 || dx === houseW || dz === -1 || dz === houseD;
+                    if (isOverhang) setBlockLocal(data, hx + dx, roofY, hz + dz, style.roofEdge);
+                }
             }
         }
 
         // Tür (Lücke in der Wand richtung Brunnen)
         const doorDz = ho.dz < 0 ? houseD - 1 : 0;
         const doorDx = Math.floor(houseW / 2);
-        setBlockLocal(data, hx + doorDx, wallY, hz + doorDz, 0);
-        setBlockLocal(data, hx + doorDx, wallY + 1, hz + doorDz, 0);
+        setBlockLocal(data, hx + doorDx, wallY, hz + doorDz, generationVersion >= 2 ? 33 : 0);
+        setBlockLocal(data, hx + doorDx, wallY + 1, hz + doorDz, generationVersion >= 2 ? 34 : 0);
         setBlockLocal(data, hx + doorDx, wallY + 2, hz + doorDz, style.doorHeader); // PLANKS Tuersturz
         const porchZ = doorDz === 0 ? hz - 1 : hz + houseD;
         setBlockLocal(data, hx + doorDx, floorY - 1, porchZ, style.path); // VILLAGE_PATH
         setBlockLocal(data, hx + doorDx, floorY, porchZ, style.threshold); // PLANKS Schwelle
         setBlockLocal(data, hx + doorDx, floorY + 1, porchZ, 0);
+        if (generationVersion >= 2) {
+            setBlockLocal(data, hx + doorDx - 1, wallY + 2, porchZ, style.roofEdge);
+            setBlockLocal(data, hx + doorDx, wallY + 2, porchZ, style.roofEdge);
+            setBlockLocal(data, hx + doorDx + 1, wallY + 2, porchZ, style.roofEdge);
+            setBlockLocal(data, hx + doorDx - 1, wallY + 1, porchZ, 104);
+            if (building.isLandmark || building.purpose === 'workshop') {
+                const chimneyX = hx + houseW - 2;
+                const chimneyZ = hz + houseD - 2;
+                for (let chimneyY = roofY; chimneyY <= roofY + roofLayers + 1; chimneyY++) {
+                    setBlockLocal(data, chimneyX, chimneyY, chimneyZ, style.foundation);
+                }
+            }
+        }
 
         // Weg vom Haus zum Brunnen
         const pathStartX = hx + doorDx;
@@ -1524,33 +1793,49 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         const toCenterZ = z - pathStartZ;
         const pathEndX = Math.abs(toCenterX) >= Math.abs(toCenterZ) ? x - Math.sign(toCenterX || 1) * 3 : x;
         const pathEndZ = Math.abs(toCenterX) >= Math.abs(toCenterZ) ? z : z - Math.sign(toCenterZ || 1) * 3;
-        const steps = Math.max(Math.abs(pathStartX - pathEndX), Math.abs(pathStartZ - pathEndZ));
-        for (let s = 0; s <= steps; s++) {
-            const t = steps > 0 ? s / steps : 0;
-            const px = Math.round(pathStartX + (pathEndX - pathStartX) * t);
-            const pz = Math.round(pathStartZ + (pathEndZ - pathStartZ) * t);
-            const pathWorldX = px + (worldX - x);
-            const pathWorldZ = pz + (worldZ - z);
-            const pathY = Math.max(y, Math.min(floorY, getTerrainHeightAt(pathWorldX, pathWorldZ)));
-            setBlockLocal(data, px, pathY - 1, pz, style.path); // VILLAGE_PATH
-            // Luft über dem Weg
-            setBlockLocal(data, px, pathY, pz, 0);
-            setBlockLocal(data, px, pathY + 1, pz, 0);
+        if (generationVersion >= 2) {
+            drawSupportedPath(pathStartX, pathStartZ, pathEndX, pathEndZ, floorY + 1, y);
+        } else {
+            const steps = Math.max(Math.abs(pathStartX - pathEndX), Math.abs(pathStartZ - pathEndZ));
+            for (let step = 0; step <= steps; step++) {
+                const t = steps > 0 ? step / steps : 0;
+                const pathX = Math.round(pathStartX + (pathEndX - pathStartX) * t);
+                const pathZ = Math.round(pathStartZ + (pathEndZ - pathStartZ) * t);
+                const pathY = Math.max(y, Math.min(floorY, getTerrainHeightAt(pathX + worldOffsetX, pathZ + worldOffsetZ)));
+                setBlockLocal(data, pathX, pathY - 1, pathZ, style.path);
+                setBlockLocal(data, pathX, pathY, pathZ, 0);
+                setBlockLocal(data, pathX, pathY + 1, pathZ, 0);
+            }
         }
         setBlockLocal(data, hx + doorDx, floorY, porchZ, style.threshold); // PLANKS Schwelle nach Weg-Clear wiederherstellen
         setBlockLocal(data, hx + doorDx, floorY + 1, porchZ, 0);
 
-        decorateVillageBuilding(hx, hz, floorY, houseW, houseD, building);
+        if (generationVersion >= 2) {
+            const lampX = hx + Math.min(houseW - 2, doorDx + 1);
+            placeSupportedSurface(lampX, porchZ, floorY + 1, style.path);
+            setBlockLocal(data, lampX, floorY + 1, porchZ, 102);
+            setBlockLocal(data, lampX, floorY + 2, porchZ, 104);
+        }
 
-        // NPC-Spawn-Position (Mitte des Hauses)
+        decorateVillageBuilding(hx, hz, floorY, houseW, houseD, building);
+        if (generationVersion >= 2) decorateVillageExterior(hx, hz, floorY, houseW, houseD, building);
+
+        const home = { x: hx + Math.floor(houseW / 2), y: floorY + 1, z: hz + Math.floor(houseD / 2) };
+        const door = { x: hx + doorDx, y: wallY, z: hz + doorDz };
+        const porch = { x: pathStartX, y: floorY + 1, z: pathStartZ };
         villageInfo.houses.push({
-            x: hx + Math.floor(houseW / 2),
-            y: floorY + 1,
-            z: hz + Math.floor(houseD / 2),
+            ...home,
             type: building.type,
             purpose: building.purpose,
-            professionIdx: building.professionIdx
+            professionIdx: building.professionIdx,
+            residentCount: building.residentCount || 1,
+            isLandmark: !!building.isLandmark,
+            home,
+            door,
+            porch,
+            work: { ...home }
         });
+        villageInfo.waypoints.push({ ...porch, role: 'porch' });
     }
 
     return villageInfo;
@@ -1562,13 +1847,18 @@ function generateTerrain(cx, cz, buffer) {
     const rng = mulberry32(cx * 1000 + cz);
     const villageInfos = []; // Tier 3: gesammelte Dorf-Infos für NPC-Spawning
     const minecartInfos = [];
+    const structureInfos = [];
+    const chestInfos = [];
+    const spawnerInfos = [];
 
     for (let x = 0; x < CHUNK_SIZE; x++) {
         for (let z = 0; z < CHUNK_SIZE; z++) {
             const wx = cx * CHUNK_SIZE + x, wz = cz * CHUNK_SIZE + z;
             const biome = getBiomeAt(wx, wz);
             const humidity = (Math.sin(wx * 0.01 + 500) + Math.cos(wz * 0.01 + 500)) * 0.5;
-            const oceanFactor = Math.max(0, Math.min(1, (-0.15 - humidity) / 0.4));
+            const oceanFactor = biome === BIOMES.OCEAN
+                ? Math.max(0, Math.min(1, (-0.15 - humidity) / 0.4))
+                : 0;
             let baseH = noise2D(wx, wz) + 38;
             baseH -= oceanFactor * 22;
             if (biome === BIOMES.DESERT) baseH += Math.sin(wx * 0.2) * 2;
@@ -1677,13 +1967,14 @@ function generateTerrain(cx, cz, buffer) {
 
     // Prozedurale Strukturen: Im 3×3-Nachbar-Chunk-Bereich prüfen, ob eine Struktur startet,
     // die in diesen Chunk hineinragt. Jede Struktur wird deterministisch am Quell-Chunk platziert.
-    for (let scx = cx - 1; scx <= cx + 1; scx++) {
-        for (let scz = cz - 1; scz <= cz + 1; scz++) {
+    const structureSourceRadius = WORLD_GENERATION_VERSION >= 2 ? 3 : 1;
+    for (let scx = cx - structureSourceRadius; scx <= cx + structureSourceRadius; scx++) {
+        for (let scz = cz - structureSourceRadius; scz <= cz + structureSourceRadius; scz++) {
             const srng = mulberry32(scx * 88317 + scz * 23497);
             const wx0 = scx * CHUNK_SIZE, wz0 = scz * CHUNK_SIZE;
 
             // Verlassene Mine (Spawn-Chance 10%, nur in Plains/Jungle/Snow)
-            if (srng() < 0.10) {
+            if (WORLD_GENERATION_VERSION < 2 && srng() < 0.10) {
                 const mx = wx0 + Math.floor(srng() * CHUNK_SIZE);
                 const mz = wz0 + Math.floor(srng() * CHUNK_SIZE);
                 const mb = getBiomeAt(mx, mz);
@@ -1740,6 +2031,8 @@ function generateTerrain(cx, cz, buffer) {
                 }
             }
 
+            // Legacy dungeon generation remains available only for worldgen-v1 saves.
+            if (WORLD_GENERATION_VERSION < 2) {
             // Dungeon (Tier 3): 5% Chance, flach unter der Oberflaeche, Plains/Jungle/Snow
             if (srng() < 0.05) {
                 const dx = wx0 + 6 + Math.floor(srng() * (CHUNK_SIZE - 12));
@@ -1760,31 +2053,65 @@ function generateTerrain(cx, cz, buffer) {
                     }
                 }
             }
+            }
 
             // NPC-Dorf (Tier 3): biome-specific villages in plains, desert and snow.
             // Dörfer sind größer als ein Chunk, deshalb werden auch Nachbar-Quellchunks geprüft,
             // damit Häuser/Fundamente/Dächer an Chunkgrenzen nicht abgeschnitten schweben.
-            const village = getVillageCandidate(scx, scz);
+            const village = getVillageCandidate(scx, scz, WORLD_GENERATION_VERSION);
             if (village) {
                 const lx = village.x - cx * CHUNK_SIZE;
                 const lz = village.z - cz * CHUNK_SIZE;
                 const villageRng = mulberry32((village.x * 428759) ^ (village.z * 756839) ^ 314159);
-                const vInfo = spawnVillage(data, lx, village.baseY, lz, villageRng, village.x, village.z, village.biome, village.variant);
+                const vInfo = spawnVillage(data, lx, village.baseY, lz, villageRng, village.x, village.z, village.biome, village.variant, WORLD_GENERATION_VERSION);
                 // Welt-Koordinaten für NPC-Spawn
                 if (scx === cx && scz === cz) {
                     vInfo.cx = cx;
                     vInfo.cz = cz;
+                    const toWorldPoint = point => {
+                        if (!point) return point;
+                        point.x += cx * CHUNK_SIZE;
+                        point.z += cz * CHUNK_SIZE;
+                        return point;
+                    };
                     vInfo.houses.forEach(h => {
-                        h.x = h.x + cx * CHUNK_SIZE;
-                        h.z = h.z + cz * CHUNK_SIZE;
+                        toWorldPoint(h);
+                        toWorldPoint(h.home);
+                        toWorldPoint(h.door);
+                        toWorldPoint(h.porch);
+                        toWorldPoint(h.work);
                     });
+                    vInfo.waypoints.forEach(toWorldPoint);
                     villageInfos.push(vInfo);
                 }
             }
         }
     }
 
-    return { data, villageInfos, minecartInfos };
+    if (WORLD_GENERATION_VERSION >= 2) {
+        const underground = generateUndergroundStructures({
+            chunk: { cx, cz, data },
+            world: {
+                seed: 0,
+                version: WORLD_GENERATION_VERSION,
+                chunkSize: CHUNK_SIZE,
+                chunkHeight: CHUNK_HEIGHT,
+                waterLevel: WATER_LEVEL
+            },
+            terrain: {
+                biomeAt: getBiomeAt,
+                heightAt: getTerrainHeightAt
+            }
+        });
+        structureInfos.push(...underground.structures);
+        chestInfos.push(...underground.chests);
+        spawnerInfos.push(...underground.spawners);
+        for (const entity of underground.entities) {
+            if (entity.kind === 'minecart') minecartInfos.push(entity);
+        }
+    }
+
+    return { data, villageInfos, minecartInfos, structureInfos, chestInfos, spawnerInfos };
 }
 
 // ============================================================
@@ -1894,6 +2221,85 @@ function buildMesh(cx, cz, getBlock, isWater, blockMeta) {
 
                 // Helper: push atlasUV-Sentinel (-1,-1) für N Vertices (Special-Blocks ohne Tiling)
                 const pushAtlasSentinel = (n) => { for (let i = 0; i < n; i++) atlasUV.push(-1, -1); };
+
+                const pushBox = (x0, y0, z0, x1, y1, z1, texIdx = BLOCK_TEX[blockType] || 0) => {
+                    const u0 = (texIdx % 16) / 16;
+                    const v0 = 1 - (Math.floor(texIdx / 16) + 1) / 16;
+                    const u1 = u0 + 1 / 16;
+                    const v1 = v0 + 1 / 16;
+                    const faces = [
+                        [[x0,y0,z1],[x1,y0,z1],[x1,y1,z1],[x0,y1,z1],[0,0,1]],
+                        [[x1,y0,z0],[x0,y0,z0],[x0,y1,z0],[x1,y1,z0],[0,0,-1]],
+                        [[x0,y0,z0],[x0,y0,z1],[x0,y1,z1],[x0,y1,z0],[-1,0,0]],
+                        [[x1,y0,z1],[x1,y0,z0],[x1,y1,z0],[x1,y1,z1],[1,0,0]],
+                        [[x0,y1,z1],[x1,y1,z1],[x1,y1,z0],[x0,y1,z0],[0,1,0]],
+                        [[x0,y0,z0],[x1,y0,z0],[x1,y0,z1],[x0,y0,z1],[0,-1,0]]
+                    ];
+                    for (const face of faces) {
+                        const st = vc;
+                        for (let vertex = 0; vertex < 4; vertex++) {
+                            pos.push(...face[vertex]);
+                            col.push(bcR, bcG, bcB);
+                            norm.push(...face[4]);
+                        }
+                        uv.push(u0,v0, u1,v0, u1,v1, u0,v1);
+                        sway.push(0,0,0,0);
+                        pushAtlasSentinel(4);
+                        idx.push(st,st+1,st+2, st,st+2,st+3);
+                        vc += 4;
+                    }
+                };
+
+                if (blockType === 102) {
+                    pushBox(x + 0.36, y, z + 0.36, x + 0.64, y + 1, z + 0.64);
+                    const neighbors = [
+                        [0, -1, x + 0.43, z, x + 0.57, z + 0.5],
+                        [0, 1, x + 0.43, z + 0.5, x + 0.57, z + 1],
+                        [-1, 0, x, z + 0.43, x + 0.5, z + 0.57],
+                        [1, 0, x + 0.5, z + 0.43, x + 1, z + 0.57]
+                    ];
+                    for (const [ndx, ndz, x0, z0, x1, z1] of neighbors) {
+                        const neighbor = getBlock(wx + ndx, y, wz + ndz);
+                        if (neighbor !== 102 && neighbor !== 103) continue;
+                        pushBox(x0, y + 0.28, z0, x1, y + 0.43, z1);
+                        pushBox(x0, y + 0.67, z0, x1, y + 0.82, z1);
+                    }
+                    continue;
+                }
+
+                if (blockType === 103) {
+                    const metadata = blockMeta[wx + ',' + y + ',' + wz] || 0;
+                    const alongX = (metadata & 1) === 0;
+                    const isOpen = (metadata & 4) !== 0;
+                    if (alongX) {
+                        pushBox(x + 0.04, y, z + 0.38, x + 0.18, y + 1, z + 0.62);
+                        pushBox(x + 0.82, y, z + 0.38, x + 0.96, y + 1, z + 0.62);
+                        if (isOpen) {
+                            pushBox(x + 0.09, y + 0.3, z + 0.5, x + 0.23, y + 0.44, z + 1.18);
+                            pushBox(x + 0.09, y + 0.68, z + 0.5, x + 0.23, y + 0.82, z + 1.18);
+                        } else {
+                            pushBox(x + 0.16, y + 0.3, z + 0.43, x + 0.84, y + 0.44, z + 0.57);
+                            pushBox(x + 0.16, y + 0.68, z + 0.43, x + 0.84, y + 0.82, z + 0.57);
+                        }
+                    } else {
+                        pushBox(x + 0.38, y, z + 0.04, x + 0.62, y + 1, z + 0.18);
+                        pushBox(x + 0.38, y, z + 0.82, x + 0.62, y + 1, z + 0.96);
+                        if (isOpen) {
+                            pushBox(x + 0.5, y + 0.3, z + 0.09, x + 1.18, y + 0.44, z + 0.23);
+                            pushBox(x + 0.5, y + 0.68, z + 0.09, x + 1.18, y + 0.82, z + 0.23);
+                        } else {
+                            pushBox(x + 0.43, y + 0.3, z + 0.16, x + 0.57, y + 0.44, z + 0.84);
+                            pushBox(x + 0.43, y + 0.68, z + 0.16, x + 0.57, y + 0.82, z + 0.84);
+                        }
+                    }
+                    continue;
+                }
+
+                if (blockType === 104) {
+                    pushBox(x + 0.28, y + 0.12, z + 0.28, x + 0.72, y + 0.78, z + 0.72);
+                    pushBox(x + 0.2, y + 0.78, z + 0.2, x + 0.8, y + 0.9, z + 0.8, 81);
+                    continue;
+                }
 
                 // ==============================
                 // FACKEL (Boden oder Wand)
@@ -2108,7 +2514,9 @@ function buildMesh(cx, cz, getBlock, isWater, blockMeta) {
                 // TÜREN (schmale Wand)
                 // ==============================
                 if (blockType === 33 || blockType === 34) {
-                    const rotation = blockMeta[wx + ',' + y + ',' + wz] || 0;
+                    const metadata = blockMeta[wx + ',' + y + ',' + wz] || 0;
+                    const alongX = (metadata & 1) === 0;
+                    const isOpen = (metadata & 4) !== 0;
                     const dR = 1, dG = 1, dB = 1;
                     const texIdx = painterlyTextureFor(blockType, null, wx, y, wz, BLOCK_TEX[blockType] || 0);
                     const u0 = (texIdx % 16) / 16, v0 = 1 - (Math.floor(texIdx / 16) + 1) / 16;
@@ -2118,18 +2526,23 @@ function buildMesh(cx, cz, getBlock, isWater, blockMeta) {
                     let front_x0, front_x1, front_z0, front_z1, back_x0, back_x1, back_z0, back_z1;
                     let front_nx, front_nz, back_nx, back_nz;
 
-                    if (rotation === 1) {
-                      front_x0 = x + 0.5 - thick / 2; front_x1 = x + 0.5 + thick / 2;
-                      front_z0 = z; front_z1 = z + 1;
-                      back_x0 = x + 0.5 + thick / 2; back_x1 = x + 0.5 - thick / 2;
-                      back_z0 = z + 1; back_z1 = z;
+                    const panelAlongZ = alongX === isOpen;
+                    if (panelAlongZ) {
+                      const centerX = isOpen ? x : x + 0.5;
+                      const startZ = isOpen ? z + 0.5 : z;
+                      front_x0 = centerX - thick / 2; front_x1 = centerX + thick / 2;
+                      front_z0 = startZ; front_z1 = startZ + 1;
+                      back_x0 = centerX + thick / 2; back_x1 = centerX - thick / 2;
+                      back_z0 = startZ + 1; back_z1 = startZ;
                       front_nx = -1; front_nz = 0;
                       back_nx = 1; back_nz = 0;
                     } else {
-                      front_x0 = x; front_x1 = x + 1;
-                      front_z0 = z + 0.5 - thick / 2; front_z1 = z + 0.5 + thick / 2;
-                      back_x0 = x + 1; back_x1 = x;
-                      back_z0 = z + 0.5 + thick / 2; back_z1 = z + 0.5 - thick / 2;
+                      const startX = isOpen ? x + 0.5 : x;
+                      const centerZ = isOpen ? z : z + 0.5;
+                      front_x0 = startX; front_x1 = startX + 1;
+                      front_z0 = centerZ - thick / 2; front_z1 = centerZ + thick / 2;
+                      back_x0 = startX + 1; back_x1 = startX;
+                      back_z0 = centerZ + thick / 2; back_z1 = centerZ - thick / 2;
                       front_nx = 0; front_nz = -1;
                       back_nx = 0; back_nz = 1;
                     }
@@ -2475,6 +2888,12 @@ self.onmessage = function (e) {
         if (e.data.blockTex) BLOCK_TEX = e.data.blockTex;
         GRAPHICS_VARIANT = e.data.graphicsVariant || 'A';
         REDUCED_GRAPHICS_DETAIL = Boolean(e.data.reducedGraphicsDetail);
+        WORLD_GENERATION_VERSION = Number(e.data.worldGenerationVersion) || 1;
+        return;
+    }
+
+    if (e.data.type === 'worldGenerationVersion') {
+        WORLD_GENERATION_VERSION = e.data.version === 1 ? 1 : 2;
         return;
     }
 
@@ -2485,8 +2904,22 @@ self.onmessage = function (e) {
         const data = result.data;
         const villageInfos = result.villageInfos || [];
         const minecartInfos = result.minecartInfos || [];
+        const structureInfos = result.structureInfos || [];
+        const chestInfos = result.chestInfos || [];
+        const spawnerInfos = result.spawnerInfos || [];
 
-        self.postMessage({ type: 'terrain', cx, cz, epoch, data, villageInfos, minecartInfos }, [data.buffer]);
+        self.postMessage({
+            type: 'terrain',
+            cx,
+            cz,
+            epoch,
+            data,
+            villageInfos,
+            minecartInfos,
+            structureInfos,
+            chestInfos,
+            spawnerInfos
+        }, [data.buffer]);
         return;
     }
 

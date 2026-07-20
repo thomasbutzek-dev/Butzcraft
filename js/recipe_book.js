@@ -1,13 +1,20 @@
-import { normalizeRecipe } from './recipes.js?v=20260717a';
+import { normalizeRecipe } from './recipes.js?v=20260721b';
 
 const recipeBookStates = new WeakMap();
 
 export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick, options = {}) {
     const EMOJI_MAP = { 21: '🐟', 22: '🥩', 23: '🍗', 24: '🧟', 25: '🍖' };
+    const RECIPE_CATEGORIES = ['Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Versorgung'];
 
     const createMiniHTML = (type) => {
         if (type === 0) return '';
         if (EMOJI_MAP[type]) return `<span class="mini-emoji">${EMOJI_MAP[type]}</span>`;
+        if (type === BLOCK_TYPES.WOOD_FENCE) {
+            return '<div class="mini-structure-icon mini-fence-icon" data-recipe-icon="fence" aria-hidden="true"></div>';
+        }
+        if (type === BLOCK_TYPES.WOOD_GATE) {
+            return '<div class="mini-structure-icon mini-gate-icon" data-recipe-icon="gate" aria-hidden="true"></div>';
+        }
         let texIdx = 0;
         if (type === 17) texIdx = 21;
         else if (type === 18) texIdx = 23;
@@ -53,6 +60,7 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             recipeBook.id = 'recipe-book';
             recipeBook.innerHTML = `
                 <div id="recipe-book-title" style="color: #ffe066; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;">Rezeptbuch</div>
+                <div id="recipe-category-tabs" role="tablist" aria-label="Rezeptkategorien"></div>
                 <input id="recipe-search" type="search" aria-label="Rezepte suchen" placeholder="Rezepte suchen…" autocomplete="off">
                 <div id="recipe-list-container"></div>
             `;
@@ -73,6 +81,35 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
 
         const container = document.getElementById('recipe-list-container');
         if (!container) return;
+
+        let categoryTabs = document.getElementById('recipe-category-tabs');
+        if (!categoryTabs) {
+            categoryTabs = document.createElement('div');
+            categoryTabs.id = 'recipe-category-tabs';
+            categoryTabs.setAttribute('role', 'tablist');
+            categoryTabs.setAttribute('aria-label', 'Rezeptkategorien');
+            document.getElementById('recipe-search')?.before(categoryTabs);
+        }
+        if (categoryTabs.children.length === 0) {
+            for (const category of RECIPE_CATEGORIES) {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'recipe-category-tab';
+                button.dataset.category = category;
+                button.setAttribute('role', 'tab');
+                button.setAttribute('aria-selected', category === 'Alle' ? 'true' : 'false');
+                button.textContent = category;
+                button.addEventListener('click', () => {
+                    container.dataset.recipeCategory = category;
+                    categoryTabs.querySelectorAll('.recipe-category-tab').forEach(tab => {
+                        tab.setAttribute('aria-selected', tab === button ? 'true' : 'false');
+                    });
+                    recipeBookStates.get(container)?.applyRecipeFilter();
+                });
+                categoryTabs.appendChild(button);
+            }
+        }
+        if (!container.dataset.recipeCategory) container.dataset.recipeCategory = 'Alle';
 
         const tooltip = ensureTooltip();
 
@@ -132,6 +169,7 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             const entry = document.createElement('button');
             entry.type = 'button';
             entry.className = 'recipe-entry';
+            entry.dataset.recipeCategory = recipe.category || 'Versorgung';
 
             // Zutaten-Grid erstellen: Das Rezeptbuch zeigt immer die aktuelle 3x3-Werkbank.
             // Legacy-2x2-Rezepte bleiben logisch 2x2, werden aber optisch oben links in 3x3 eingebettet.
@@ -193,8 +231,8 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
 
             const nameDiv = document.createElement('div');
             nameDiv.className = 'recipe-name';
-            nameDiv.textContent = formattedName;
-            entry.dataset.recipeName = formattedName.toLocaleLowerCase('de');
+            nameDiv.textContent = recipe.name || formattedName;
+            entry.dataset.recipeName = (recipe.name || formattedName).toLocaleLowerCase('de');
 
             resultContainer.appendChild(resultSlot);
             resultContainer.appendChild(nameDiv);
@@ -213,8 +251,11 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
         const searchInput = document.getElementById('recipe-search');
         state.applyRecipeFilter = () => {
             const query = searchInput?.value.trim().toLocaleLowerCase('de') || '';
+            const category = container.dataset.recipeCategory || 'Alle';
             for (const entry of container.querySelectorAll('.recipe-entry')) {
-                entry.hidden = Boolean(query) && !entry.dataset.recipeName.includes(query);
+                const wrongCategory = category !== 'Alle' && entry.dataset.recipeCategory !== category;
+                const wrongQuery = Boolean(query) && !entry.dataset.recipeName.includes(query);
+                entry.hidden = wrongCategory || wrongQuery;
             }
             for (const title of container.querySelectorAll('.recipe-section-title')) {
                 let sibling = title.nextElementSibling;

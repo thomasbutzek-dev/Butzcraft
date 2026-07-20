@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readChunkWorkerSource } from './chunkWorkerSource.js';
 import { CONFIG } from '../config.js';
 
 describe('dungeon generation', () => {
-    const source = readFileSync('js/chunkWorker.js', 'utf8');
+    const source = readChunkWorkerSource();
 
     it('platziert Dungeons flach relativ zur Oberflaeche statt tief bei Y 8-18', () => {
         expect(source).toContain('const dungeonDepth = 10 + Math.floor(srng() * 5)');

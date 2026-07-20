@@ -26,7 +26,7 @@ describe('painterly interface skin', () => {
     it('refreshes the stylesheet URL so browsers receive the new skin', () => {
         const html = readFileSync('index.html', 'utf8');
 
-        expect(html).toContain('style.css?v=20260719b');
+        expect(html).toContain('style.css?v=20260721c');
     });
 
     it('keeps filtered recipe entries visually hidden', () => {

@@ -13,14 +13,14 @@ const TOOL_MATERIALS = [
 
 const BLOCK_CATEGORIES = {
     pickaxe: new Set([3, 29, 30, 56, 57, 58, 59, 78, 79, 80, 82, 83, 84, 85]),
-    axe: new Set([5, 13, 15, 26, 28, 33, 34, 36, 38, 39, 75, 81, 88]),
+    axe: new Set([5, 13, 15, 26, 28, 33, 34, 36, 38, 39, 75, 81, 88, 102, 103, 104]),
     shovel: new Set([1, 2, 7, 11, 44, 46, 50, 77, 87])
 };
 
 const UNBREAKABLE_BLOCKS = new Set([0, 4, 20]);
 const PLANT_BLOCKS = new Set([6, 9, 10, 14, 16, 43, 44, 46, 47, 48, 49, 50, 52, 54, 86]);
 const SOFT_BLOCKS = new Set([1, 2, 7, 11, 77, 87]);
-const WOOD_BLOCKS = new Set([5, 13, 15, 26, 28, 33, 34, 36, 38, 39, 75, 81, 88]);
+const WOOD_BLOCKS = new Set([5, 13, 15, 26, 28, 33, 34, 36, 38, 39, 75, 81, 88, 102, 103, 104]);
 const ORE_BLOCKS = new Set([56, 57, 58]);
 
 const REQUIRED_PICKAXE_TIER = new Map([

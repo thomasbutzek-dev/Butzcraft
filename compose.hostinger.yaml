@@ -1,0 +1,38 @@
+name: butzcraft
+
+services:
+  app:
+    build:
+      context: https://github.com/thomasbutzek-dev/Butzcraft.git#stabilization/game-optimization
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "3000"
+      ALLOWED_ORIGINS: https://butzcraft.de,https://www.butzcraft.de,https://play.butzcraft.de
+      ENABLE_REMOTE_SAVES: "false"
+      WEBSITE_HOSTS: butzcraft.de,www.butzcraft.de
+      GAME_ORIGIN: https://play.butzcraft.de/
+    expose:
+      - "3000"
+    volumes:
+      - butzcraft_saves:/app/saves
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--output-document=-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.butzcraft.rule: Host(`butzcraft.de`) || Host(`www.butzcraft.de`) || Host(`play.butzcraft.de`)
+      traefik.http.routers.butzcraft.entrypoints: websecure
+      traefik.http.routers.butzcraft.tls: "true"
+      traefik.http.routers.butzcraft.tls.certresolver: letsencrypt
+      traefik.http.services.butzcraft.loadbalancer.server.port: "3000"
+
+volumes:
+  butzcraft_saves:

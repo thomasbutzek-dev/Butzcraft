@@ -2,6 +2,9 @@ node_modules
 dist
 saves
 _backups
+.backups
 .claude
 .git
+test-screenshots
+tests
 *.log

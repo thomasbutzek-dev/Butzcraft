@@ -1,5 +1,5 @@
 /* js/crafting.js - Butzcraft Crafting System Logic */
-import { craftingRecipes, matchRecipe } from './recipes.js?v=20260717a';
+import { craftingRecipes, getRecipeTrustLockReason, matchRecipe } from './recipes.js?v=20260721b';
 
 const CRAFTING_GRID_SIZE = 3;
 let activeCraftingGridSize = 2;
@@ -22,7 +22,9 @@ export function checkCrafting() {
         : [craftingGridData[0], craftingGridData[1], craftingGridData[3], craftingGridData[4]];
     const currentPattern = activeSlots.map(slot => slot.count > 0 ? slot.type : 0);
 
-    const result = matchRecipe(currentPattern, activeCraftingGridSize, craftingRecipes);
+    const trust = globalThis.window?.getHighestVillageTrust?.() || 0;
+    const availableRecipes = craftingRecipes.filter(recipe => !getRecipeTrustLockReason(recipe, trust));
+    const result = matchRecipe(currentPattern, activeCraftingGridSize, availableRecipes);
     if (result) {
         craftingResultData.type = result.type;
         craftingResultData.count = result.count;

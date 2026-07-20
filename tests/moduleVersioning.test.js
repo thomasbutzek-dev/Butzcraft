@@ -17,13 +17,13 @@ describe('browser module identity', () => {
             return source.match(/\.\/blocks\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./blocks.js?v=20260717y']));
+        expect(new Set(specifiers)).toEqual(new Set(['./blocks.js?v=20260717z']));
     });
 
     it('cache-busts the browser entry after atlas changes', () => {
         const source = readFileSync('index.html', 'utf8');
 
-        expect(source).toContain('./js/GameMain.js?v=20260719h');
+        expect(source).toContain('./js/GameMain.js?v=20260721c');
     });
 
     it('loads world generation through one versioned URL everywhere', () => {
@@ -33,7 +33,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/world\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260719a']));
+        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260721b']));
     });
 
     it('loads inventory through one versioned URL everywhere', () => {
@@ -49,7 +49,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/inventory\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260719b']));
+        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260721c']));
     });
 
     it('loads the Game singleton through one versioned URL everywhere', () => {
@@ -77,17 +77,17 @@ describe('browser module identity', () => {
             return source.match(/\.\/touch\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./touch.js?v=20260717b']));
+        expect(new Set(specifiers)).toEqual(new Set(['./touch.js?v=20260720q']));
     });
 
     it('loads story progress through one versioned URL everywhere', () => {
-        const consumers = ['js/GameMain.js', 'js/tradeUI.js'];
+        const consumers = ['js/GameMain.js', 'js/PlayerInteraction.js', 'js/tradeUI.js'];
         const specifiers = consumers.map(file => {
             const source = readFileSync(file, 'utf8');
             return source.match(/\.\/storyProgress\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./storyProgress.js?v=20260718b']));
+        expect(new Set(specifiers)).toEqual(new Set(['./storyProgress.js?v=20260721b']));
     });
 
     it('loads dialog focus management through one versioned URL everywhere', () => {
@@ -107,7 +107,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/tradeUI\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./tradeUI.js?v=20260718d']));
+        expect(new Set(specifiers)).toEqual(new Set(['./tradeUI.js?v=20260721c']));
     });
 
     it('loads the furnace through one versioned URL everywhere', () => {
@@ -117,13 +117,13 @@ describe('browser module identity', () => {
             return source.match(/\.\/furnace\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./furnace.js?v=20260719a']));
+        expect(new Set(specifiers)).toEqual(new Set(['./furnace.js?v=20260721c']));
     });
 
     it('loads player interaction through the current browser URL', () => {
         const source = readFileSync('js/GameMain.js', 'utf8');
 
-        expect(source).toContain('./PlayerInteraction.js?v=20260719b');
+        expect(source).toContain('./PlayerInteraction.js?v=20260721c');
     });
 
     it('loads the graphics variant state through one URL everywhere', () => {
@@ -152,6 +152,6 @@ describe('browser module identity', () => {
             return source.match(/\.\/torchLights\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./torchLights.js?v=20260718b']));
+        expect(new Set(specifiers)).toEqual(new Set(['./torchLights.js?v=20260719a']));
     });
 });

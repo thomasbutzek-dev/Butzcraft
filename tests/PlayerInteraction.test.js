@@ -36,11 +36,13 @@ async function createInteraction({ blockType = 0, inventoryItem = null, mobs = [
         openWorkbenchCrafting: vi.fn()
     };
     let currentBlockType = blockType;
+    const blockMetadata = new Map();
     const world = {
         chunks: new Map(),
         getBlock: (x, y, z) => getBlockAt ? getBlockAt(x, y, z) : currentBlockType,
         setBlock: vi.fn((x, y, z, type) => { currentBlockType = type; }),
-        setBlockMeta: vi.fn(),
+        setBlockMeta: vi.fn((x, y, z, value) => blockMetadata.set(`${x},${y},${z}`, value)),
+        getBlockMeta: vi.fn((x, y, z) => blockMetadata.get(`${x},${y},${z}`) || 0),
         deleteBlockMeta: vi.fn(),
         chestContents: {},
         lootedChests: new Set(),
@@ -79,6 +81,7 @@ describe('PlayerInteraction through the Game seam', () => {
         delete window.getSelectedSlot;
         delete window.butzcraftCanInteract;
         delete window.trySleepInBed;
+        delete window.tryActivateBloodMoonRitual;
     });
 
     it('starts an empty-hand animation without showing or sounding like a free sword', async () => {
@@ -206,7 +209,7 @@ describe('PlayerInteraction through the Game seam', () => {
 
             expect(inventorySlots[1]).toEqual({ type: 95, count: 1 });
             expect(inventorySlots[0].durability).toBe(4);
-            expect(mob.takeDamage).toHaveBeenCalledWith(6);
+            expect(mob.takeDamage).toHaveBeenCalledWith(6, expect.any(Function));
             expect(context.updateInventoryUI).toHaveBeenCalled();
             expect(Game.player.startBowAnimation).toHaveBeenCalledWith(expect.objectContaining({ damage: 6 }));
         } finally {
@@ -242,6 +245,25 @@ describe('PlayerInteraction through the Game seam', () => {
         expect(context.updateUI).toHaveBeenCalled();
         expect(interaction.showMessage).toHaveBeenCalledWith('Lecker gekocht!', '#ffe066', 24);
     }, 15000);
+
+    it.each([
+        [33, [[0, 0, 0, 4], [0, 1, 0, 4]]],
+        [103, [[0, 0, 0, 4]]]
+    ])('toggles door or gate block %i with right click', async (blockType, expectedCalls) => {
+        const { interaction, world } = await createInteraction({ blockType });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        world.chunks.set('0,0', { mesh, waterMesh: null });
+        interaction.raycaster.intersectObjects = vi.fn(objects => objects.includes(mesh) ? [{
+            distance: 2,
+            object: mesh,
+            point: new THREE.Vector3(0.5, 0.5, 0.5),
+            face: { normal: new THREE.Vector3(0, 0, 1) }
+        }] : []);
+
+        await interaction.handleInteraction({ button: 2 });
+
+        for (const call of expectedCalls) expect(world.setBlockMeta).toHaveBeenCalledWith(...call);
+    });
 
     it('applies pressure-plate damage to the central player state', async () => {
         const { interaction, sound, world } = await createInteraction({ blockType: 79 });
@@ -383,6 +405,41 @@ describe('PlayerInteraction through the Game seam', () => {
         expect(world.setBlock).toHaveBeenCalledWith(1, 0, 0, 101);
         expect(world.setBlockMeta).toHaveBeenCalledWith(1, 0, 0, 1);
         expect(inventorySlots[0].count).toBe(1);
+    }, 15000);
+
+    it('keeps a dungeon gate locked until its generated key chest was opened', async () => {
+        const { interaction, world } = await createInteraction({ blockType: 85 });
+        const structureId = 'dungeon:0,0:v2';
+        const gate = { x: 4, y: 18, z: 6, widthAxis: 'z' };
+        world.structureGates = new Map([['4,18,6', { structureId, gate }]]);
+        world.structureProgress = {};
+
+        expect(interaction._tryUnlockStructureGate(4, 18, 6)).toBe(true);
+        expect(world.setBlock).not.toHaveBeenCalled();
+
+        world.structureProgress[structureId] = { keyFound: true };
+        expect(interaction._tryUnlockStructureGate(4, 18, 6)).toBe(true);
+        expect(world.setBlock).toHaveBeenCalledTimes(9);
+        expect(world.structureProgress[structureId]).toEqual({ keyFound: true, gateOpened: true });
+    }, 15000);
+
+    it('activates the blood moon ritual through the generated dungeon altar', async () => {
+        const { interaction, world } = await createInteraction({ blockType: 58 });
+        const structureId = 'dungeon:0,0:v2';
+        world.structureAltars = new Map([['4,18,6', {
+            structureId,
+            spawn: { x: 4, y: 18, z: 9 }
+        }]]);
+        world.structureProgress = {};
+        window.tryActivateBloodMoonRitual = vi.fn(() => ({ ok: true, message: 'Das Ritual beginnt.' }));
+
+        expect(interaction._tryActivateRitualAltar(4, 18, 6)).toBe(true);
+        expect(window.tryActivateBloodMoonRitual).toHaveBeenCalledWith({
+            structureId,
+            position: { x: 4, y: 18, z: 9 }
+        });
+        expect(world.structureProgress[structureId]).toEqual({ ritualActivated: true });
+        expect(interaction.showMessage).toHaveBeenCalledWith('Das Ritual beginnt.', '#ff647c', 18);
     }, 15000);
 
     it.each([

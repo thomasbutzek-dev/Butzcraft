@@ -4,7 +4,10 @@ const vm = require('node:vm');
 const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 
-const workerSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'chunkWorker.js'), 'utf8');
+const workerSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'chunkWorker.js'), 'utf8')
+    .replace(/^import .*undergroundStructures.*\r?\n/m, '');
+const undergroundSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'undergroundStructures.js'), 'utf8')
+    .replace('export function generateUndergroundStructures', 'function generateUndergroundStructures');
 const config = {
     CHUNK_SIZE: 16,
     CHUNK_HEIGHT: 64,
@@ -20,6 +23,7 @@ function createWorkerRuntime(variant) {
         }
     };
     const context = vm.createContext({ self, console });
+    vm.runInContext(undergroundSource, context, { filename: 'undergroundStructures.js' });
     vm.runInContext(workerSource, context, { filename: 'chunkWorker.js' });
     self.onmessage({
         data: {
@@ -28,7 +32,8 @@ function createWorkerRuntime(variant) {
             blockColors: {},
             blockTex: {},
             graphicsVariant: variant,
-            reducedGraphicsDetail: false
+            reducedGraphicsDetail: false,
+            worldGenerationVersion: 2
         }
     });
     return { self, messages };

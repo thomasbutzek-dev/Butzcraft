@@ -2,10 +2,11 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../config.js?v=20260719a';
 import { SoundManager } from './sound.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260717y';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260717z';
 import { Physics } from './Physics.js?v=20260717a';
 import { Game } from './Game.js?v=20260716b';
 import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260719a';
+import { getAnimalLureItem, isAnimalPenEnclosed, isKeepableAnimal } from './animalHusbandry.js?v=20260720a';
 
 const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
 const { GRAVITY, MOB_JUMP_FORCE = 5.5 } = CONFIG.PHYSICS;
@@ -117,6 +118,8 @@ export class Mob {
         this.isDead = false;
         this.velocity = new THREE.Vector3();
         this.lastJump = 0;
+        this.isPenned = false;
+        this._penCheckTimer = 0;
         this.group = new THREE.Group();
         this.visualVariant = selectEntityTextureVariant(x, z, type.length);
 
@@ -412,8 +415,7 @@ export class Mob {
 
 
     
-    updateAquatic(delta, playerPos, world, onDamage) {
-        const time = performance.now();
+    updateAquatic(delta, playerPos, world, onDamage, time = performance.now()) {
         const pos = this.group.position;
         const dist = pos.distanceTo(playerPos);
         
@@ -773,8 +775,7 @@ export class Mob {
         return candidates[Math.floor(Math.random() * candidates.length)];
     }
 
-    updateParrot(delta, playerPos, world) {
-        const time = performance.now();
+    updateParrot(delta, playerPos, world, time = performance.now()) {
         const pos = this.group.position;
 
         if (pos.distanceTo(playerPos) > SPAWN_DIST_MAX + 15) {
@@ -904,8 +905,7 @@ export class Mob {
         }
     }
 
-    updateGeist(delta, playerPos, world, dayRatio) {
-        const time = performance.now();
+    updateGeist(delta, playerPos, world, dayRatio, time = performance.now()) {
         const pos = this.group.position;
 
         // Am Tag lautlos auflösen
@@ -960,7 +960,7 @@ export class Mob {
         return 1;
     }
 
-    update(delta, playerPos, world, onDamage, dayRatio = 0.5) {
+    update(delta, playerPos, world, onDamage, dayRatio = 0.5, frameTime = performance.now(), heldItemType = 0) {
         if (this.isDead) return;
         if (this.updateVisualLod(playerPos)) {
             this._farUpdateAccumulator = (this._farUpdateAccumulator || 0) + delta;
@@ -970,15 +970,25 @@ export class Mob {
         } else {
             this._farUpdateAccumulator = 0;
         }
-        if (this.isAquatic) { this.updateAquatic(delta, playerPos, world, onDamage); return; }
-        if (this.type === 'geist') { this.updateGeist(delta, playerPos, world, dayRatio); return; }
-        if (this.type === 'parrot') { this.updateParrot(delta, playerPos, world); return; }
+        if (this.isAquatic) { this.updateAquatic(delta, playerPos, world, onDamage, frameTime); return; }
+        if (this.type === 'geist') { this.updateGeist(delta, playerPos, world, dayRatio, frameTime); return; }
+        if (this.type === 'parrot') { this.updateParrot(delta, playerPos, world, frameTime); return; }
                 const pos = this.group.position;
                 const dist = pos.distanceTo(playerPos);
+                const keepableAnimal = isKeepableAnimal(this.type);
+                if (keepableAnimal) {
+                    this._penCheckTimer -= delta;
+                    if (this._penCheckTimer <= 0) {
+                        if (world.getBlock(Math.floor(pos.x), Math.floor(pos.y - 1), Math.floor(pos.z)) !== -1) {
+                            this.isPenned = isAnimalPenEnclosed(world, pos.x, pos.y, pos.z);
+                        }
+                        this._penCheckTimer = 2;
+                    }
+                }
 
-                if (!this.lastSound || performance.now() - this.lastSound > 3000) {
+                if (!this.lastSound || frameTime - this.lastSound > 3000) {
                     if (Math.random() < 0.005) { 
-                        this.lastSound = performance.now();
+                        this.lastSound = frameTime;
                         // Position übergeben → 3D-Spatial (Distanz-Attenuation + Stereo-Pan).
                         // Distanz-Filter (dist < N) bleibt als Early-Exit, der Sound-Manager macht
                         // den finalen Falloff fein.
@@ -991,7 +1001,7 @@ export class Mob {
                 }
                 
                 // Despawn, wenn Mob zu weit weg ist (damit in der Nähe des Spielers neue spawnen können)
-                if (dist > SPAWN_DIST_MAX + 15) {
+                if (dist > SPAWN_DIST_MAX + 15 && !this.isPenned) {
                     this.isDead = true;
                     return;
                 }
@@ -1024,18 +1034,25 @@ export class Mob {
                         }
                         if (dir.length() > 0.1) this.group.rotation.y = Math.atan2(dir.x, dir.z);
                         if (this.type === 'skeleton') {
-                            if (performance.now() - this.lastShotTime > 2500) {
-                                this.lastShotTime = performance.now();
+                            if (frameTime - this.lastShotTime > 2500) {
+                                this.lastShotTime = frameTime;
                                 const pDir = _tempPDir.subVectors(playerPos, new THREE.Vector3(pos.x, pos.y + 1.2, pos.z)).normalize();
                                 pDir.y += 0.05;
                                 projectiles.push(new ArrowProjectile(this.scene, new THREE.Vector3(pos.x, pos.y + 1.2, pos.z), pDir));
                             }
                         }
                         const nX = pos.x + dir.x * 0.5, nZ = pos.z + dir.z * 0.5;
-                        if (world.getBlock(Math.floor(nX), Math.floor(pos.y), Math.floor(nZ)) !== 0 && performance.now() - this.lastJump > 1200) {
-                            this.velocity.y = MOB_JUMP_FORCE; this.lastJump = performance.now();
+                        if (world.getBlock(Math.floor(nX), Math.floor(pos.y), Math.floor(nZ)) !== 0 && frameTime - this.lastJump > 1200) {
+                            this.velocity.y = MOB_JUMP_FORCE; this.lastJump = frameTime;
                         }
                     }
+                } else if (keepableAnimal && heldItemType === getAnimalLureItem(this.type) && dist < 10) {
+                    const dir = _tempDir.subVectors(playerPos, pos);
+                    dir.y = 0;
+                    dir.normalize();
+                    this.velocity.x = dir.x * WANDER_SPEED * 1.25;
+                    this.velocity.z = dir.z * WANDER_SPEED * 1.25;
+                    this.group.rotation.y = Math.atan2(dir.x, dir.z);
                 } else {
                     // Wander-Logik für friedliche Mobs oder Zombies außer Reichweite
                     if (Math.random() < 0.005 || (this.velocity.x === 0 && this.velocity.z === 0 && Math.random() < 0.05)) {
@@ -1063,7 +1080,7 @@ export class Mob {
                 
                 // Beinanimation beim Gehen
                 if (Math.abs(this.velocity.x) > 0.01 || Math.abs(this.velocity.z) > 0.01) {
-                    const walkCycle = (performance.now() % 600) / 600 * Math.PI * 2; // Beine schwingen im 600ms Takt
+                    const walkCycle = (frameTime % 600) / 600 * Math.PI * 2; // Beine schwingen im 600ms Takt
                     if (this.legs && this.legs.length > 0) {
                         if (this.legs.length === 2) {
                             // Zweibeiner
@@ -1107,23 +1124,28 @@ export class Mob {
                 const mnz = pos.z + this.velocity.z * delta;
                 
                 let hitWall = false;
+                let blockedByFence = false;
                 if (!checkMobC({ x: mnx, y: pos.y, z: pos.z })) {
                     pos.x = mnx; 
                 } else { 
+                    const block = world.getBlock(Math.floor(mnx), Math.floor(pos.y), Math.floor(pos.z));
+                    blockedByFence ||= block === 102 || block === 103;
                     this.velocity.x = 0; hitWall = true; 
                 }
                 
                 if (!checkMobC({ x: pos.x, y: pos.y, z: mnz })) {
                     pos.z = mnz; 
                 } else { 
+                    const block = world.getBlock(Math.floor(pos.x), Math.floor(pos.y), Math.floor(mnz));
+                    blockedByFence ||= block === 102 || block === 103;
                     this.velocity.z = 0; hitWall = true; 
                 }
 
                 if (hitWall) {
-                    if (this.velocity.y <= 0 && (performance.now() - this.lastJump) > 1000) {
+                    if (!blockedByFence && this.velocity.y <= 0 && (frameTime - this.lastJump) > 1000) {
                         // Bei Wandkontakt automatisch springen (Schwerkraft ist im y<=0 abgedeckt)
                         this.velocity.y = MOB_JUMP_FORCE;
-                        this.lastJump = performance.now();
+                        this.lastJump = frameTime;
                     } else if (Math.random() < 0.1) {
                         // Gelegentlich neue Richtung suchen
                         this.velocity.x = 0; this.velocity.z = 0; 
@@ -1169,6 +1191,17 @@ export class Mob {
                     }
                 }
             }
+            serialize() {
+                return {
+                    type: this.type,
+                    x: this.group.position.x,
+                    y: this.group.position.y,
+                    z: this.group.position.z,
+                    health: this.health,
+                    isPenned: this.isPenned
+                };
+            }
+
             takeDamage(amount, onKill) {
                 if (this.type === 'octopus') return; // Unsterblich
                 if (this.type === 'geist') return;   // Geist – unantastbar, kein Schaden möglich
@@ -1198,6 +1231,7 @@ export class Mob {
                         if (!Game.droppedItems) Game.droppedItems = [];
                         Game.droppedItems.push({ mesh: dropMesh, velocityY: 2.0, blockType: blockType });
                     }
+                    if (typeof onKill === 'function') onKill(this);
                 }
             }
         }

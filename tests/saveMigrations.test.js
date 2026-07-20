@@ -7,7 +7,32 @@
  *  - stampSaveVersion setzt korrekt die Version
  */
 import { describe, it, expect } from 'vitest';
-import { migrateSave, prepareSaveForLoad, stampSaveVersion, CURRENT_SAVE_VERSION } from '../js/saveMigrations.js';
+import {
+    migrateSave,
+    prepareSaveForLoad,
+    stampSaveVersion,
+    getWorldGenerationLoadNotice,
+    CURRENT_SAVE_VERSION
+} from '../js/saveMigrations.js';
+
+describe('migrateSave - v13 to v14 (quest state)', () => {
+    it('preserves the existing journey index in the new quest state', () => {
+        const migrated = migrateSave({ version: 13, inventory: [], storyObjectiveIndex: 3 });
+
+        expect(migrated.questState).toEqual(expect.objectContaining({
+            mainQuestIndex: 3,
+            activeSideQuests: [],
+            villages: {}
+        }));
+    });
+});
+
+describe('migrateSave – v12 → v13 (Tierhaltung)', () => {
+    it('initialisiert gespeicherte Gehegetiere für ältere Spielstände', () => {
+        const migrated = migrateSave({ version: 12, inventory: [] });
+        expect(migrated.keptAnimals).toEqual([]);
+    });
+});
 
 describe('migrateSave – v0 → v1 (Inventory-Format)', () => {
     it('konvertiert Legacy-Inventory-Objekt zu Array', () => {
@@ -143,6 +168,14 @@ describe('migrateSave – Edge Cases', () => {
         expect(migrated.minecarts).toEqual([]);
     });
 
+    it('marks pre-v2 worlds as legacy and adds persistent structure progress', () => {
+        const migrated = migrateSave({ version: 11, inventory: [] });
+
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.worldGenerationVersion).toBe(1);
+        expect(migrated.structureProgress).toEqual({});
+    });
+
     it('normalisiert Profil und Kameraabstand in aktuellen Saves', () => {
         const migrated = migrateSave({
             version: CURRENT_SAVE_VERSION,
@@ -175,7 +208,15 @@ describe('stampSaveVersion', () => {
         const data = { foo: 'bar' };
         const stamped = stampSaveVersion(data);
         expect(stamped.version).toBe(CURRENT_SAVE_VERSION);
+        expect(stamped.worldGenerationVersion).toBe(2);
+        expect(stamped.structureProgress).toEqual({});
         expect(stamped.foo).toBe('bar');
+    });
+
+    it('preserves the generator version when a legacy world is saved again', () => {
+        const stamped = stampSaveVersion({ worldGenerationVersion: 1 });
+
+        expect(stamped.worldGenerationVersion).toBe(1);
     });
 
     it('überschreibt eine veraltete Version', () => {
@@ -234,5 +275,19 @@ describe('prepareSaveForLoad', () => {
             time: 0,
             inventory: []
         })).toThrow('Spielstand enthält ungültige Spielerwerte');
+    });
+});
+
+describe('world generation compatibility notice', () => {
+    it('creates a valid backup name and warning for a legacy world', () => {
+        const notice = getWorldGenerationLoadNotice({}, 'A'.repeat(64));
+
+        expect(notice.backupName).toMatch(/ - Worldgen 1 Backup$/);
+        expect(notice.backupName.length).toBeLessThanOrEqual(64);
+        expect(notice.message).toContain('neue Welt');
+    });
+
+    it('does not warn for a worldgen-v2 save', () => {
+        expect(getWorldGenerationLoadNotice({ worldGenerationVersion: 2 }, 'Neue Welt')).toBeNull();
     });
 });

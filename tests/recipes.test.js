@@ -7,7 +7,17 @@
  *  - Negativ-Tests: falsche Pattern matchen NICHT (kein false-positive Crafting)
  */
 import { describe, it, expect } from 'vitest';
-import { matchRecipe, normalizeRecipe, craftingRecipes } from '../js/recipes.js';
+import { getRecipeTrustLockReason, matchRecipe, normalizeRecipe, craftingRecipes } from '../js/recipes.js';
+
+describe('trust recipes', () => {
+    it('keeps specialist recipes visible but locked until enough trust was earned', () => {
+        const specialist = craftingRecipes.find(recipe => recipe.name === 'Meisterklinge');
+
+        expect(specialist).toBeTruthy();
+        expect(getRecipeTrustLockReason(specialist, 7)).toBe('Verbündetes Dorf erforderlich (12 Vertrauen).');
+        expect(getRecipeTrustLockReason(specialist, 12)).toBe('');
+    });
+});
 
 describe('normalizeRecipe', () => {
     it('konvertiert Legacy-Form zu shaped/2×2', () => {
@@ -146,5 +156,10 @@ describe('matchRecipe – Smoke-Test mit echten Spiel-Rezepten', () => {
     it('Kohle und Stock ergeben vier Fackeln im Inventar-Grid', () => {
         expect(matchRecipe([60, 27, 0, 0], 2, craftingRecipes)).toEqual({ type: 101, count: 4 });
         expect(matchRecipe([0, 27, 60, 0], 2, craftingRecipes)).toEqual({ type: 101, count: 4 });
+    });
+
+    it('craftet Zaun und Gatter aus vier Stöcken und zwei Brettern', () => {
+        expect(matchRecipe([27,26,27, 27,26,27, 0,0,0], 3, craftingRecipes)).toEqual({ type: 102, count: 4 });
+        expect(matchRecipe([27,27,27, 26,26,27, 0,0,0], 3, craftingRecipes)).toEqual({ type: 103, count: 1 });
     });
 });

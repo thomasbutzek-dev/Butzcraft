@@ -1,8 +1,8 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260717a';
-import { craftingRecipes } from './recipes.js?v=20260717a';
-import { initRecipeBook } from './recipe_book.js?v=20260718b';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717y';
+import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260721b';
+import { craftingRecipes, getRecipeTrustLockReason } from './recipes.js?v=20260721b';
+import { initRecipeBook } from './recipe_book.js?v=20260721c';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717z';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getToolInfo } from './miningRules.js?v=20260716a';
@@ -94,7 +94,7 @@ const TRANSLATIONS = {
     'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil',
     'COOKED_FISH': 'Gebratener Fisch', 'COOKED_MEAT': 'Gebratenes Fleisch', 'COOKED_CHICKEN': 'Gebratenes Hähnchen',
     'COOKED_MUTTON': 'Gebratenes Hammelfleisch', 'COOKED_TURTLE_MEAT': 'Gebratenes Schildkrötenfleisch',
-    'TORCH': 'Fackel'
+    'TORCH': 'Fackel', 'WOOD_FENCE': 'Holzzaun', 'WOOD_GATE': 'Holzgatter', 'VILLAGE_LANTERN': 'Dorflaterne'
 };
 
 
@@ -651,6 +651,8 @@ function formatMissingItems(missing) {
 
 function getRecipeLockReason(recipe) {
     if (recipe.gridSize === 3 && craftingStation !== 'workbench') return 'Werkbank erforderlich.';
+    const trustLock = getRecipeTrustLockReason(recipe, window.getHighestVillageTrust?.() || 0);
+    if (trustLock) return trustLock;
     const missing = getMissingRecipeItems(recipe);
     return missing.length > 0 ? formatMissingItems(missing) : '';
 }
@@ -750,6 +752,9 @@ export function craftCurrentRecipe() {
     updateInventoryUI();
     setCraftingStatus(`${getItemName(output.type)} hergestellt.`, 'success');
     SoundManager.playSound('dig_wood', 0.4, 1.8);
+    window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+        detail: { type: 'craft', itemType: output.type, count: output.count }
+    }));
     return { crafted: true, reason: null };
 }
 
@@ -804,6 +809,7 @@ function openCraftingOverlay(station, gameStarted, spawning, controls) {
     setCraftingGridSize(station === 'workbench' ? 3 : 2);
     const overlay = document.getElementById('inventory-overlay');
     overlay.style.display = 'flex';
+    window.showInventoryPanel?.('inventory');
     activateDialog(overlay, '#inventory-close-btn');
     if (!Game.touchActive) controls.unlock();
     initInventoryGrid();

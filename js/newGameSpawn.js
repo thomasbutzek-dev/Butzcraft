@@ -1,5 +1,5 @@
 import { CONFIG } from '../config.js?v=20260511a';
-import { BIOMES, getBiomeAt, getHeightAt } from './world.js?v=20260719a';
+import { BIOMES, getBiomeAt, getHeightAt } from './world.js?v=20260721b';
 
 const MAX_SPAWN_ATTEMPTS = 2048;
 

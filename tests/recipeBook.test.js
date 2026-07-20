@@ -99,4 +99,62 @@ describe('recipe book initialization', () => {
         expect(firstEntry.classList.contains('locked')).toBe(false);
         expect(firstEntry.querySelector('.recipe-lock-reason')).toBeNull();
     });
+
+    it('filters recipes with the agreed category tabs', () => {
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 26: 2, 27: 3, 63: 4 },
+            [
+                { category: 'Versorgung', pattern: [26, 0, 0, 0], result: { type: 27, count: 4 } },
+                { category: 'Werkzeuge', kind: 'shaped', gridSize: 3, pattern: [26, 26, 26, 0, 27, 0, 0, 27, 0], result: { type: 63, count: 1 } }
+            ],
+            { PLANKS: 26, STICK: 27, WOOD_PICKAXE: 63 },
+            { PLANKS: 'Holzbretter', STICK: 'Stock', WOOD_PICKAXE: 'Holz-Spitzhacke' },
+            vi.fn()
+        );
+
+        expect([...document.querySelectorAll('.recipe-category-tab')].map(tab => tab.textContent)).toEqual([
+            'Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Versorgung'
+        ]);
+        document.querySelector('[data-category="Werkzeuge"]').click();
+        expect([...document.querySelectorAll('.recipe-entry')].map(entry => entry.hidden)).toEqual([true, false]);
+    });
+
+    it('shows a custom title for a visible trust recipe', () => {
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 26: 2, 27: 3, 102: 4 },
+            [{
+                name: 'Verstärkter Dorfzaun', requiredTrust: 3, category: 'Bauen',
+                kind: 'shaped', gridSize: 3,
+                pattern: [26, 27, 26, 26, 27, 26, 0, 0, 0],
+                result: { type: 102, count: 8 }
+            }],
+            { PLANKS: 26, STICK: 27, WOOD_FENCE: 102 },
+            { PLANKS: 'Holzbretter', STICK: 'Stock', WOOD_FENCE: 'Holzzaun' },
+            vi.fn(),
+            { getLockReason: () => 'Bekanntes Dorf erforderlich (3 Vertrauen).' }
+        );
+
+        expect(document.querySelector('.recipe-name').textContent).toBe('Verstärkter Dorfzaun');
+        expect(document.querySelector('[data-recipe-icon="fence"]')).not.toBeNull();
+        expect(document.querySelector('.recipe-entry').classList.contains('locked')).toBe(true);
+    });
+
+    it('uses distinct silhouettes for fence and gate outputs', () => {
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 26: 2, 27: 3, 102: 4, 103: 4 },
+            [
+                { category: 'Bauen', kind: 'shaped', gridSize: 3, pattern: [27,26,27, 27,26,27, 0,0,0], result: { type: 102, count: 4 } },
+                { category: 'Bauen', kind: 'shaped', gridSize: 3, pattern: [27,27,27, 26,26,27, 0,0,0], result: { type: 103, count: 1 } }
+            ],
+            { PLANKS: 26, STICK: 27, WOOD_FENCE: 102, WOOD_GATE: 103 },
+            { PLANKS: 'Holzbretter', STICK: 'Stock', WOOD_FENCE: 'Holzzaun', WOOD_GATE: 'Holzgatter' },
+            vi.fn()
+        );
+
+        expect(document.querySelectorAll('[data-recipe-icon="fence"]')).toHaveLength(1);
+        expect(document.querySelectorAll('[data-recipe-icon="gate"]')).toHaveLength(1);
+    });
 });

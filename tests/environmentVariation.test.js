@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readChunkWorkerSource } from './chunkWorkerSource.js';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
@@ -14,7 +14,7 @@ function loadWorkerVariants() {
         Uint32Array,
         ArrayBuffer
     });
-    const source = readFileSync('js/chunkWorker.js', 'utf8');
+    const source = readChunkWorkerSource();
     vm.runInContext(`${source}\nself.__variants = { spawnTree, spawnPalm, BIOMES };`, context);
     vm.runInContext("GRAPHICS_VARIANT = 'B';", context);
     return self.__variants;

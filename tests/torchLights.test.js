@@ -51,4 +51,13 @@ describe('placed torch light selection', () => {
             { x: 4.5, y: 4.72, z: 0.5 }
         ]);
     });
+
+    it('accepts an indexed torch set without scanning all modified blocks', () => {
+        const torchKeys = new Set(['7,4,0', '2,4,0', '40,4,0']);
+
+        expect(selectNearestTorchPositions(torchKeys, { x: 0, y: 4, z: 0 }, 2, 12)).toEqual([
+            { x: 2.5, y: 4.72, z: 0.5 },
+            { x: 7.5, y: 4.72, z: 0.5 }
+        ]);
+    });
 });

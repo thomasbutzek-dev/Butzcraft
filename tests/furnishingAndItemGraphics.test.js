@@ -1,3 +1,4 @@
+import { readChunkWorkerSource } from './chunkWorkerSource.js';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
@@ -15,7 +16,7 @@ function loadPainterlyTextureFor(graphicsVariant) {
         Uint32Array,
         ArrayBuffer
     });
-    const source = readFileSync('js/chunkWorker.js', 'utf8');
+    const source = readChunkWorkerSource();
     vm.runInContext(`${source}\nself.painterlyTextureFor = painterlyTextureFor;`, context);
     vm.runInContext(`GRAPHICS_VARIANT = '${graphicsVariant}';`, context);
     return self.painterlyTextureFor;
@@ -34,7 +35,7 @@ function loadFurnitureHelpers(graphicsVariant) {
         Uint32Array,
         ArrayBuffer
     });
-    const source = readFileSync('js/chunkWorker.js', 'utf8');
+    const source = readChunkWorkerSource();
     vm.runInContext(`${source}\nself.furnitureTopUVs = furnitureTopUVs; self.furnitureTextureFor = furnitureTextureFor;`, context);
     vm.runInContext(`GRAPHICS_VARIANT = '${graphicsVariant}';`, context);
     return self;
