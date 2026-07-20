@@ -16,7 +16,7 @@
 
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { normalizeCharacterProfile } from './characterProfile.js?v=20260602a';
-import { createQuestState, normalizeQuestState } from './quests.js?v=20260720q';
+import { createQuestState, normalizeQuestState } from './quests.js?v=20260721b';
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
 export const CURRENT_SAVE_VERSION = 14;

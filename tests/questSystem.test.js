@@ -12,6 +12,7 @@ import {
     generateVillageOffers,
     getAdjustedTrade,
     getNpcIdentity,
+    getProfessionChainStatus,
     getTrustTier,
     getVillageId,
     grantQuestItem,
@@ -117,6 +118,41 @@ describe('side quest capacity', () => {
 
         expect(abandonSideQuest(state, 'quest-1')).toBe(true);
         expect(acceptSideQuest(state, offers[3]).accepted).toBe(true);
+    });
+});
+
+describe('profession quest chains', () => {
+    it('unlocks the next local profession stage through trust and completion', () => {
+        const state = createQuestState();
+        const village = ensureVillageState(state, grassVillage, 0);
+        const first = getProfessionChainStatus(state, village.id, 0, 10);
+
+        expect(first.state).toBe('available');
+        expect(first.quest.title).toBe('Die kalte Esse');
+        acceptSideQuest(state, first.quest);
+        state.activeSideQuests[0].objective.current = 12;
+        completeSideQuest(state, first.quest.id, 1);
+
+        expect(village.professionChainProgress[0]).toBe(1);
+        expect(getProfessionChainStatus(state, village.id, 0, 10)).toEqual(expect.objectContaining({
+            state: 'locked',
+            reason: '3 Vertrauen in diesem Dorf erforderlich.'
+        }));
+
+        addVillageTrust(state, village.id, 1);
+        expect(getProfessionChainStatus(state, village.id, 0, 10).quest.title).toBe('Werkzeug für die Tiefe');
+    });
+
+    it('keeps the librarian endgame stage locked until the story boss is defeated', () => {
+        const state = createQuestState();
+        const village = ensureVillageState(state, grassVillage, 0);
+        village.trust = 12;
+        village.professionChainProgress[3] = 2;
+
+        expect(getProfessionChainStatus(state, village.id, 3, 9).state).toBe('locked');
+        const endgame = getProfessionChainStatus(state, village.id, 3, 10);
+        expect(endgame.state).toBe('available');
+        expect(endgame.quest.objective).toMatchObject({ type: 'boss', bossType: 'bloodMoonEcho' });
     });
 });
 

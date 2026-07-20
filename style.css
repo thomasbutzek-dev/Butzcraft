@@ -1336,6 +1336,46 @@ body { user-select: none; -webkit-user-select: none; }
     transition: width 0.18s linear;
 }
 
+.npc-dialogue {
+    margin-bottom: 14px;
+    padding: 14px;
+    border: 1px solid rgba(255, 224, 102, 0.38);
+    border-radius: 6px;
+    background: rgba(12, 10, 8, 0.72);
+}
+
+#npc-dialogue-text {
+    min-height: 2.8em;
+    margin: 0 0 12px;
+    color: #f3ead4;
+    line-height: 1.45;
+}
+
+.npc-dialogue-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+}
+
+.dialogue-choice {
+    padding: 7px 10px;
+    border: 1px solid rgba(255, 224, 102, 0.48);
+    border-radius: 4px;
+    background: #332b20;
+    color: #ffe8a3;
+    cursor: pointer;
+}
+
+.dialogue-choice:hover,
+.dialogue-choice:focus-visible {
+    background: #4a3b26;
+}
+
+.profession-chain-row {
+    border-color: rgba(255, 215, 90, 0.58);
+    box-shadow: inset 3px 0 rgba(255, 215, 90, 0.5);
+}
+
 #inventory-view-tabs {
     display: flex;
     gap: 6px;

@@ -23,7 +23,7 @@ describe('browser module identity', () => {
     it('cache-busts the browser entry after atlas changes', () => {
         const source = readFileSync('index.html', 'utf8');
 
-        expect(source).toContain('./js/GameMain.js?v=20260720q');
+        expect(source).toContain('./js/GameMain.js?v=20260721b');
     });
 
     it('loads world generation through one versioned URL everywhere', () => {
@@ -33,7 +33,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/world\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260719b']));
+        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260721b']));
     });
 
     it('loads inventory through one versioned URL everywhere', () => {
@@ -49,7 +49,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/inventory\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260720q']));
+        expect(new Set(specifiers)).toEqual(new Set(['./inventory.js?v=20260721b']));
     });
 
     it('loads the Game singleton through one versioned URL everywhere', () => {
@@ -87,7 +87,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/storyProgress\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./storyProgress.js?v=20260720q']));
+        expect(new Set(specifiers)).toEqual(new Set(['./storyProgress.js?v=20260721b']));
     });
 
     it('loads dialog focus management through one versioned URL everywhere', () => {
@@ -107,7 +107,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/tradeUI\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./tradeUI.js?v=20260720q']));
+        expect(new Set(specifiers)).toEqual(new Set(['./tradeUI.js?v=20260721b']));
     });
 
     it('loads the furnace through one versioned URL everywhere', () => {
@@ -123,7 +123,7 @@ describe('browser module identity', () => {
     it('loads player interaction through the current browser URL', () => {
         const source = readFileSync('js/GameMain.js', 'utf8');
 
-        expect(source).toContain('./PlayerInteraction.js?v=20260720q');
+        expect(source).toContain('./PlayerInteraction.js?v=20260721b');
     });
 
     it('loads the graphics variant state through one URL everywhere', () => {

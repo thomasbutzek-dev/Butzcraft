@@ -57,6 +57,149 @@ const NPC_NAMES = [
     ['Elin', 'Arvid', 'Lina', 'Theodor']
 ];
 
+const PROFESSION_QUEST_CHAINS = [
+    [
+        {
+            title: 'Die kalte Esse', requiredTrust: 0,
+            objective: { type: 'delivery', itemType: 60, required: 12 },
+            reward: { type: 61, count: 2 }, trustReward: 2,
+            dialogue: {
+                offer: 'Ohne Kohle bleibt meine Esse kalt. Bring mir genug Brennstoff, dann kann ich wieder arbeiten.',
+                details: 'Zwölf Stück Kohle reichen für die nächste Schicht. Kohle aus deinem Vorrat zählt ebenfalls.',
+                progress: 'Die Glut hält nicht mehr lange. Hast du die Kohle dabei?',
+                complete: 'Das Feuer lebt wieder. Nimm dieses Eisen – du hast es dir verdient.'
+            }
+        },
+        {
+            title: 'Werkzeug für die Tiefe', requiredTrust: 3,
+            objective: { type: 'craft', itemType: 65, required: 1 },
+            reward: { type: 62, count: 2 }, trustReward: 3,
+            dialogue: {
+                offer: 'Ein guter Schmied erkennt sein Werk am Werkzeug. Fertige eine Eisen-Spitzhacke.',
+                details: 'Stelle sie nach Annahme dieses Auftrags an einer Werkbank her.',
+                progress: 'Eine saubere Spitze und ein fester Schaft – daran erkenne ich gute Arbeit.',
+                complete: 'Saubere Arbeit. Jetzt vertraue ich dir auch bei schwierigen Aufträgen.'
+            }
+        },
+        {
+            title: 'Klingen gegen Knochen', requiredTrust: 7,
+            objective: { type: 'hunt', mobType: 'skeleton', required: 6 },
+            reward: { type: 91, count: 1 }, trustReward: 4,
+            dialogue: {
+                offer: 'Skelette streifen nachts über unsere Wege. Zeig ihnen, was eine gute Klinge vermag.',
+                details: 'Besiege sechs Skelette, nachdem du den Auftrag angenommen hast.',
+                progress: 'Solange die Knochen klappern, sind unsere Wege nicht sicher.',
+                complete: 'Das Dorf schläft ruhiger. Diese Klinge gehört jetzt dir.'
+            }
+        }
+    ],
+    [
+        {
+            title: 'Leere Vorratskörbe', requiredTrust: 0,
+            objective: { type: 'delivery', itemType: 51, required: 12 },
+            reward: { type: 88, count: 4 }, trustReward: 2,
+            dialogue: {
+                offer: 'Die Vorratskörbe sind fast leer. Ein paar Beeren würden uns über die nächsten Tage helfen.',
+                details: 'Bring zwölf Beeren. Bereits gesammelte Vorräte kannst du direkt abgeben.',
+                progress: 'Die Kinder fragen schon nach dem Abendessen. Hast du etwas gefunden?',
+                complete: 'Das reicht für viele Mahlzeiten. Danke – hier ist Futter für deine Tiere.'
+            }
+        },
+        {
+            title: 'Ein sicherer Hof', requiredTrust: 3,
+            objective: { type: 'place', itemType: 102, required: 8, villageRadius: 34 },
+            reward: { type: 19, count: 4 }, trustReward: 3,
+            dialogue: {
+                offer: 'Nachts dringen Tiere und Monster auf die Felder. Hilfst du mir mit einem neuen Zaun?',
+                details: 'Setze acht Zaunelemente innerhalb des Dorfes, nachdem du den Auftrag angenommen hast.',
+                progress: 'Die offene Stelle liegt noch immer im Wind.',
+                complete: 'Der Hof ist wieder sicher. Diese Wolle soll dich warm halten.'
+            }
+        },
+        {
+            title: 'Vorrat für den Winter', requiredTrust: 7,
+            objective: { type: 'delivery', itemType: 19, required: 10 },
+            reward: { type: 97, count: 4 }, trustReward: 4,
+            dialogue: {
+                offer: 'Der nächste Winter kommt bestimmt. Wir brauchen Wolle für Decken und Kleidung.',
+                details: 'Zehn Stück Wolle füllen unser Lager für eine Weile.',
+                progress: 'Jede weitere Decke kann in einer kalten Nacht entscheidend sein.',
+                complete: 'Jetzt sind wir vorbereitet. Teile diese Vorräte mit deinen Gefährten.'
+            }
+        }
+    ],
+    [
+        {
+            title: 'Ware aus der Ferne', requiredTrust: 0,
+            objective: { type: 'delivery', itemType: 30, required: 12 },
+            reward: { type: 62, count: 2 }, trustReward: 2,
+            dialogue: {
+                offer: 'Meine Kunden wollen Stein aus fernen Gegenden. Sandstein wäre ein guter Anfang.',
+                details: 'Bring zwölf Sandsteinblöcke. Woher sie stammen, überlasse ich dir.',
+                progress: 'Ein Händler ohne Ware ist nur jemand mit einem leeren Wagen.',
+                complete: 'Genau diese Qualität habe ich gesucht. Wir werden noch gute Geschäfte machen.'
+            }
+        },
+        {
+            title: 'Die verschollene Lieferung', requiredTrust: 3,
+            objective: { type: 'structure', structureKind: 'mine', required: 1 },
+            reward: { type: 66, count: 1 }, trustReward: 3,
+            dialogue: {
+                offer: 'Eine Lieferung aus einer großen Mine ist nie angekommen. Finde heraus, was dort geschah.',
+                details: 'Erreiche die Belohnungskammer einer großen Mine.',
+                progress: 'Ohne Nachricht von der Mine kann ich keine neue Route planen.',
+                complete: 'Du hast mehr gefunden als nur eine verlorene Spur. Diese Spitzhacke hilft dir auf der nächsten Reise.'
+            }
+        },
+        {
+            title: 'Ein Handel mit dem Frost', requiredTrust: 7,
+            objective: { type: 'delivery', itemType: 78, required: 12 },
+            reward: { type: 62, count: 5 }, trustReward: 4,
+            dialogue: {
+                offer: 'Im Süden zahlen sie gut für klares Eis. Beschaffe mir eine Lieferung, bevor der Markt kippt.',
+                details: 'Zwölf Blöcke Eis genügen für meinen besten Kunden.',
+                progress: 'Der Käufer wartet nicht ewig – aber ich breche unser Wort nicht.',
+                complete: 'Pünktlich und unversehrt. Du bist längst mehr Partner als Laufbursche.'
+            }
+        }
+    ],
+    [
+        {
+            title: 'Zeichen der Vergangenheit', requiredTrust: 0,
+            objective: { type: 'delivery', itemType: 31, required: 10 },
+            reward: { type: 95, count: 8 }, trustReward: 2,
+            dialogue: {
+                offer: 'In alten Knochen bleiben Spuren vergangener Nächte. Bring mir einige für meine Aufzeichnungen.',
+                details: 'Zehn Knochen sollten genügen. Bereits gefundene Exemplare zählen.',
+                progress: 'Die Chronik wartet auf ihre fehlenden Seiten.',
+                complete: 'Diese Spuren bestätigen meine Sorge: Der Blutmond folgt einem alten Muster.'
+            }
+        },
+        {
+            title: 'Die versiegelte Chronik', requiredTrust: 3,
+            objective: { type: 'structure', structureKind: 'dungeon', required: 1 },
+            reward: { type: 94, count: 1 }, trustReward: 3,
+            dialogue: {
+                offer: 'Unter der Erde liegt eine versiegelte Chronik. Suche die Endkammer eines Dungeons.',
+                details: 'Öffne die Belohnungstruhe hinter dem unteren Dungeon-Tor.',
+                progress: 'Das Siegel kann nur dort gebrochen werden, wo die Quelle einst verehrt wurde.',
+                complete: 'Die Chronik nennt einen Wächter – und ein Ritual, das ihn bindet.'
+            }
+        },
+        {
+            title: 'Echo der Quelle', requiredTrust: 7, requiredStoryIndex: 10,
+            objective: { type: 'boss', bossType: 'bloodMoonEcho', required: 1 },
+            reward: { type: 92, count: 1 }, trustReward: 5,
+            dialogue: {
+                offer: 'Der Wächter ist gefallen, doch sein Echo kehrt zurück. Stelle dich ihm noch einmal am Altar.',
+                details: 'Aktiviere den Ritualaltar nach Abschluss der Hauptgeschichte und besiege das Blutmondecho.',
+                progress: 'Das Echo ist noch nicht verstummt. Der Altar wartet in der Endkammer.',
+                complete: 'Jetzt ist selbst der Nachhall gebrochen. Diese Klinge trägt die Geschichte deines Sieges.'
+            }
+        }
+    ]
+];
+
 const QUEST_TEMPLATES = [
     {
         id: 'food-berries', title: 'Vorräte für das Dorf', professionIdx: 1,
@@ -286,16 +429,72 @@ export function ensureVillageState(questState, village, dayCount = 0) {
             trust: 0,
             offers: generateVillageOffers(village, dayCount, problemProfile),
             nextOfferRefreshDay: Math.max(0, Math.floor(Number(dayCount) || 0)) + 3,
-            nextReplacementDay: null
+            nextReplacementDay: null,
+            professionChainProgress: {}
         };
         questState.villages[villageId] = stored;
     } else {
         if (!Array.isArray(stored.offers)) stored.offers = [];
+        if (!stored.professionChainProgress || typeof stored.professionChainProgress !== 'object') {
+            stored.professionChainProgress = {};
+        }
         if (!Number.isFinite(stored.nextOfferRefreshDay)) {
             stored.nextOfferRefreshDay = Math.max(0, Math.floor(Number(dayCount) || 0));
         }
     }
     return stored;
+}
+
+export function getProfessionChainStatus(questState, villageId, professionIdx, mainQuestIndex = 0) {
+    const village = questState?.villages?.[villageId];
+    const normalizedProfession = Math.max(0, Math.min(PROFESSION_QUEST_CHAINS.length - 1, Math.floor(Number(professionIdx) || 0)));
+    if (!village) return { state: 'unavailable', quest: null, reason: 'Dorf nicht bekannt.' };
+    if (!village.professionChainProgress || typeof village.professionChainProgress !== 'object') {
+        village.professionChainProgress = {};
+    }
+    const stage = Math.max(0, Math.floor(Number(village.professionChainProgress[normalizedProfession]) || 0));
+    const template = PROFESSION_QUEST_CHAINS[normalizedProfession]?.[stage];
+    if (!template) return { state: 'complete', quest: null, reason: 'Questreihe abgeschlossen.' };
+
+    const questId = `${villageId}:profession:${normalizedProfession}:${stage}`;
+    const activeQuest = (questState.activeSideQuests || []).find(quest => quest.id === questId);
+    if (activeQuest) return { state: 'active', quest: activeQuest, reason: null };
+
+    const requiredTrust = Math.max(0, Number(template.requiredTrust) || 0);
+    if ((Number(village.trust) || 0) < requiredTrust) {
+        return {
+            state: 'locked', quest: null,
+            reason: `${requiredTrust} Vertrauen in diesem Dorf erforderlich.`
+        };
+    }
+    const requiredStoryIndex = Math.max(0, Number(template.requiredStoryIndex) || 0);
+    if ((Number(mainQuestIndex) || 0) < requiredStoryIndex) {
+        return {
+            state: 'locked', quest: null,
+            reason: 'Diese Aufgabe wird erst nach der Hauptgeschichte verfügbar.'
+        };
+    }
+
+    return {
+        state: 'available',
+        reason: null,
+        quest: {
+            id: questId,
+            templateId: `profession:${normalizedProfession}:${stage}`,
+            villageId,
+            professionIdx: normalizedProfession,
+            title: template.title,
+            objective: {
+                ...template.objective,
+                current: 0,
+                ...(village.center ? { target: { ...village.center } } : {})
+            },
+            reward: { ...template.reward },
+            trustReward: template.trustReward,
+            dialogue: { ...template.dialogue },
+            chain: { professionIdx: normalizedProfession, stage }
+        }
+    };
 }
 
 export function addVillageTrust(questState, villageId, amount) {
@@ -365,6 +564,7 @@ function eventMatchesObjective(objective, event) {
     if (objective.itemType && objective.itemType !== event.itemType) return false;
     if (objective.mobType && objective.mobType !== event.mobType) return false;
     if (objective.structureKind && objective.structureKind !== event.structureKind) return false;
+    if (objective.bossType && objective.bossType !== event.bossType) return false;
     if ((objective.type === 'place' || objective.type === 'defend') && !isInsideObjectiveArea(objective, event.position)) return false;
     return true;
 }
@@ -402,7 +602,16 @@ export function completeSideQuest(questState, questId, dayCount = 0) {
     if (!questState.completedQuestIds.includes(quest.id)) questState.completedQuestIds.push(quest.id);
     addVillageTrust(questState, quest.villageId, quest.trustReward || 0);
     const village = questState.villages?.[quest.villageId];
-    if (village) village.nextReplacementDay = Math.max(0, Math.floor(Number(dayCount) || 0)) + 1;
+    if (village) {
+        village.nextReplacementDay = Math.max(0, Math.floor(Number(dayCount) || 0)) + 1;
+        if (quest.chain && Number.isInteger(quest.chain.professionIdx) && Number.isInteger(quest.chain.stage)) {
+            if (!village.professionChainProgress || typeof village.professionChainProgress !== 'object') {
+                village.professionChainProgress = {};
+            }
+            const currentStage = Math.max(0, Math.floor(Number(village.professionChainProgress[quest.chain.professionIdx]) || 0));
+            village.professionChainProgress[quest.chain.professionIdx] = Math.max(currentStage, quest.chain.stage + 1);
+        }
+    }
     if (questState.trackedTarget?.questId === quest.id) questState.trackedTarget = { kind: 'main' };
     return quest;
 }

@@ -6,6 +6,7 @@ const BLOCK = Object.freeze({
     WORKBENCH: 28,
     COAL_ORE: 56,
     IRON_ORE: 57,
+    GOLD_ORE: 58,
     FURNACE: 59,
     CHEST: 75,
     ICE: 78,
@@ -531,12 +532,43 @@ function stampDungeonGate(candidate, chunk, world, palette) {
     }
 }
 
+function ritualAltarFor(candidate) {
+    const rewardRoom = candidate.plan.rooms.find(room => room.role === 'reward');
+    const x = candidate.x + rewardRoom.x;
+    const y = candidate.plan.baseY + rewardRoom.y;
+    const z = candidate.z + rewardRoom.z - 2;
+    return {
+        x,
+        y,
+        z,
+        interaction: { x, y: y + 1, z },
+        spawn: { x, y: y + 1, z: z + 3 },
+        blocks: [
+            { x: x - 1, y, z },
+            { x, y, z },
+            { x: x + 1, y, z },
+            { x, y: y + 1, z }
+        ]
+    };
+}
+
+function stampRitualAltar(candidate, chunk, world) {
+    const altar = ritualAltarFor(candidate);
+    setBlock(chunk.data, chunk, world, altar.x - 1, altar.y, altar.z, BLOCK.MOSSY_STONE);
+    setBlock(chunk.data, chunk, world, altar.x, altar.y, altar.z, BLOCK.MOSSY_STONE);
+    setBlock(chunk.data, chunk, world, altar.x + 1, altar.y, altar.z, BLOCK.MOSSY_STONE);
+    setBlock(chunk.data, chunk, world, altar.x, altar.y + 1, altar.z, BLOCK.GOLD_ORE);
+    setBlock(chunk.data, chunk, world, altar.x - 1, altar.y + 1, altar.z, BLOCK.TORCH);
+    setBlock(chunk.data, chunk, world, altar.x + 1, altar.y + 1, altar.z, BLOCK.TORCH);
+}
+
 function stampDungeon(candidate, chunk, world) {
     const palette = dungeonPaletteForTheme(candidate.plan.theme);
     for (const room of candidate.plan.rooms) stampDungeonRoom(candidate, room, chunk, world, palette);
     for (const cell of candidate.plan.passages) carveDungeonPassage(candidate, cell, chunk, world, palette);
     for (const room of candidate.plan.rooms) decorateDungeonRoom(candidate, room, chunk, world, palette);
     stampDungeonGate(candidate, chunk, world, palette);
+    stampRitualAltar(candidate, chunk, world);
 
     for (let y = candidate.plan.baseY; y <= candidate.surfaceY + 1; y++) {
         setBlock(chunk.data, chunk, world, candidate.x, y, candidate.z, BLOCK.AIR);
@@ -571,6 +603,7 @@ function publicMineStructure(candidate) {
 
 function publicDungeonStructure(candidate) {
     const gate = candidate.plan.gate;
+    const altar = ritualAltarFor(candidate);
     return {
         id: candidate.id,
         kind: candidate.kind,
@@ -586,6 +619,12 @@ function publicDungeonStructure(candidate) {
             y: candidate.plan.baseY + gate.y,
             z: candidate.z + gate.z,
             widthAxis: 'z'
+        },
+        altar: {
+            structureId: candidate.id,
+            interaction: { ...altar.interaction },
+            spawn: { ...altar.spawn },
+            blocks: altar.blocks.map(block => ({ ...block }))
         },
         progression: {
             keyRequired: true,

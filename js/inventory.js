@@ -1,7 +1,7 @@
 /* js/inventory.js - Butzcraft Inventory Module */
-import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260720q';
-import { craftingRecipes } from './recipes.js?v=20260720q';
-import { initRecipeBook } from './recipe_book.js?v=20260720q';
+import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260721b';
+import { craftingRecipes, getRecipeTrustLockReason } from './recipes.js?v=20260721b';
+import { initRecipeBook } from './recipe_book.js?v=20260721b';
 import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717z';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
@@ -651,6 +651,8 @@ function formatMissingItems(missing) {
 
 function getRecipeLockReason(recipe) {
     if (recipe.gridSize === 3 && craftingStation !== 'workbench') return 'Werkbank erforderlich.';
+    const trustLock = getRecipeTrustLockReason(recipe, window.getHighestVillageTrust?.() || 0);
+    if (trustLock) return trustLock;
     const missing = getMissingRecipeItems(recipe);
     return missing.length > 0 ? formatMissingItems(missing) : '';
 }

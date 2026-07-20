@@ -62,8 +62,8 @@ const STORY_OBJECTIVES = [
     {
         label: 'Die Blutmondquelle',
         text: 'Aktiviere das Blutmondritual',
-        hint: 'Untersuche den Ritualkern an der Belohnungstruhe erneut und bereite dich auf einen schweren Kampf vor.',
-        touchHint: 'Untersuche den Ritualkern an der Belohnungstruhe erneut und bereite dich auf einen schweren Kampf vor.'
+        hint: 'Aktiviere den leuchtenden Ritualaltar in der Endkammer und bereite dich auf einen schweren Kampf vor.',
+        touchHint: 'Aktiviere den leuchtenden Ritualaltar in der Endkammer und bereite dich auf einen schweren Kampf vor.'
     },
     {
         label: 'Wächter der Quelle',

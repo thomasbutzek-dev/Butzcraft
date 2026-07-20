@@ -24,6 +24,7 @@ beforeEach(() => {
     document.body.innerHTML = `
         <div id="trade-overlay" style="display:none">
             <div id="trade-title"></div>
+            <div id="npc-dialogue"><p id="npc-dialogue-text"></p><div id="npc-dialogue-actions"></div></div>
             <div id="trade-grid"></div>
         </div>
     `;
@@ -129,8 +130,8 @@ describe('NPC trade transactions', () => {
         };
 
         openTradeUI(npc, { unlock() {} });
-        expect(document.querySelector('.trade-label').textContent).toContain('9×');
-        document.querySelector('.trade-btn').click();
+        expect(document.querySelector('#trade-row-0 .trade-label').textContent).toContain('9×');
+        document.querySelector('#trade-row-0 .trade-btn').click();
 
         expect(inventory.inventorySlots[0]).toEqual({ type: 60, count: 1 });
         expect(inventory.inventorySlots.some(slot => slot.type === 61 && slot.count === 1)).toBe(true);
@@ -172,5 +173,34 @@ describe('NPC trade transactions', () => {
         expect(questState.activeSideQuests).toEqual([]);
         expect(questState.villages['village:1,2'].trust).toBe(2);
         expect(inventory.inventorySlots.some(slot => slot.type === 61 && slot.count === 1)).toBe(true);
+    });
+
+    it('offers a profession chain through an NPC conversation', () => {
+        const questState = {
+            mainQuestIndex: 2,
+            trackedTarget: { kind: 'main' },
+            completedQuestIds: [], abandonedQuestIds: [], activeSideQuests: [],
+            villages: {
+                'village:1,2': {
+                    id: 'village:1,2', trust: 0, center: { x: 10, z: 10 },
+                    offers: [], professionChainProgress: {}, nextOfferRefreshDay: 3
+                }
+            }
+        };
+        window.getQuestState = () => questState;
+        const npc = {
+            villageId: 'village:1,2', displayName: 'Hagen', professionIdx: 0,
+            profession: { name: 'Schmied', quest: null, trades: [] }
+        };
+
+        openTradeUI(npc, { unlock() {} });
+        expect(document.getElementById('npc-dialogue-text').textContent).toContain('Esse');
+        expect([...document.querySelectorAll('.dialogue-choice')].map(button => button.dataset.dialogueAction))
+            .toEqual(['accept', 'ask', 'trade', 'decline']);
+
+        document.querySelector('[data-dialogue-action="accept"]').click();
+        expect(questState.activeSideQuests[0]).toMatchObject({
+            title: 'Die kalte Esse', chain: { professionIdx: 0, stage: 0 }
+        });
     });
 });

@@ -1,4 +1,4 @@
-import { addItemToInventory } from './inventory.js?v=20260720q';
+import { addItemToInventory } from './inventory.js?v=20260721b';
 
 export function addItemOrCreateDrop(type, count, createDrop) {
     const result = addItemToInventory(type, count);

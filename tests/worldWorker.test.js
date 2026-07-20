@@ -95,7 +95,13 @@ describe('World worker buffer recycling', () => {
         const structure = {
             id: 'dungeon:0,0:v2',
             kind: 'dungeon',
-            gate: { x: 8, y: 18, z: 9, widthAxis: 'z' }
+            gate: { x: 8, y: 18, z: 9, widthAxis: 'z' },
+            altar: {
+                structureId: 'dungeon:0,0:v2',
+                interaction: { x: 12, y: 17, z: 13 },
+                spawn: { x: 12, y: 17, z: 16 },
+                blocks: [{ x: 12, y: 17, z: 13 }]
+            }
         };
         const message = {
             type: 'terrain',
@@ -113,6 +119,10 @@ describe('World worker buffer recycling', () => {
         expect([...world.structures.keys()]).toEqual([structure.id]);
         expect(world.structureChests.get('chest,4,20,5')).toMatchObject({ role: 'dungeon_key' });
         expect(world.structureGates.get('8,18,9')).toMatchObject({ structureId: structure.id });
+        expect(world.structureAltars.get('12,17,13')).toMatchObject({
+            structureId: structure.id,
+            spawn: { x: 12, y: 17, z: 16 }
+        });
         expect(world.spawnerMeta['6,19,7']).toMatchObject({ structureId: structure.id, role: 'upper-combat' });
     }, 15000);
 

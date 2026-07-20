@@ -7,7 +7,17 @@
  *  - Negativ-Tests: falsche Pattern matchen NICHT (kein false-positive Crafting)
  */
 import { describe, it, expect } from 'vitest';
-import { matchRecipe, normalizeRecipe, craftingRecipes } from '../js/recipes.js';
+import { getRecipeTrustLockReason, matchRecipe, normalizeRecipe, craftingRecipes } from '../js/recipes.js';
+
+describe('trust recipes', () => {
+    it('keeps specialist recipes visible but locked until enough trust was earned', () => {
+        const specialist = craftingRecipes.find(recipe => recipe.name === 'Meisterklinge');
+
+        expect(specialist).toBeTruthy();
+        expect(getRecipeTrustLockReason(specialist, 7)).toBe('Verbündetes Dorf erforderlich (12 Vertrauen).');
+        expect(getRecipeTrustLockReason(specialist, 12)).toBe('');
+    });
+});
 
 describe('normalizeRecipe', () => {
     it('konvertiert Legacy-Form zu shaped/2×2', () => {

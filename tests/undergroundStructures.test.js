@@ -78,6 +78,7 @@ describe('underground structure generation', () => {
     });
 
     it('generates a two-level dungeon expedition with key, gate, combat and reward metadata', () => {
+        const chunks = new Map();
         const structures = [];
         const chests = [];
         const spawners = [];
@@ -97,14 +98,12 @@ describe('underground structure generation', () => {
 
         for (let cx = 0; cx < 24; cx++) {
             for (let cz = 0; cz < 24; cz++) {
+                const data = new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
                 const result = generateUndergroundStructures({
                     ...context,
-                    chunk: {
-                        cx,
-                        cz,
-                        data: new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE)
-                    }
+                    chunk: { cx, cz, data }
                 });
+                chunks.set(`${cx},${cz}`, data);
                 structures.push(...result.structures);
                 chests.push(...result.chests);
                 spawners.push(...result.spawners);
@@ -127,6 +126,14 @@ describe('underground structure generation', () => {
         });
         expect(dungeons[0].roomCount).toBeGreaterThanOrEqual(10);
         expect(dungeons[0].roomCount).toBeLessThanOrEqual(16);
+        expect(dungeons[0].altar).toMatchObject({
+            structureId: dungeons[0].id,
+            interaction: expect.objectContaining({ y: expect.any(Number) }),
+            spawn: expect.objectContaining({ y: expect.any(Number) })
+        });
+        expect(dungeons[0].altar.blocks).toHaveLength(4);
+        expect(blockAt(chunks, dungeons[0].altar.interaction.x, dungeons[0].altar.interaction.y, dungeons[0].altar.interaction.z)).toBe(58);
+        expect(blockAt(chunks, dungeons[0].altar.interaction.x, dungeons[0].altar.interaction.y - 1, dungeons[0].altar.interaction.z)).toBe(84);
 
         const dungeonChests = chests.filter(chest => chest.structureId === dungeons[0].id);
         expect(dungeonChests.map(chest => chest.role).sort()).toEqual(['dungeon_key', 'dungeon_reward']);

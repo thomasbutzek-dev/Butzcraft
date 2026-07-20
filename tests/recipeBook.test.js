@@ -119,4 +119,24 @@ describe('recipe book initialization', () => {
         document.querySelector('[data-category="Werkzeuge"]').click();
         expect([...document.querySelectorAll('.recipe-entry')].map(entry => entry.hidden)).toEqual([true, false]);
     });
+
+    it('shows a custom title for a visible trust recipe', () => {
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 26: 2, 27: 3, 102: 4 },
+            [{
+                name: 'Verstärkter Dorfzaun', requiredTrust: 3, category: 'Bauen',
+                kind: 'shaped', gridSize: 3,
+                pattern: [26, 27, 26, 26, 27, 26, 0, 0, 0],
+                result: { type: 102, count: 8 }
+            }],
+            { PLANKS: 26, STICK: 27, WOOD_FENCE: 102 },
+            { PLANKS: 'Holzbretter', STICK: 'Stock', WOOD_FENCE: 'Holzzaun' },
+            vi.fn(),
+            { getLockReason: () => 'Bekanntes Dorf erforderlich (3 Vertrauen).' }
+        );
+
+        expect(document.querySelector('.recipe-name').textContent).toBe('Verstärkter Dorfzaun');
+        expect(document.querySelector('.recipe-entry').classList.contains('locked')).toBe(true);
+    });
 });

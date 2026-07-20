@@ -57,7 +57,18 @@ export const craftingRecipes = [
     { category: 'Kampf', kind: 'shapeless', ingredients: [3,27], result: { type: 95, count: 4 } }, // 4 Pfeile
     // Ofen (8x Stein im Ring)
     { category: 'Versorgung', kind: 'shaped', gridSize: 3, pattern: [3,3,3, 3,0,3, 3,3,3], result: { type: 59, count: 1 } }, // Ofen
+    // Dorfvertrauen: sichtbar, aber erst durch den besten erreichten Vertrauenswert nutzbar
+    { name: 'Verstärkter Dorfzaun', requiredTrust: 3, category: 'Bauen', kind: 'shaped', gridSize: 3, pattern: [26,27,26, 26,27,26, 0,0,0], result: { type: 102, count: 8 } },
+    { name: 'Jägerpfeile', requiredTrust: 7, category: 'Kampf', kind: 'shapeless', ingredients: [3,27,31], result: { type: 95, count: 8 } },
+    { name: 'Meisterklinge', requiredTrust: 12, category: 'Kampf', kind: 'shaped', gridSize: 3, pattern: [0,61,0, 0,61,0, 62,27,62], result: { type: 91, count: 2 } }
 ];
+
+export function getRecipeTrustLockReason(recipe, trust = 0) {
+    const requiredTrust = Math.max(0, Math.floor(Number(recipe?.requiredTrust) || 0));
+    if (requiredTrust <= Math.max(0, Math.floor(Number(trust) || 0))) return '';
+    const tier = requiredTrust >= 12 ? 'Verbündet' : requiredTrust >= 7 ? 'Vertraut' : 'Bekannt';
+    return `${tier}es Dorf erforderlich (${requiredTrust} Vertrauen).`;
+}
 
 /**
  * Normalisiert ein Recipe-Objekt zu interner Form. Idempotent.

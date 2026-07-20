@@ -3,7 +3,7 @@
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717z';
-        import { World, getBiomeAt, BIOMES } from './world.js?v=20260719b';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260721b';
         import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260720q';
         import { BloodMoonBoss } from './bloodMoonBoss.js?v=20260720a';
 
@@ -13,12 +13,12 @@
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260719a';
         import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260720q';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260720q';
+        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260721b';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260721b';
         import { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } from './itemCollection.js?v=20260718c';
         import { getOnboardingProgress } from './onboarding.js?v=20260718f';
-        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260720q';
-        import { applyQuestEvent, createQuestState, ensureVillageState, getNpcIdentity, getVillageId, grantQuestItem, hasQuestItems, normalizeQuestState, refreshVillageOffers } from './quests.js?v=20260720q';
+        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260721b';
+        import { applyQuestEvent, createQuestState, ensureVillageState, getNpcIdentity, getVillageId, grantQuestItem, hasQuestItems, normalizeQuestState, refreshVillageOffers } from './quests.js?v=20260721b';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260719a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260719a';
         import { WeatherSystem } from './weather.js?v=20260719a';
@@ -26,7 +26,7 @@
         import { NPC } from './npc.js?v=20260720q';
         import { preloadEntityMaterials } from './entityMaterials.js?v=20260719a';
         import { Minecart } from './minecart.js?v=20260719a';
-        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260720q';
+        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260721b';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260718b';
         import { SaveRepository } from './saveRepository.js?v=20260718a';
         import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260719a';
@@ -95,6 +95,7 @@
         window.npcs = npcs;
         window.getQuestState = () => questState;
         window.getQuestDayCount = () => Math.floor(time / DAY_DURATION);
+        window.getHighestVillageTrust = () => Math.max(0, ...Object.values(questState.villages || {}).map(village => Number(village.trust) || 0));
         window.getCurrentStoryObjective = () => currentStoryObjective;
         window.getQuestNavigationContext = () => {
             const playerPosition = controls?.getObject?.()?.position || null;
@@ -907,6 +908,7 @@
             world.structures.clear();
             world.structureChests.clear();
             world.structureGates.clear();
+            world.structureAltars.clear();
             world.structureProgress = {};
         }
 

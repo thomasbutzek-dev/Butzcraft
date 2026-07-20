@@ -5,17 +5,19 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName, inventorySlots, tryAddItemsToInventory, tryExchangeInventory } from './inventory.js?v=20260720q';
+import { createBlockHTML, getItemName, inventorySlots, tryAddItemsToInventory, tryExchangeInventory } from './inventory.js?v=20260721b';
 import {
     acceptSideQuest,
     completeSideQuest,
     getAdjustedTrade,
+    getProfessionChainStatus,
     getQuestProgress,
     getSideQuestProgress,
     getTrustTier
-} from './quests.js?v=20260720q';
+} from './quests.js?v=20260721b';
+import { getNpcConversation } from './npcDialogue.js?v=20260721b';
 import { Game } from './Game.js?v=20260716b';
-import { STORY_EVENTS } from './storyProgress.js?v=20260720q';
+import { STORY_EVENTS } from './storyProgress.js?v=20260721b';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 let currentNPC = null;
@@ -41,6 +43,8 @@ export function openTradeUI(npc, controls) {
         const npcName = npc.displayName && npc.displayName !== prof.name ? `${npc.displayName} · ` : '';
         title.textContent = `🤝 ${npcName}${prof.name}${villageState ? ` · ${trustTier.label}` : ''}`;
     }
+
+    renderNpcDialogue(overlay, npc, questState, villageState);
 
     // Trade-Slots befüllen
     const grid = overlay.querySelector('#trade-grid');
@@ -95,9 +99,69 @@ export function openTradeUI(npc, controls) {
     });
 
     overlay.style.display = 'flex';
-    activateDialog(overlay, '.trade-btn:not(:disabled), .panel-close-button');
+    activateDialog(overlay, '.dialogue-choice:not(:disabled), .trade-btn:not(:disabled), .panel-close-button');
     window.dispatchEvent(new CustomEvent(STORY_EVENTS.VILLAGER_MET, { detail: { npc } }));
     if (controls) controls.unlock();
+}
+
+function ensureDialogueElements(overlay) {
+    let dialogue = overlay.querySelector('#npc-dialogue');
+    if (dialogue) return dialogue;
+    dialogue = document.createElement('div');
+    dialogue.id = 'npc-dialogue';
+    dialogue.className = 'npc-dialogue';
+    dialogue.setAttribute('aria-live', 'polite');
+    dialogue.innerHTML = '<p id="npc-dialogue-text"></p><div id="npc-dialogue-actions" class="npc-dialogue-actions"></div>';
+    overlay.querySelector('#trade-grid')?.before(dialogue);
+    return dialogue;
+}
+
+function renderNpcDialogue(overlay, npc, questState, villageState) {
+    const dialogue = ensureDialogueElements(overlay);
+    const text = dialogue.querySelector('#npc-dialogue-text');
+    const actions = dialogue.querySelector('#npc-dialogue-actions');
+    const conversation = getNpcConversation({ npc, questState, villageState, inventorySlots });
+    text.textContent = conversation.text;
+    actions.innerHTML = '';
+    for (const action of conversation.actions) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'dialogue-choice';
+        button.dataset.dialogueAction = action.id;
+        button.textContent = action.label;
+        button.addEventListener('click', () => {
+            if (action.id === 'accept' && conversation.quest) {
+                const result = acceptSideQuest(questState, conversation.quest);
+                if (!result.accepted) {
+                    text.textContent = result.reason === 'quest-limit'
+                        ? 'Du hast bereits drei Nebenquests. Schließe eine davon ab oder brich sie im Journal ab.'
+                        : 'Diesen Auftrag hast du bereits angenommen.';
+                    return;
+                }
+                showTradeMessage(`Quest angenommen: ${conversation.quest.title}`, '#ffe066');
+                openTradeUI(npc);
+                return;
+            }
+            if (action.id === 'turn-in' && conversation.quest) {
+                executeVillageQuest(conversation.quest, questState);
+                return;
+            }
+            if (action.id === 'progress') {
+                text.textContent = conversation.details;
+                return;
+            }
+            if (action.id === 'ask') {
+                text.textContent = conversation.lore;
+                return;
+            }
+            if (action.id === 'trade') {
+                text.textContent = 'Sieh dich um. Vertrauen macht jedes Geschäft für beide Seiten besser.';
+                return;
+            }
+            text.textContent = 'Vielleicht ein anderes Mal. Die Aufgabe bleibt verfügbar.';
+        });
+        actions.appendChild(button);
+    }
 }
 
 function buildVillageQuestRows(npc, questState, villageState) {
@@ -117,6 +181,10 @@ function buildVillageQuestRows(npc, questState, villageState) {
         if (activeIds.has(offer.id) || completedIds.has(offer.id) || abandonedIds.has(offer.id)) continue;
         rows.push(buildVillageQuestOfferRow(offer, questState));
     }
+    const chainStatus = getProfessionChainStatus(questState, npc.villageId, professionIdx, questState.mainQuestIndex || 0);
+    if (chainStatus.state === 'available' && chainStatus.quest) {
+        rows.push(buildVillageQuestOfferRow(chainStatus.quest, questState, true));
+    }
     return rows;
 }
 
@@ -127,12 +195,13 @@ function objectiveText(objective) {
     if (objective.type === 'place') return `${objective.required}× ${getItemName(objective.itemType)} im Dorf platzieren`;
     if (objective.type === 'hunt') return `${objective.required}× ${objective.mobType} besiegen`;
     if (objective.type === 'structure') return `${objective.structureKind === 'mine' ? 'Mine' : 'Dungeon'} abschließen`;
+    if (objective.type === 'boss') return 'Blutmondecho am Ritualaltar besiegen';
     return objective.type;
 }
 
-function buildVillageQuestOfferRow(offer, questState) {
+function buildVillageQuestOfferRow(offer, questState, isChain = false) {
     const row = document.createElement('div');
-    row.className = 'trade-row quest-row quest-offer-row';
+    row.className = `trade-row quest-row quest-offer-row${isChain ? ' profession-chain-row' : ''}`;
     const details = document.createElement('div');
     details.className = 'trade-item';
     details.innerHTML = `<strong>${offer.title}</strong><span class="trade-label">${objectiveText(offer.objective)}</span>`;

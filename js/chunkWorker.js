@@ -4,7 +4,7 @@
 // Läuft komplett off-main-thread für ruckelfreies Gameplay.
 // ============================================================
 
-import { generateUndergroundStructures } from './undergroundStructures.js?v=20260720a';
+import { generateUndergroundStructures } from './undergroundStructures.js?v=20260721b';
 
 let CHUNK_SIZE = 16, CHUNK_HEIGHT = 64, WATER_LEVEL = 32, CLOUD_HEIGHT = 50;
 let BLOCK_COLORS = {};

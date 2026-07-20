@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260720q">
+    <link rel="stylesheet" href="style.css?v=20260721b">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -472,6 +472,10 @@
     <div id="trade-overlay" role="dialog" aria-modal="true" aria-labelledby="trade-title" aria-hidden="true" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.75); z-index:500; align-items:center; justify-content:center;">
         <div class="trade-panel">
             <div id="trade-title" class="panel-title" style="text-align:center; font-size:20px; margin-bottom:20px; color:#FFD700;">🤝 Händler</div>
+            <div id="npc-dialogue" class="npc-dialogue" aria-live="polite">
+                <p id="npc-dialogue-text"></p>
+                <div id="npc-dialogue-actions" class="npc-dialogue-actions"></div>
+            </div>
             <div id="trade-grid" style="display:flex; flex-direction:column; gap:10px; max-height:400px; overflow-y:auto; padding-right:8px;">
                 <!-- Wird per JS befüllt -->
             </div>
@@ -496,7 +500,7 @@
 
     <script
         type="module"
-        src="./js/GameMain.js?v=20260720q"
+        src="./js/GameMain.js?v=20260721b"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

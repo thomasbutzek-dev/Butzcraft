@@ -1,5 +1,5 @@
-import { inventorySlots } from './inventory.js?v=20260720q';
-import { abandonSideQuest, getSideQuestProgress, getTrustTier } from './quests.js?v=20260720q';
+import { inventorySlots } from './inventory.js?v=20260721b';
+import { abandonSideQuest, getSideQuestProgress, getTrustTier } from './quests.js?v=20260721b';
 import { getCompassGuidance, resolveHomeTarget } from './questNavigation.js?v=20260720q';
 
 const PROFESSION_NAMES = ['Schmied', 'Bauer', 'Händler', 'Bibliothekar'];

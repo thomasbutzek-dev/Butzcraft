@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260719a';
 import { openFurnace } from './furnace.js?v=20260719a';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260720q';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260721b';
         import { BLOCK_COLORS } from './blocks.js?v=20260717z';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260718b';
@@ -11,8 +11,8 @@ import { PlayerArrowProjectile } from './playerArrow.js?v=20260720q';
 import { getFoodInfo } from './foodRules.js?v=20260716a';
 import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260719a';
 import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-import { openTradeUI } from './tradeUI.js?v=20260720q';
-import { STORY_EVENTS } from './storyProgress.js?v=20260720q';
+import { openTradeUI } from './tradeUI.js?v=20260721b';
+import { STORY_EVENTS } from './storyProgress.js?v=20260721b';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 const { MAX_HUNGER, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
@@ -640,6 +640,11 @@ export class PlayerInteraction {
                 p.add(h.face.normal.clone().multiplyScalar(-0.5));
                 const bx = Math.floor(p.x), by = Math.floor(p.y), bz = Math.floor(p.z);
                 const brokenType = this.world.getBlock(bx, by, bz);
+                if (this.world.structureAltars?.has(`${bx},${by},${bz}`)) {
+                    this.cancelMining();
+                    this.showMessage('Der Ritualaltar widersteht deinen Werkzeugen.', '#ff647c', 18);
+                    return;
+                }
                 
                 const toolType = currentItem && currentItem.count > 0 ? currentItem.type : 0;
                 const plan = getMiningPlan(brokenType, toolType);
@@ -652,6 +657,7 @@ export class PlayerInteraction {
                 const harvestX = Math.floor(p.x), harvestY = Math.floor(p.y), harvestZ = Math.floor(p.z);
                 const harvestBlock = this.world.getBlock(harvestX, harvestY, harvestZ);
 
+                if (this._tryActivateRitualAltar(harvestX, harvestY, harvestZ)) return;
                 if (this._tryUnlockStructureGate(harvestX, harvestY, harvestZ)) return;
 
                 if (harvestBlock === 33 || harvestBlock === 34) {
@@ -871,14 +877,6 @@ export class PlayerInteraction {
         const key = `chest,${x},${y},${z}`;
         const structureChest = this.world.structureChests?.get(key);
         const wasLooted = this.world.lootedChests.has(key);
-        if (wasLooted && structureChest?.role === 'dungeon_reward' && typeof window.tryActivateBloodMoonRitual === 'function') {
-            const result = window.tryActivateBloodMoonRitual({
-                structureId: structureChest.structureId,
-                position: { x, y: y + 1.5, z }
-            });
-            if (result?.message) this.showMessage(result.message, result.ok ? '#ff647c' : '#ffe066', 18);
-            if (result?.ok) return;
-        }
         // Loot nur einmal generieren: lootedChests merkt sich alle je geöffneten Kisten.
         // Auch nach Save/Load wird kein Loot mehr nachgefüllt.
         if (!wasLooted) {
@@ -983,6 +981,24 @@ export class PlayerInteraction {
                 else this._controls.lock();
             }
         };
+    }
+
+    _tryActivateRitualAltar(x, y, z) {
+        const altar = this.world.structureAltars?.get(`${x},${y},${z}`);
+        if (!altar) return false;
+        const result = typeof window.tryActivateBloodMoonRitual === 'function'
+            ? window.tryActivateBloodMoonRitual({
+                structureId: altar.structureId,
+                position: { ...altar.spawn }
+            })
+            : { ok: false, message: 'Der Ritualaltar bleibt still.' };
+        if (result.ok) {
+            if (!this.world.structureProgress) this.world.structureProgress = {};
+            const progress = this.world.structureProgress[altar.structureId] || {};
+            this.world.structureProgress[altar.structureId] = { ...progress, ritualActivated: true };
+        }
+        if (result.message) this.showMessage(result.message, result.ok ? '#ff647c' : '#ffe066', 18);
+        return true;
     }
 
     // Druckplatten-Schaden prüfen — wird aus dem Game-Loop aufgerufen

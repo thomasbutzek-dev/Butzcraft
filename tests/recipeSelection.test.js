@@ -24,7 +24,7 @@ const {
     openWorkbenchCrafting,
     toggleInventory
 } = await import('../js/inventory.js');
-const { craftingGridData, craftingResultData } = await import('../js/crafting.js');
+const { checkCrafting, craftingGridData, craftingResultData } = await import('../js/crafting.js');
 
 const controls = {
     lock: vi.fn(),
@@ -64,10 +64,12 @@ beforeEach(() => {
     recipeBookState.options = null;
     controls.lock.mockClear();
     controls.unlock.mockClear();
+    window.getHighestVillageTrust = () => 0;
 });
 
 afterEach(() => {
     if (isInventoryOpened()) toggleInventory(true, false, controls);
+    delete window.getHighestVillageTrust;
 });
 
 describe('recipe selection', () => {
@@ -123,6 +125,20 @@ describe('recipe selection', () => {
         expect(getCraftingStation()).toBe('workbench');
         expect(document.getElementById('crafting-grid').children).toHaveLength(9);
         expect(craftingResultData).toEqual({ type: 63, count: 1 });
+    });
+
+    it('blocks manually entered trust recipes until the required village trust was reached', () => {
+        openWorkbenchCrafting(true, false, controls);
+        [0, 61, 0, 0, 61, 0, 62, 27, 62].forEach((type, index) => {
+            craftingGridData[index] = { type, count: type === 0 ? 0 : 1 };
+        });
+
+        checkCrafting();
+        expect(craftingResultData).toEqual({ type: 0, count: 0 });
+
+        window.getHighestVillageTrust = () => 12;
+        checkCrafting();
+        expect(craftingResultData).toEqual({ type: 91, count: 2 });
     });
 
     it('crafts directly into the inventory and gives tools full durability', () => {

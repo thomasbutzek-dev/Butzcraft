@@ -1,4 +1,4 @@
-import { normalizeRecipe } from './recipes.js?v=20260720q';
+import { normalizeRecipe } from './recipes.js?v=20260721b';
 
 const recipeBookStates = new WeakMap();
 
@@ -225,8 +225,8 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
 
             const nameDiv = document.createElement('div');
             nameDiv.className = 'recipe-name';
-            nameDiv.textContent = formattedName;
-            entry.dataset.recipeName = formattedName.toLocaleLowerCase('de');
+            nameDiv.textContent = recipe.name || formattedName;
+            entry.dataset.recipeName = (recipe.name || formattedName).toLocaleLowerCase('de');
 
             resultContainer.appendChild(resultSlot);
             resultContainer.appendChild(nameDiv);
