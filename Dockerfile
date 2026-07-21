@@ -19,7 +19,7 @@ COPY --chown=node:node server.js ./
 COPY --chown=node:node --from=build /app/dist ./dist
 COPY --chown=node:node --from=build /app/sounds ./sounds
 
-RUN mkdir -p /app/saves && chown node:node /app/saves
+RUN mkdir -p /app/saves /app/site-content/uploads && chown -R node:node /app/saves /app/site-content
 
 ENV NODE_ENV=production
 ENV HOST=0.0.0.0

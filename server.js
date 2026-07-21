@@ -4,6 +4,7 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -39,6 +40,163 @@ app.use('/api', cors(corsOptions));
 // Body-Limit: 5MB reicht für realistische Saves (Welt + Inventar + Mods).
 // Vorher 50MB → DoS-Vektor (RAM-Exhaustion durch parallele große Requests).
 app.use(bodyParser.json({ limit: '5mb' }));
+
+const siteContentDir = path.resolve(process.env.SITE_CONTENT_DIR || path.join(__dirname, 'site-content'));
+const siteMediaDir = path.join(siteContentDir, 'uploads');
+const siteContentFile = path.join(siteContentDir, 'content.json');
+const adminUsername = process.env.SITE_ADMIN_USER || 'admin';
+const adminPassword = process.env.SITE_ADMIN_PASSWORD || '';
+const adminSessions = new Map();
+const loginAttempts = new Map();
+const ADMIN_COOKIE = 'butzcraft_admin';
+const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
+const CONTENT_KEY = /^[a-z0-9.-]{1,80}$/;
+
+fs.mkdirSync(siteMediaDir, { recursive: true });
+
+function emptySiteContent() {
+    return { texts: {}, images: {}, updatedAt: null };
+}
+
+function readSiteContent() {
+    if (!fs.existsSync(siteContentFile)) return emptySiteContent();
+    try {
+        const content = JSON.parse(fs.readFileSync(siteContentFile, 'utf8'));
+        return {
+            texts: content.texts && typeof content.texts === 'object' ? content.texts : {},
+            images: content.images && typeof content.images === 'object' ? content.images : {},
+            updatedAt: content.updatedAt || null
+        };
+    } catch (error) {
+        console.error(`Site content could not be read: ${error.message}`);
+        return emptySiteContent();
+    }
+}
+
+function writeSiteContent(content) {
+    fs.writeFileSync(siteContentFile, JSON.stringify(content, null, 2));
+}
+
+function parseCookies(req) {
+    return Object.fromEntries((req.headers.cookie || '').split(';').map(part => part.trim()).filter(Boolean).map(part => {
+        const separator = part.indexOf('=');
+        return separator === -1 ? [part, ''] : [part.slice(0, separator), part.slice(separator + 1)];
+    }));
+}
+
+function safeEqual(actual, expected) {
+    const actualBuffer = crypto.createHash('sha256').update(String(actual)).digest();
+    const expectedBuffer = crypto.createHash('sha256').update(String(expected)).digest();
+    return crypto.timingSafeEqual(actualBuffer, expectedBuffer);
+}
+
+function getAdminSession(req) {
+    const token = parseCookies(req)[ADMIN_COOKIE];
+    const expiresAt = token && adminSessions.get(token);
+    if (!expiresAt || expiresAt <= Date.now()) {
+        if (token) adminSessions.delete(token);
+        return null;
+    }
+    return token;
+}
+
+function requireSiteAdmin(req, res, next) {
+    if (!adminPassword) return res.status(503).json({ error: 'Der Adminmodus ist auf dem Server noch nicht aktiviert.' });
+    if (!getAdminSession(req)) return res.status(401).json({ error: 'Bitte zuerst anmelden.' });
+    next();
+}
+
+function validateSiteContent(input) {
+    const texts = input?.texts;
+    const images = input?.images;
+    if (!texts || typeof texts !== 'object' || Array.isArray(texts) || !images || typeof images !== 'object' || Array.isArray(images)) return null;
+    const textEntries = Object.entries(texts);
+    const imageEntries = Object.entries(images);
+    if (textEntries.length > 100 || imageEntries.length > 30) return null;
+
+    for (const [key, value] of textEntries) {
+        if (!CONTENT_KEY.test(key) || typeof value !== 'string' || value.length > 4000) return null;
+    }
+    for (const [key, value] of imageEntries) {
+        if (!CONTENT_KEY.test(key) || typeof value !== 'string' || !/^\/site-media\/[a-z0-9-]+\.(webp|png|jpg)$/.test(value)) return null;
+    }
+    return { texts, images, updatedAt: new Date().toISOString() };
+}
+
+function validImageSignature(buffer, mimeType) {
+    if (mimeType === 'image/jpeg') return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+    if (mimeType === 'image/png') return buffer.subarray(0, 4).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47]));
+    if (mimeType === 'image/webp') return buffer.subarray(0, 4).toString() === 'RIFF' && buffer.subarray(8, 12).toString() === 'WEBP';
+    return false;
+}
+
+app.use('/site-media', express.static(siteMediaDir, { immutable: true, maxAge: '1y' }));
+
+app.get('/api/site-content', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(readSiteContent());
+});
+
+app.get('/api/admin/session', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    if (!adminPassword) return res.status(503).json({ error: 'Der Adminmodus ist auf dem Server noch nicht aktiviert.' });
+    res.json({ authenticated: Boolean(getAdminSession(req)) });
+});
+
+app.post('/api/admin/login', (req, res) => {
+    if (!adminPassword) return res.status(503).json({ error: 'Der Adminmodus ist auf dem Server noch nicht aktiviert.' });
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const attempt = loginAttempts.get(ip);
+    if (attempt?.blockedUntil > Date.now()) return res.status(429).json({ error: 'Zu viele Versuche. Bitte in 15 Minuten erneut versuchen.' });
+
+    const usernameMatches = safeEqual(req.body?.username || '', adminUsername);
+    const passwordMatches = safeEqual(req.body?.password || '', adminPassword);
+    if (!usernameMatches || !passwordMatches) {
+        const count = (attempt?.count || 0) + 1;
+        loginAttempts.set(ip, count >= 5 ? { count: 0, blockedUntil: Date.now() + 15 * 60 * 1000 } : { count, blockedUntil: 0 });
+        return res.status(401).json({ error: 'Benutzername oder Passwort ist falsch.' });
+    }
+
+    loginAttempts.delete(ip);
+    const token = crypto.randomBytes(32).toString('hex');
+    adminSessions.set(token, Date.now() + ADMIN_SESSION_MS);
+    const secure = isProduction ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${ADMIN_COOKIE}=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${ADMIN_SESSION_MS / 1000}${secure}`);
+    res.json({ authenticated: true });
+});
+
+app.post('/api/admin/logout', requireSiteAdmin, (req, res) => {
+    const token = getAdminSession(req);
+    if (token) adminSessions.delete(token);
+    const secure = isProduction ? '; Secure' : '';
+    res.setHeader('Set-Cookie', `${ADMIN_COOKIE}=; HttpOnly; SameSite=Strict; Path=/; Max-Age=0${secure}`);
+    res.json({ success: true });
+});
+
+app.put('/api/site-content', requireSiteAdmin, (req, res) => {
+    const content = validateSiteContent(req.body);
+    if (!content) return res.status(400).json({ error: 'Die Inhaltsdaten sind ungültig.' });
+    writeSiteContent(content);
+    res.json(content);
+});
+
+app.post('/api/admin/image', requireSiteAdmin, (req, res) => {
+    const match = typeof req.body?.dataUrl === 'string' && req.body.dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/);
+    if (!CONTENT_KEY.test(req.body?.key || '') || !match) return res.status(400).json({ error: 'Das Bild ist ungültig.' });
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length === 0 || buffer.length > 3 * 1024 * 1024 || !validImageSignature(buffer, match[1])) {
+        return res.status(400).json({ error: 'Das Bild ist ungültig oder größer als 3 MB.' });
+    }
+
+    const extension = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[match[1]];
+    const filename = `${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${extension}`;
+    fs.writeFileSync(path.join(siteMediaDir, filename), buffer);
+    res.status(201).json({ url: `/site-media/${filename}` });
+});
+
+app.get('/admin', (req, res) => {
+    res.redirect(302, '/butzcraft-preview.html?edit=1');
+});
 
 const savesDir = path.join(__dirname, 'saves');
 const savesDirResolved = path.resolve(savesDir);

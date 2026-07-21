@@ -10,6 +10,8 @@ const CAMERA_EXTRA_BLOCKING_BLOCKS = new Set([5, 6, 13, 14, 15, 16]);
 const THIRD_PERSON_CAMERA_CLEARANCE = 0.28;
 const THIRD_PERSON_CHARACTER_HIDE_DISTANCE = 1.1;
 const THIRD_PERSON_CHARACTER_SHOW_DISTANCE = 1.35;
+const GHOST_FLY_SPEED = 12;
+const GHOST_FAST_MULTIPLIER = 2.5;
 
 export class Player {
     constructor(scene, camera, domElement, CONFIG, characterProfile = null, cameraControlElement = domElement) {
@@ -30,6 +32,7 @@ export class Player {
         this.direction = new THREE.Vector3();
         this.canJ = false;
         this.distanceTravelled = 0;
+        this.ghostMode = false;
         
         // Environment State
         this.wasInWater = false;
@@ -88,6 +91,7 @@ export class Player {
         this._aimDirection = new THREE.Vector3();
         this._lastCharacterPosition = new THREE.Vector3().copy(this.controls.getObject().position);
         this._worldVelocity = new THREE.Vector3();
+        this._ghostMove = new THREE.Vector3();
         this._savedCameraPosition = new THREE.Vector3();
         this._savedCameraQuaternion = new THREE.Quaternion();
         this.thirdPersonCameraDistance = 4.2;
@@ -136,12 +140,12 @@ export class Player {
 
     updateHeldTorch(selected) {
         this.heldTorchSelected = Boolean(selected);
-        this.heldTorchGroup.visible = this.heldTorchSelected && this.cameraMode === 'first';
+        this.heldTorchGroup.visible = this.heldTorchSelected && this.cameraMode === 'first' && !this.ghostMode;
         if (this.heldTorchThirdPerson) {
-            this.heldTorchThirdPerson.visible = this.heldTorchSelected && this.cameraMode === 'third';
+            this.heldTorchThirdPerson.visible = this.heldTorchSelected && this.cameraMode === 'third' && !this.ghostMode;
         }
-        this.heldTorchLight.visible = this.heldTorchSelected;
-        if (this.heldTorchSelected) {
+        this.heldTorchLight.visible = this.heldTorchSelected && !this.ghostMode;
+        if (this.heldTorchSelected && !this.ghostMode) {
             const playerPos = this.controls.getObject().position;
             this.heldTorchLight.position.set(
                 playerPos.x,
@@ -154,6 +158,35 @@ export class Player {
     toggleCameraMode() {
         this.setCameraMode(this.cameraMode === 'first' ? 'third' : 'first');
         return this.cameraMode;
+    }
+
+    toggleGhostMode() {
+        return this.setGhostMode(!this.ghostMode);
+    }
+
+    setGhostMode(enabled) {
+        this.ghostMode = Boolean(enabled);
+        this.velocity.set(0, 0, 0);
+        this.canJ = false;
+        this.isSprinting = false;
+        this.isCrouching = false;
+        this.isSwinging = false;
+        this.swordGroup.visible = false;
+        this.bowGroup.visible = false;
+        this.updateHeldTorch(this.heldTorchSelected);
+        return this.ghostMode;
+    }
+
+    canExitGhostMode(world) {
+        const { PLAYER_WIDTH, PLAYER_HITBOX_Y_MIN, PLAYER_HITBOX_Y_MAX } = this.CONFIG.PHYSICS;
+        return !Physics.checkAABBCollision(
+            world,
+            this.controls.getObject().position,
+            PLAYER_WIDTH,
+            PLAYER_HITBOX_Y_MIN,
+            PLAYER_HITBOX_Y_MAX,
+            false
+        );
     }
 
     setCameraMode(mode) {
@@ -221,7 +254,7 @@ export class Player {
         const orbit = orbitDirection(this.orbitYaw, this.orbitPitch);
         const forward = this._thirdPersonForward.set(orbit.x, orbit.y, orbit.z).normalize();
         this._thirdPersonAimTarget.copy(eye).addScaledVector(forward, 64);
-        this.camera.position.copy(this.getThirdPersonCameraPosition(world, eye, forward));
+        this.camera.position.copy(this.getThirdPersonCameraPosition(this.ghostMode ? null : world, eye, forward));
         this.updateCharacterCameraVisibility(this.camera.position.distanceTo(eye));
         this.camera.lookAt(this._thirdPersonAimTarget);
 
@@ -491,6 +524,17 @@ export class Player {
     updateWaterAndVoid(world, SoundManager, delta = 0) {
         const playerPos = this.controls.getObject().position;
 
+        if (this.ghostMode) {
+            this.inWater = false;
+            this.wasInWater = false;
+            this.underwaterTime = 0;
+            if (this.wasHeadInWater) SoundManager.setUnderwater(false);
+            this.wasHeadInWater = false;
+            if (!this._uwOverlay) this._uwOverlay = document.getElementById('underwater-overlay');
+            if (this._uwOverlay) this._uwOverlay.style.display = 'none';
+            return;
+        }
+
         // Void Protection
         if (playerPos.y < -20) {
             playerPos.set(playerPos.x, 50, playerPos.z);
@@ -537,6 +581,10 @@ export class Player {
 
     updatePhysics(delta, Input, world, SoundManager) {
         const playerPos = this.controls.getObject().position;
+        if (this.ghostMode) {
+            this.updateGhostMovement(delta, Input);
+            return;
+        }
         if (world.getBlock(Math.floor(playerPos.x), Math.floor(playerPos.y), Math.floor(playerPos.z)) === -1) {
             this.velocity.set(0, 0, 0);
             return;
@@ -668,6 +716,24 @@ export class Player {
             stepHoriz('x', (fwdH.x * -this.velocity.z + rgt.x * this.velocity.x) * delta);
             stepHoriz('z', (fwdH.z * -this.velocity.z + rgt.z * this.velocity.x) * delta);
         }
+    }
+
+    updateGhostMovement(delta, Input) {
+        const playerPos = this.controls.getObject().position;
+        this.controls.getDirection(this._fwd);
+        this._fwdH.set(this._fwd.x, 0, this._fwd.z).normalize();
+        this._rgt.crossVectors(this._fwdH, this.camera.up).normalize();
+
+        this._ghostMove.set(0, 0, 0);
+        this._ghostMove.addScaledVector(this._fwd, Number(Boolean(Input.moveF)) - Number(Boolean(Input.moveB)));
+        this._ghostMove.addScaledVector(this._rgt, Number(Boolean(Input.moveR)) - Number(Boolean(Input.moveL)));
+        this._ghostMove.y += Number(Boolean(Input.moveUp)) - Number(Boolean(Input.crouch));
+
+        if (this._ghostMove.lengthSq() > 0) {
+            const speed = GHOST_FLY_SPEED * (Input.sprint ? GHOST_FAST_MULTIPLIER : 1);
+            playerPos.addScaledVector(this._ghostMove.normalize(), speed * delta);
+        }
+        this.velocity.set(0, 0, 0);
     }
 }
 

@@ -11,7 +11,7 @@
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260720q';
         import { getWorldGenerationLoadNotice, prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260720q';
         import { Game } from './Game.js?v=20260716b'; // Central state container
-        import { Player } from './Player.js?v=20260719a';
+        import { Player } from './Player.js?v=20260720a';
         import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
         import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260721c';
         import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260721c';
@@ -37,7 +37,7 @@
         import { FrameRateTracker } from './frameRateTracker.js?v=20260718a';
         import { calculateRenderPixelRatio } from './renderResolution.js?v=20260718a';
         import { resolveUiInputCommand } from './inputCommand.js?v=20260720q';
-        import { initQuestJournal, showInventoryPanel, updateQuestCompass } from './questJournal.js?v=20260721c';
+        import { initQuestJournal, showInventoryPanel, updateQuestCompass } from './questJournal.js?v=20260721e';
         import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
@@ -87,7 +87,7 @@
         let damageFeedback = null;
 
         function applyPlayerDamage(damage) {
-            if (damage <= 0) return;
+            if (damage <= 0 || Game.player?.ghostMode) return;
             Game.player.health -= damage;
             damageFeedback.trigger(damage);
         }
@@ -125,7 +125,7 @@
                 playerPosition,
                 respawnBed,
                 world,
-                headingDegrees: camera?.rotation?.y ? camera.rotation.y * 180 / Math.PI : 0,
+                cameraYawRadians: camera?.rotation?.y || 0,
                 mainTarget
             };
         };
@@ -399,8 +399,21 @@
             showCameraModeMessage(mode);
         }
 
+        function handleGhostModeToggle(e) {
+            if (e.code !== 'KeyG' || !e.ctrlKey || !e.altKey || !e.shiftKey || e.metaKey) return false;
+            if (e.repeat) return true;
+            if (!gameStarted || manuallyPaused || isBlockingOverlayOpen()) return true;
+            if (e.cancelable) e.preventDefault();
+            if (Game.player.ghostMode && !Game.player.canExitGhostMode(world)) return true;
+            if (activeMinecart) exitActiveMinecart();
+            const enabled = Game.player.toggleGhostMode();
+            document.body.classList.toggle('ghost-mode', enabled);
+            window.playerInteraction?.cancelMining();
+            return true;
+        }
+
         window.butzcraftCanInteract = function() {
-            return canUseMouseInteraction({
+            return !Game.player?.ghostMode && canUseMouseInteraction({
                 gameStarted,
                 gameActive,
                 spawning,
@@ -1525,6 +1538,7 @@
                 // Wenn ein Textfeld fokussiert ist, keine Spielsteuerung auslösen
                 const tag = document.activeElement?.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+                if (handleGhostModeToggle(e)) return;
                 if (e.code === 'F3') {
                     if (e.cancelable) e.preventDefault();
                     toggleDebugHud();
@@ -1532,6 +1546,11 @@
                 }
                 if (e.code === 'KeyV') {
                     handleCameraModeToggle(e);
+                    return;
+                }
+                if (Game.player?.ghostMode && e.code !== 'Tab') {
+                    if (isGameplayKey(e) && e.cancelable) e.preventDefault();
+                    relockControlsFromInput(e);
                     return;
                 }
                 if (isGameplayKey(e) && e.cancelable) e.preventDefault();
@@ -1993,14 +2012,18 @@
                 } else {
                     Game.player.updatePhysics(delta, Input, world, SoundManager);
                 }
-                Game.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (Game.player.hunger <= 0) { Game.player.hunger = 0; Game.player.health -= 2 * delta; }
-                if (Game.player.hunger > REGEN_THRESHOLD && Game.player.health < MAX_HEALTH) Game.player.health += REGEN_RATE * delta;
+                if (!Game.player.ghostMode) {
+                    Game.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (Game.player.hunger <= 0) { Game.player.hunger = 0; Game.player.health -= 2 * delta; }
+                    if (Game.player.hunger > REGEN_THRESHOLD && Game.player.health < MAX_HEALTH) Game.player.health += REGEN_RATE * delta;
+                }
 
                 // Druckplatten-Schaden
-                if (window.playerInteraction) window.playerInteraction.checkPressurePlates(playerPos.x, playerPos.y, playerPos.z);
-                if (window.playerInteraction) window.playerInteraction.updateMining(delta);
-                if (window.playerInteraction) window.playerInteraction.updateCombat();
-                if (window.playerInteraction) window.playerInteraction.updateRanged(delta);
+                if (!Game.player.ghostMode && window.playerInteraction) {
+                    window.playerInteraction.checkPressurePlates(playerPos.x, playerPos.y, playerPos.z);
+                    window.playerInteraction.updateMining(delta);
+                    window.playerInteraction.updateCombat();
+                    window.playerInteraction.updateRanged(delta);
+                }
             }
 
             // Ofen-Tick (auch wenn pausiert, solange UI offen)

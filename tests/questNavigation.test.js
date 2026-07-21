@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { getCompassGuidance, resolveHomeTarget } from '../js/questNavigation.js';
+import {
+    getCompassGuidance,
+    getCompassHeadingDegrees,
+    getRelativeCompassBearing,
+    resolveHomeTarget
+} from '../js/questNavigation.js';
 
 describe('quest compass guidance', () => {
     it('reports direction and distance to a tracked target', () => {
@@ -22,6 +27,23 @@ describe('quest compass guidance', () => {
         expect(guidance.exact).toBe(false);
         expect(guidance.searchRadius).toBe(40);
         expect(guidance.displayDistance % 50).toBe(0);
+    });
+});
+
+describe('quest compass orientation', () => {
+    it('points straight up while the camera faces the target', () => {
+        const eastBearing = getCompassGuidance(
+            { x: 0, z: 0 },
+            { x: 10, z: 0 }
+        ).bearing;
+        const eastHeading = getCompassHeadingDegrees(-Math.PI / 2);
+
+        expect(getRelativeCompassBearing(eastBearing, eastHeading)).toBe(0);
+    });
+
+    it('uses the shortest rotation across north', () => {
+        expect(getRelativeCompassBearing(0, 270)).toBe(90);
+        expect(getRelativeCompassBearing(270, 0)).toBe(-90);
     });
 });
 

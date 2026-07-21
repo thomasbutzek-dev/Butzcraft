@@ -1,200 +1,216 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="de">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Butzcraft ist ein Survival-Abenteuer mit Crafting, Dungeons, Biomen und Dorfbewohnern – direkt im Browser spielbar.">
-    <meta name="theme-color" content="#111a12">
-    <title>Butzcraft – Baue deine Welt. Überlebe die Nacht.</title>
-    <link rel="stylesheet" href="butzcraft-preview.css">
+    <meta name="description" content="Butzcraft ist ein Survival-Abenteuer mit Crafting, Dörfern, Quests und Dungeons – direkt im Browser spielbar.">
+    <meta name="theme-color" content="#ece9d8">
+    <title>Butzcraft – Deine Welt beginnt hier</title>
     <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="stylesheet" href="butzcraft-preview.css">
 </head>
-
-<body>
+<body data-site-content-root>
     <a class="skip-link" href="#main-content">Zum Inhalt springen</a>
 
-    <header class="hero" id="start">
-        <nav class="top-nav" aria-label="Hauptnavigation">
-            <a href="#start" class="brand" aria-label="Butzcraft Startseite">
-                <img src="logo.png" alt="Butzcraft">
-            </a>
-            <div class="nav-links">
-                <a href="#gameplay">Gameplay</a>
-                <a href="#einstieg">Einstieg</a>
-                <a href="#editor">Charakter</a>
-                <a href="#faq">FAQ</a>
-            </div>
-            <a class="nav-action" href="index.html">Jetzt spielen</a>
-        </nav>
-
-        <div class="hero-content">
-            <p class="hero-badge"><span aria-hidden="true"></span> Direkt im Browser spielbar</p>
-            <img src="logo.png" alt="Butzcraft" class="hero-logo">
-            <h1>Baue deine Welt.<br>Überlebe die Nacht.</h1>
-            <p class="hero-copy">
-                Sammle Ressourcen, fertige Werkzeuge und entdecke eine offene Blockwelt voller Biome,
-                Dörfer und verborgener Dungeons.
-            </p>
-            <div class="hero-actions">
-                <a class="button button-primary" href="index.html">
-                    Spiel starten <span aria-hidden="true">→</span>
-                </a>
-                <a class="button button-secondary" href="#gameplay">Welt entdecken</a>
-            </div>
-            <ul class="hero-facts" aria-label="Spielmerkmale">
-                <li><strong>Survival</strong><span>Tag & Nacht</span></li>
-                <li><strong>Crafting</strong><span>Werkzeuge & Bauten</span></li>
-                <li><strong>Erkundung</strong><span>Biome & Dungeons</span></li>
-            </ul>
+    <nav class="site-nav" aria-label="Hauptnavigation">
+        <a class="brand" href="#start" aria-label="Butzcraft Startseite"><img src="logo.png" alt="Butzcraft"></a>
+        <button class="nav-menu-toggle" type="button" aria-expanded="false" aria-controls="site-menu">
+            <span class="nav-menu-icon" aria-hidden="true"></span>
+            <span>Menü</span>
+        </button>
+        <div class="nav-links" id="site-menu">
+            <a href="#welt">Abenteuer</a>
+            <a href="guide.html">Guide</a>
+            <a href="faq.html">FAQ</a>
+            <a href="#charakter">Charakter</a>
+            <a href="#kontakt">Kontakt</a>
         </div>
+        <a class="nav-play" href="https://play.butzcraft.de/">Jetzt spielen</a>
+    </nav>
 
-        <a class="scroll-hint" href="#gameplay" aria-label="Zu den Gameplay-Eindrücken">
-            <span>Entdecken</span>
-            <span class="scroll-line" aria-hidden="true"></span>
-        </a>
+    <header class="cinematic-hero" id="start" data-cinematic-hero>
+        <div class="hero-sticky">
+            <video class="hero-video" data-hero-video muted playsinline preload="auto" poster="assets/site/current/hero-sunrise.webp" aria-hidden="true" tabindex="-1">
+                <source src="assets/site/current/hero-scroll-flight-web.mp4" type="video/mp4">
+            </video>
+            <div class="hero-frame hero-frame-sunrise" aria-hidden="true"></div>
+            <div class="hero-frame hero-frame-day" aria-hidden="true"></div>
+            <div class="hero-daywash" aria-hidden="true"></div>
+            <div class="hero-grade" aria-hidden="true"></div>
+
+            <div class="hero-copy">
+                <p class="kicker"><span></span> <span data-content-key="hero.kicker">Eine Welt wartet auf dich</span></p>
+                <h1 data-content-key="hero.title">Dein Morgen. Dein Abenteuer.</h1>
+                <p data-content-key="hero.copy">Noch liegt der erste Sonnenstrahl über den Baumwipfeln. Hinter dem Dorf beginnen unbekannte Wege, unter deinen Füßen ruhen alte Minen – und bis zur Nacht musst du entscheiden, welche Geschichte du schreiben willst.</p>
+                <div class="hero-actions">
+                    <a class="button button-primary" href="https://play.butzcraft.de/">Jetzt spielen <span aria-hidden="true">→</span></a>
+                    <a class="text-link" href="#portale">In die Welt eintauchen <span aria-hidden="true">↓</span></a>
+                </div>
+            </div>
+
+            <div class="time-shift" aria-hidden="true">
+                <span>Sonnenaufgang</span><i></i><span>Tag</span>
+            </div>
+        </div>
     </header>
 
     <main id="main-content">
-        <section class="section showcase" id="gameplay" aria-labelledby="gameplay-title">
+        <section class="section portals" id="portale" aria-labelledby="portal-title">
             <div class="section-inner">
-                <div class="section-heading split-heading">
-                    <div>
-                        <p class="eyebrow">Dein Abenteuer</p>
-                        <h2 id="gameplay-title">Jeder Tag schreibt<br>eine neue Geschichte.</h2>
-                    </div>
-                    <p>
-                        Friedlicher Sonnenaufgang oder riskanter Abstieg: Du entscheidest, ob du baust,
-                        handelst, erkundest oder dich auf die nächste Nacht vorbereitest.
-                    </p>
+                <div class="section-heading" data-reveal>
+                    <p class="eyebrow" data-content-key="portals.kicker">Dein Einstieg</p>
+                    <h2 id="portal-title" data-content-key="portals.title">Wähle deinen Weg.</h2>
+                    <p data-content-key="portals.copy">Zieh sofort los, erschaffe zuerst deinen Helden oder bereite dich im Guide auf die erste Nacht vor.</p>
                 </div>
-
-                <div class="showcase-grid">
-                    <figure class="showcase-card showcase-main">
-                        <img src="assets/site/chrome-third-person-camera-refined.png" alt="Butzcraft-Spielfigur in einer grünen Blocklandschaft" loading="lazy">
-                        <figcaption>
-                            <span>01</span>
-                            <div><strong>Eine lebendige Welt</strong><small>Wälder, Wüsten, Schnee und Dörfer</small></div>
-                        </figcaption>
-                    </figure>
-                    <figure class="showcase-card">
-                        <img src="assets/site/chrome-game-third-person-after-start.png" alt="Butzcraft-Spielfigur in einer verschneiten Landschaft" loading="lazy">
-                        <figcaption>
-                            <span>02</span>
-                            <div><strong>Für jedes Biom gerüstet</strong><small>Ressourcen finden und Gefahren meistern</small></div>
-                        </figcaption>
-                    </figure>
-                    <article class="feature-card">
-                        <p class="eyebrow">Mehr als nur bauen</p>
-                        <h3>Entdecke, was unter der Oberfläche wartet.</h3>
-                        <ul>
-                            <li>Dungeons & Spawner</li>
-                            <li>Handel & Quests</li>
-                            <li>Wetter & Tageszeiten</li>
-                            <li>Tiere & Gegner</li>
-                        </ul>
-                    </article>
+                <div class="portal-grid">
+                    <a class="portal-card portal-play" href="https://play.butzcraft.de/" data-reveal>
+                        <span class="portal-number">01</span>
+                        <div><p class="eyebrow" data-content-key="portals.play.kicker">Spiel</p><h3 data-content-key="portals.play.title">Dem Horizont entgegen</h3><p data-content-key="portals.play.copy">Kein Download, keine Wartezeit: Betritt deine Welt und finde heraus, was hinter dem nächsten Hügel liegt.</p></div>
+                        <span class="portal-arrow" aria-hidden="true">↗</span>
+                    </a>
+                    <a class="portal-card" href="#charakter" data-reveal>
+                        <span class="portal-number">02</span>
+                        <div><p class="eyebrow" data-content-key="portals.character.kicker">Charakter</p><h3 data-content-key="portals.character.title">Gib deinem Abenteuer ein Gesicht</h3><p data-content-key="portals.character.copy">Wähle deinen Look, übernimm ihn mit einem Klick und beginne genau als der Held, den du dir vorgestellt hast.</p></div>
+                        <span class="portal-arrow" aria-hidden="true">↗</span>
+                    </a>
+                    <a class="portal-card" href="guide.html" data-reveal>
+                        <span class="portal-number">03</span>
+                        <div><p class="eyebrow" data-content-key="portals.guide.kicker">Guide</p><h3 data-content-key="portals.guide.title">Bereit für die erste Nacht</h3><p data-content-key="portals.guide.copy">Lerne die wichtigsten Handgriffe, baue deinen ersten Schutzraum und behalte genug Fackeln im Gepäck.</p></div>
+                        <span class="portal-arrow" aria-hidden="true">↗</span>
+                    </a>
                 </div>
             </div>
         </section>
 
-        <section class="section game-loop" id="einstieg" aria-labelledby="loop-title">
+        <section class="section world-section" id="welt" aria-labelledby="world-title">
             <div class="section-inner">
-                <div class="section-heading centered-heading">
-                    <p class="eyebrow">Die ersten Minuten</p>
-                    <h2 id="loop-title">Von der ersten Axt<br>bis zum eigenen Zuhause.</h2>
+                <div class="section-heading split-heading" data-reveal>
+                    <div><p class="eyebrow" data-content-key="world.kicker">Eine Welt mit Ecken und Tiefe</p><h2 id="world-title" data-content-key="world.title">Hinter jedem Horizont wartet etwas anderes.</h2></div>
+                    <p data-content-key="world.copy">Jeder Aufbruch beginnt im Kleinen: ein Stück Holz, eine erste Fackel, ein sicherer Platz für die Nacht. Doch schon bald führen dich Dorfgeschichten, verlassene Schienen und seltene Funde weit über dein erstes Lager hinaus.</p>
                 </div>
+                <div class="world-grid">
+                    <figure class="world-card" data-reveal>
+                        <img src="assets/site/current/desert-village.webp" alt="Butzcraft-Dorf zwischen Palmen in der Wüste" loading="lazy" data-image-key="world.1.image">
+                        <figcaption><span data-content-key="world.1.title">Lebendige Dörfer</span><small data-content-key="world.1.copy">Begegne Schmieden, Bauern und Händlern – und ihren Geschichten</small></figcaption>
+                    </figure>
+                    <figure class="world-card" data-reveal>
+                        <img src="assets/site/current/mine-rails.webp" alt="Unterirdische Butzcraft-Mine mit Schienen und Kisten" loading="lazy" data-image-key="world.2.image">
+                        <figcaption><span data-content-key="world.2.title">Tiefe Minen</span><small data-content-key="world.2.copy">Folge alten Schienen zu Erzen, Vorräten und vergessenen Kammern</small></figcaption>
+                    </figure>
+                    <figure class="world-card" data-reveal>
+                        <img src="assets/site/current/dungeon-torch.webp" alt="Dunkler Butzcraft-Dungeon im Fackelschein" loading="lazy" data-image-key="world.3.image">
+                        <figcaption><span data-content-key="world.3.title">Verborgene Dungeons</span><small data-content-key="world.3.copy">Fackelschein, enge Gänge und die Ahnung, nicht allein zu sein</small></figcaption>
+                    </figure>
+                    <figure class="world-card" data-reveal>
+                        <img src="assets/site/current/blood-moon.webp" alt="Roter Blutmond über einem verregneten Wald mit Gegnern" loading="lazy" data-image-key="world.4.image">
+                        <figcaption><span data-content-key="world.4.title">Unruhige Nächte</span><small data-content-key="world.4.copy">Regen, Dunkelheit und Blutmond stellen deine Vorbereitung auf die Probe</small></figcaption>
+                    </figure>
+                    <figure class="world-card world-card-placeholder" data-reveal>
+                        <img src="assets/site/current/hero-village-close.webp" alt="Platzhalter für ein weiteres Butzcraft-Abenteuer" loading="lazy" data-image-key="world.5.image">
+                        <figcaption><span data-content-key="world.5.title">Freier Platz</span><small data-content-key="world.5.copy">Hier kannst du später ein weiteres Abenteuer vorstellen</small></figcaption>
+                    </figure>
+                    <figure class="world-card world-card-placeholder" data-reveal>
+                        <img src="assets/site/current/desert-temple.webp" alt="Platzhalter für ein weiteres Butzcraft-Abenteuer" loading="lazy" data-image-key="world.6.image">
+                        <figcaption><span data-content-key="world.6.title">Freier Platz</span><small data-content-key="world.6.copy">Bild und Text lassen sich im geschützten Editor austauschen</small></figcaption>
+                    </figure>
+                </div>
+            </div>
+        </section>
 
-                <ol class="loop-steps">
-                    <li>
-                        <span class="step-number">01</span>
-                        <div class="step-icon step-tree" aria-hidden="true"></div>
-                        <h3>Sammeln</h3>
-                        <p>Holz, Stein und Nahrung bilden die Grundlage für dein Abenteuer.</p>
-                    </li>
-                    <li>
-                        <span class="step-number">02</span>
-                        <div class="step-icon step-craft" aria-hidden="true"></div>
-                        <h3>Herstellen</h3>
-                        <p>Verwandle Rohstoffe in Werkzeuge, Ausrüstung und nützliche Blöcke.</p>
-                    </li>
-                    <li>
-                        <span class="step-number">03</span>
-                        <div class="step-icon step-home" aria-hidden="true"></div>
-                        <h3>Bauen</h3>
-                        <p>Errichte einen sicheren Unterschlupf, bevor die Sonne untergeht.</p>
-                    </li>
-                    <li>
-                        <span class="step-number">04</span>
-                        <div class="step-icon step-compass" aria-hidden="true"></div>
-                        <h3>Entdecken</h3>
-                        <p>Suche Dörfer, seltene Erze und die Schätze verborgener Dungeons.</p>
-                    </li>
+        <section class="section loop-section" aria-labelledby="loop-title">
+            <div class="section-inner">
+                <div class="section-heading compact-heading" data-reveal>
+                    <p class="eyebrow" data-content-key="loop.kicker">Dein Rhythmus</p>
+                    <h2 id="loop-title" data-content-key="loop.title">Sammeln. Herstellen. Bauen. Entdecken.</h2>
+                </div>
+                <ol class="loop-list">
+                    <li data-reveal><span>01</span><div><h3 data-content-key="loop.1.title">Sammeln</h3><p data-content-key="loop.1.copy">Streife durch Wälder und Schluchten, sichere Nahrung und entdecke Rohstoffe, aus denen deine nächsten Möglichkeiten entstehen.</p></div></li>
+                    <li data-reveal><span>02</span><div><h3 data-content-key="loop.2.title">Herstellen</h3><p data-content-key="loop.2.copy">Verwandle Fundstücke in Werkzeuge, Waffen, Licht und Ausrüstung – jedes Rezept bringt dich ein Stück weiter.</p></div></li>
+                    <li data-reveal><span>03</span><div><h3 data-content-key="loop.3.title">Bauen</h3><p data-content-key="loop.3.copy">Aus dem ersten Schutzraum wächst ein Zuhause, aus einem Zuhause ein Ort, zu dem du nach jeder Reise gern zurückkehrst.</p></div></li>
+                    <li data-reveal><span>04</span><div><h3 data-content-key="loop.4.title">Entdecken</h3><p data-content-key="loop.4.copy">Folge den Geschichten der Dorfbewohner, steige in Minen hinab und wage dich dorthin, wo das Tageslicht endet.</p></div></li>
                 </ol>
             </div>
         </section>
 
-        <section class="section editor-section" id="editor" aria-labelledby="editor-title">
-            <div class="section-inner editor-layout">
-                <div class="editor-copy">
-                    <p class="eyebrow">Dein Charakter</p>
-                    <h2 id="editor-title">Nicht irgendein Held.<br>Dein Held.</h2>
-                    <p>
-                        Wähle Körperform, Haare, Farben und Accessoires. Dein Charakter begleitet dich
-                        vom ersten Holzblock bis tief in die dunkelsten Höhlen.
-                    </p>
-                    <a class="button button-secondary" href="character-editor.html">
-                        Charakter gestalten <span aria-hidden="true">→</span>
-                    </a>
+        <section class="section character-section" id="charakter" aria-labelledby="character-title">
+            <div class="section-inner">
+                <div class="section-heading split-heading" data-reveal>
+                    <div>
+                        <p class="eyebrow" data-content-key="character.kicker">Dein Charakter</p>
+                        <h2 id="character-title" data-content-key="character.title">Erstelle deinen Charakter. Spiele los.</h2>
+                    </div>
+                    <p data-content-key="character.copy">Bevor du die ersten Spuren im Gras hinterlässt, gib deiner Figur einen Namen und einen unverwechselbaren Look. Deine Auswahl reist direkt mit dir in eine neue Welt.</p>
                 </div>
-                <a class="editor-preview" href="character-editor.html" aria-label="Charakter-Editor öffnen">
-                    <img src="assets/site/chrome-editor-visible.png" alt="Vorschau des Butzcraft Charakter-Editors" loading="lazy">
-                    <span>Editor öffnen <span aria-hidden="true">↗</span></span>
-                </a>
+
+                <div class="editor-window" data-reveal>
+                    <div class="editor-window-bar" aria-hidden="true">
+                        <span></span><span></span><span></span>
+                        <strong>Butzcraft Charakterwerkstatt</strong>
+                    </div>
+                    <iframe id="landing-character-editor" src="character-editor.html?embed=1" title="Butzcraft Charakter-Editor" loading="lazy"></iframe>
+                </div>
+
+                <div class="editor-action-row" data-reveal>
+                    <ol class="mini-steps">
+                        <li><span>1</span>Look gestalten</li>
+                        <li><span>2</span>Charakter übernehmen</li>
+                        <li><span>3</span>Neue Welt starten</li>
+                    </ol>
+                    <div>
+                        <button class="button button-primary" id="play-created-character" type="button">Charakter übernehmen &amp; spielen <span aria-hidden="true">→</span></button>
+                        <p id="character-transfer-status" class="transfer-status" role="status"></p>
+                    </div>
+                </div>
             </div>
         </section>
 
-        <section class="section final-cta" aria-labelledby="cta-title">
-            <div class="cta-landscape" aria-hidden="true"></div>
-            <div class="section-inner cta-content">
-                <p class="eyebrow">Die Welt wartet</p>
-                <h2 id="cta-title">Dein nächstes Abenteuer<br>beginnt mit einem Block.</h2>
-                <p>Kein Download. Kein langes Setup. Einfach starten und losbauen.</p>
-                <a class="button button-primary" href="index.html">
-                    Butzcraft spielen <span aria-hidden="true">→</span>
-                </a>
+        <section class="section contact-section" id="kontakt" aria-labelledby="contact-title">
+            <div class="section-inner contact-grid">
+                <div class="contact-copy" data-reveal>
+                    <p class="eyebrow" data-content-key="contact.kicker">Nachricht ans Lagerfeuer</p>
+                    <h2 id="contact-title" data-content-key="contact.title">Deine Idee gehört zur Reise.</h2>
+                    <p data-content-key="contact.copy">Du hast einen seltenen Fehler entdeckt, eine Idee für die Welt oder möchtest einfach erzählen, wie dein Abenteuer begonnen hat? Schreib uns. Jede Nachricht hilft dabei, Butzcraft lebendiger zu machen.</p>
+                    <p class="contact-note">Für Fragen zum Spiel findest du viele schnelle Antworten auch im <a href="faq.html">FAQ</a> und im <a href="guide.html">Guide</a>.</p>
+                </div>
+                <form class="contact-form" data-contact-form data-recipient="" data-reveal>
+                    <div class="form-row">
+                        <label>Name <input name="name" type="text" autocomplete="name" maxlength="80" required></label>
+                        <label>E-Mail <input name="email" type="email" autocomplete="email" maxlength="160" required></label>
+                    </div>
+                    <label>Thema
+                        <select name="subject" required>
+                            <option value="">Bitte wählen</option>
+                            <option>Frage zum Spiel</option>
+                            <option>Fehler melden</option>
+                            <option>Idee und Feedback</option>
+                            <option>Sonstiges</option>
+                        </select>
+                    </label>
+                    <label>Nachricht <textarea name="message" rows="7" maxlength="4000" required></textarea></label>
+                    <label class="consent-check"><input name="privacy" type="checkbox" required> <span>Ich habe die <a href="datenschutz.html">Datenschutzhinweise</a> zur Kontaktaufnahme zur Kenntnis genommen.</span></label>
+                    <button class="button button-primary" type="submit">Nachricht senden <span aria-hidden="true">→</span></button>
+                    <p class="form-status" data-contact-status role="status"></p>
+                </form>
             </div>
         </section>
 
-        <section class="section faq-section" id="faq" aria-labelledby="faq-title">
-            <div class="section-inner faq-layout">
-                <div class="section-heading">
-                    <p class="eyebrow">Gut zu wissen</p>
-                    <h2 id="faq-title">Häufige Fragen.</h2>
-                </div>
-                <div class="faq-list">
-                    <details>
-                        <summary>Wie steuere ich Butzcraft?</summary>
-                        <p>Mit WASD bewegst du dich, mit der Maus siehst du dich um. E öffnet das Inventar, die Leertaste lässt dich springen.</p>
-                    </details>
-                    <details>
-                        <summary>Kann ich meinen Spielstand speichern?</summary>
-                        <p>Ja. Im Pausenmenü kannst du Spielstände speichern, laden, exportieren und importieren.</p>
-                    </details>
-                    <details>
-                        <summary>Ist Multiplayer schon verfügbar?</summary>
-                        <p>Noch nicht. Gemeinsame Welten sind als kommender großer Schritt geplant.</p>
-                    </details>
-                </div>
+        <section class="final-cta" aria-labelledby="final-title">
+            <div class="final-backdrop" aria-hidden="true"></div>
+            <div class="final-content" data-reveal>
+                <p class="eyebrow" data-content-key="final.kicker">Die Sonne geht schon unter</p>
+                <h2 id="final-title" data-content-key="final.title">Wie beginnt deine Geschichte?</h2>
+                <p data-content-key="final.copy">Zwischen dir und der ersten Nacht liegt nur ein Klick. Kein Download, kein Konto – nur eine neue Welt.</p>
+                <a class="button button-primary" href="https://play.butzcraft.de/">Jetzt Butzcraft spielen <span aria-hidden="true">→</span></a>
             </div>
         </section>
     </main>
 
-    <footer class="footer">
-        <a href="#start" class="footer-brand"><img src="logo.png" alt="Butzcraft"></a>
+    <footer class="site-footer">
+        <a href="#start"><img src="logo.png" alt="Butzcraft"></a>
+        <nav aria-label="Fußnavigation"><a href="guide.html">Guide</a><a href="faq.html">FAQ</a><a href="#kontakt">Kontakt</a><a href="impressum.html">Impressum</a><a href="datenschutz.html">Datenschutz</a><button type="button" data-cookie-settings>Cookie-Einstellungen</button></nav>
         <p>Baue. Entdecke. Überlebe.</p>
-        <a href="#start">Nach oben ↑</a>
     </footer>
-</body>
 
+    <script type="module" src="js/butzcraftSite.js"></script>
+</body>
 </html>

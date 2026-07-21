@@ -23,7 +23,7 @@ describe('browser module identity', () => {
     it('cache-busts the browser entry after atlas changes', () => {
         const source = readFileSync('index.html', 'utf8');
 
-        expect(source).toContain('./js/GameMain.js?v=20260721c');
+        expect(source).toContain('./js/GameMain.js?v=20260721e');
     });
 
     it('loads world generation through one versioned URL everywhere', () => {

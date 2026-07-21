@@ -50,7 +50,7 @@ beforeEach(() => {
         playerPosition: { x: 0, z: 0 },
         respawnBed: { x: 30, y: 20, z: -40 },
         world: { getBlock: () => 38 },
-        headingDegrees: 0,
+        cameraYawRadians: 0,
         mainTarget: { x: 20, z: 20 }
     });
 });
@@ -73,5 +73,18 @@ describe('quest journal UI', () => {
         expect(document.getElementById('quest-compass').hidden).toBe(false);
         expect(document.querySelector('.quest-compass-label').textContent).toContain('Zuhause');
         expect(document.querySelector('.quest-compass-distance').textContent).toContain('50 Blöcke');
+    });
+
+    it('points straight up while looking directly at the target', () => {
+        window.getQuestState().trackedTarget = { kind: 'main' };
+        window.getQuestNavigationContext = () => ({
+            playerPosition: { x: 0, z: 0 },
+            cameraYawRadians: -Math.PI / 2,
+            mainTarget: { x: 10, z: 0 }
+        });
+
+        updateQuestCompass();
+
+        expect(document.querySelector('.quest-compass-arrow').style.transform).toBe('rotate(0deg)');
     });
 });

@@ -8,6 +8,14 @@ import {
     serializeCharacterProfile
 } from './characterProfile.js';
 import { createCharacterModel } from './characterModel.js?v=20260717a';
+import {
+    CHARACTER_TRANSFER_STORAGE_KEY,
+    createCharacterPlayUrl,
+    getCharacterPlayTarget
+} from './characterTransfer.js';
+
+const isEmbedded = new URLSearchParams(window.location.search).get('embed') === '1' || window.parent !== window;
+document.documentElement.classList.toggle('embedded', isEmbedded);
 
 const preview = document.getElementById('character-preview');
 const form = document.getElementById('character-form');
@@ -15,6 +23,7 @@ const jsonOutput = document.getElementById('profile-json');
 const statusLine = document.getElementById('status-line');
 const displayName = document.getElementById('display-name');
 const importFile = document.getElementById('import-file');
+const playWithCharacterButton = document.getElementById('play-with-character-button');
 
 let profile = createCharacterProfile();
 let loadedProfile = createCharacterProfile();
@@ -55,7 +64,10 @@ scene.add(floor);
 
 applyProfile(profile);
 resizePreview();
-window.addEventListener('resize', resizePreview);
+window.addEventListener('resize', () => {
+    resizePreview();
+    reportEmbeddedHeight();
+});
 
 form.addEventListener('input', () => {
     const previousGender = profile.gender;
@@ -66,6 +78,13 @@ form.addEventListener('input', () => {
 
 document.getElementById('save-button').addEventListener('click', () => {
     applyDraft();
+});
+
+playWithCharacterButton.hidden = isEmbedded;
+playWithCharacterButton.addEventListener('click', () => {
+    profile = normalizeCharacterProfile(readFormProfile());
+    localStorage.setItem(CHARACTER_TRANSFER_STORAGE_KEY, serializeCharacterProfile(profile));
+    window.location.assign(createCharacterPlayUrl(profile, getCharacterPlayTarget()));
 });
 
 document.getElementById('export-button').addEventListener('click', async () => {
@@ -142,18 +161,22 @@ window.addEventListener('message', (event) => {
     }
 });
 
-if (window.parent !== window) {
+if (isEmbedded) {
     window.parent.postMessage({ type: 'editor-ready' }, window.location.origin);
+    const editorShell = document.querySelector('.editor-shell');
+    new ResizeObserver(reportEmbeddedHeight).observe(editorShell);
+    requestAnimationFrame(reportEmbeddedHeight);
 }
 
 function applyDraft() {
     profile = normalizeCharacterProfile(readFormProfile());
-    if (window.parent !== window) {
+    if (isEmbedded) {
         window.parent.postMessage({ type: 'apply-profile', profile }, window.location.origin);
         setStatus('Profil übernommen.');
         return;
     }
-    setStatus('Profil ist gültig. Öffne den Editor über einen Spielstand, um es zu übernehmen.');
+    localStorage.setItem(CHARACTER_TRANSFER_STORAGE_KEY, serializeCharacterProfile(profile));
+    setStatus('Profil lokal gespeichert.');
 }
 
 function applyProfile(nextProfile) {
@@ -248,6 +271,14 @@ function resizePreview() {
 
 function setStatus(message) {
     statusLine.textContent = message;
+    reportEmbeddedHeight();
+}
+
+function reportEmbeddedHeight() {
+    if (!isEmbedded) return;
+    const editorShell = document.querySelector('.editor-shell');
+    const height = Math.ceil(editorShell?.getBoundingClientRect().height || document.documentElement.scrollHeight);
+    window.parent.postMessage({ type: 'editor-height', height }, window.location.origin);
 }
 
 function pick(values) {

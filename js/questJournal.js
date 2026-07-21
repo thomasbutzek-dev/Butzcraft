@@ -1,6 +1,6 @@
 import { inventorySlots } from './inventory.js?v=20260721c';
 import { abandonSideQuest, getSideQuestProgress, getTrustTier } from './quests.js?v=20260721b';
-import { getCompassGuidance, resolveHomeTarget } from './questNavigation.js?v=20260720q';
+import { getCompassGuidance, getCompassHeadingDegrees, getRelativeCompassBearing, resolveHomeTarget } from './questNavigation.js?v=20260721e';
 
 const PROFESSION_NAMES = ['Schmied', 'Bauer', 'Händler', 'Bibliothekar'];
 
@@ -179,7 +179,8 @@ export function updateQuestCompass() {
         compass.hidden = true;
         return;
     }
-    const relativeBearing = guidance.bearing - (Number(context.headingDegrees) || 0);
+    const headingDegrees = getCompassHeadingDegrees(context.cameraYawRadians);
+    const relativeBearing = getRelativeCompassBearing(guidance.bearing, headingDegrees);
     const arrow = compass.querySelector('.quest-compass-arrow');
     const label = compass.querySelector('.quest-compass-label');
     const distance = compass.querySelector('.quest-compass-distance');
