@@ -23,7 +23,7 @@ describe('browser module identity', () => {
     it('cache-busts the browser entry after atlas changes', () => {
         const source = readFileSync('index.html', 'utf8');
 
-        expect(source).toContain('./js/GameMain.js?v=20260721e');
+        expect(source).toContain('./js/GameMain.js?v=20260721g');
     });
 
     it('loads world generation through one versioned URL everywhere', () => {
@@ -33,7 +33,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/world\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260721b']));
+        expect(new Set(specifiers)).toEqual(new Set(['./world.js?v=20260721d']));
     });
 
     it('loads inventory through one versioned URL everywhere', () => {

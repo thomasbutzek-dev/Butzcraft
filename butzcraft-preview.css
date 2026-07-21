@@ -234,24 +234,6 @@ button, input, select, textarea { font: inherit; }
 .legal-copy h2 { margin: 0 0 14px; font-family: Georgia, serif; font-size: clamp(28px, 4vw, 42px); overflow-wrap: anywhere; }
 .legal-copy h3 { margin: 24px 0 8px; font-size: 18px; }
 .legal-copy p, .legal-copy li { color: var(--muted); line-height: 1.72; }
-.legal-placeholder { padding: 18px 20px; border: 2px dashed #a77145; border-radius: 10px 7px 11px 6px; background: #fff4d8; color: #67401f !important; overflow-wrap: anywhere; }
-
-.cookie-notice { position: fixed; right: 22px; bottom: 22px; z-index: 80; width: min(520px, calc(100% - 44px)); padding: 22px; color: var(--parchment); border: 1px solid rgba(224,195,137,.58); border-radius: 14px 10px 15px 9px; background: radial-gradient(circle at 14% 0%, rgba(239,211,151,.13), transparent 38%), rgba(37,42,31,.97); box-shadow: 0 18px 46px rgba(20,17,12,.34); }
-.cookie-notice[hidden] { display: none; }
-.cookie-notice h2 { margin-bottom: 8px; font-family: Georgia, serif; font-size: 24px; }
-.cookie-notice p { margin-bottom: 16px; color: rgba(242,223,183,.82); font-size: 14px; line-height: 1.55; }
-.cookie-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
-.cookie-actions .button { min-height: 42px; padding: 0 16px; font-size: 13px; }
-.cookie-link { color: var(--parchment); border: 0; background: transparent; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
-.cookie-dialog { width: min(620px, calc(100% - 32px)); padding: 0; color: var(--ink); border: 1px solid var(--edge); border-radius: 15px 10px 16px 9px; background: var(--paper-light); box-shadow: 0 24px 70px rgba(20,17,12,.4); }
-.cookie-dialog::backdrop { background: rgba(25,28,21,.58); backdrop-filter: blur(4px); }
-.cookie-dialog-inner { padding: clamp(24px, 4vw, 36px); }
-.cookie-dialog h2 { margin-bottom: 12px; font-family: Georgia, serif; font-size: 34px; }
-.cookie-setting { display: flex; justify-content: space-between; gap: 24px; margin: 24px 0; padding: 18px 0; border-top: 1px solid var(--edge); border-bottom: 1px solid var(--edge); }
-.cookie-setting strong { display: block; margin-bottom: 5px; }
-.cookie-setting p { margin: 0; font-size: 14px; }
-.cookie-badge { align-self: start; padding: 6px 9px; color: #2f5128; border: 1px solid rgba(107,157,93,.45); border-radius: 999px; background: rgba(169,210,148,.32); font-size: 11px; font-weight: 800; white-space: nowrap; }
-
 /* Geschützter Redaktionsmodus */
 .site-admin-login { position: fixed; inset: 0; z-index: 120; display: grid; place-items: center; padding: 24px; background: rgba(25,28,21,.78); backdrop-filter: blur(9px); }
 .site-admin-login[hidden], .site-admin-bar[hidden] { display: none; }
@@ -276,7 +258,6 @@ button, input, select, textarea { font: inherit; }
 .site-edit-mode [data-content-key] a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .site-edit-mode [data-image-key] { cursor: pointer; outline: 3px dashed var(--gold); outline-offset: -8px; }
 .site-edit-mode .world-card::before { content: "Bild ändern"; position: absolute; z-index: 3; top: 16px; right: 16px; padding: 7px 10px; color: var(--ink); border-radius: 7px 5px 8px 4px; background: var(--gold-light); box-shadow: 0 5px 14px rgba(20,17,12,.3); font-size: 11px; font-weight: 850; pointer-events: none; }
-.site-edit-mode .cookie-notice { display: none; }
 
 @media (max-width: 1100px) {
     .world-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -340,8 +321,6 @@ button, input, select, textarea { font: inherit; }
     .site-editor-tools { width: auto; flex-wrap: wrap; }
     .site-admin-actions { display: grid; grid-template-columns: 1fr 1fr; }
     .site-admin-actions .button { width: 100%; }
-    .cookie-notice { right: 14px; bottom: 14px; width: calc(100% - 28px); }
-    .cookie-actions .button { width: 100%; }
     .page-hero { padding: 56px 0; }
     .page-hero figure { height: 280px; }
     .key-grid, .recipe-grid { grid-template-columns: 1fr; }

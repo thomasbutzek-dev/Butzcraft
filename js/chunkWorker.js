@@ -361,6 +361,29 @@ function choosePlainsVegetation(wx, wz, rng) {
     return 0;
 }
 
+function spawnSnowRock(data, x, h, z, worldX, worldZ) {
+    const rockRng = mulberry32(Math.imul(worldX, 92837111) ^ Math.imul(worldZ, 689287499));
+    setBlockLocal(data, x, h, z, 3);
+    if (rockRng() < 0.65) {
+        const dx = rockRng() < 0.5 ? -1 : 1;
+        const dz = rockRng() < 0.5 ? -1 : 1;
+        if (getTerrainHeightAt(worldX + dx, worldZ + dz) === h) {
+            setBlockLocal(data, x + dx, h, z + dz, 3);
+        }
+    }
+    if (rockRng() < 0.3) setBlockLocal(data, x, h + 1, z, 3);
+}
+
+function spawnIceMound(data, x, h, z, worldX, worldZ) {
+    const iceRng = mulberry32(Math.imul(worldX, 19349663) ^ Math.imul(worldZ, 83492791));
+    setBlockLocal(data, x, h, z, 78);
+    const dx = iceRng() < 0.5 ? -1 : 1;
+    const dz = iceRng() < 0.5 ? -1 : 1;
+    if (getTerrainHeightAt(worldX + dx, worldZ) === h) setBlockLocal(data, x + dx, h, z, 78);
+    if (getTerrainHeightAt(worldX, worldZ + dz) === h) setBlockLocal(data, x, h, z + dz, 78);
+    if (iceRng() < 0.45) setBlockLocal(data, x, h + 1, z, 78);
+}
+
 function spawnTree(data, x, h, z, biome, rng, worldX, worldZ) {
     const isJ = biome === BIOMES.JUNGLE;
     const isSnow = biome === BIOMES.SNOW;
@@ -425,6 +448,30 @@ function spawnTree(data, x, h, z, biome, rng, worldX, worldZ) {
                 if (Math.sqrt(lx * lx + lz * lz + (ly - 1.5) * (ly - 1.5)) > lr) continue;
                 const idx = (wy * CHUNK_SIZE * CHUNK_SIZE) + (wz * CHUNK_SIZE) + wx;
                 if (data[idx] === 0) data[idx] = lt;
+            }
+        }
+    }
+}
+
+function frostSnowyTreeCanopies(data, cx, cz) {
+    const layerSize = CHUNK_SIZE * CHUNK_SIZE;
+    for (let rootY = 1; rootY < CHUNK_HEIGHT - 1; rootY++) {
+        for (let rootZ = 0; rootZ < CHUNK_SIZE; rootZ++) {
+            for (let rootX = 0; rootX < CHUNK_SIZE; rootX++) {
+                const rootIndex = rootY * layerSize + rootZ * CHUNK_SIZE + rootX;
+                if (data[rootIndex] !== 5 || data[rootIndex - layerSize] === 5) continue;
+                const worldX = cx * CHUNK_SIZE + rootX;
+                const worldZ = cz * CHUNK_SIZE + rootZ;
+                if (getBiomeAt(worldX, worldZ) !== BIOMES.SNOW && data[rootIndex - layerSize] !== 11) continue;
+
+                for (let y = rootY + 2; y <= Math.min(CHUNK_HEIGHT - 2, rootY + 11); y++) {
+                    for (let z = Math.max(0, rootZ - 4); z <= Math.min(CHUNK_SIZE - 1, rootZ + 4); z++) {
+                        for (let x = Math.max(0, rootX - 4); x <= Math.min(CHUNK_SIZE - 1, rootX + 4); x++) {
+                            const index = y * layerSize + z * CHUNK_SIZE + x;
+                            if (data[index] === 6 && data[index + layerSize] === 0) data[index] = 77;
+                        }
+                    }
+                }
             }
         }
     }
@@ -1921,7 +1968,9 @@ function generateTerrain(cx, cz, buffer) {
 
             if (h > WATER_LEVEL + 1) {
                 const surfIdx = (h * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x;
-                if (biome === BIOMES.PLAINS) {
+                const surfaceIndex = ((h - 1) * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x;
+                const isSnowLandscape = biome === BIOMES.SNOW || data[surfaceIndex] === 11;
+                if (biome === BIOMES.PLAINS && !isSnowLandscape) {
                     const plant = choosePlainsVegetation(wx, wz, rng);
                     if (plant) data[surfIdx] = plant;
                 }
@@ -1942,8 +1991,18 @@ function generateTerrain(cx, cz, buffer) {
                     else if (r < 0.25) data[surfIdx] = rng() < 0.5 ? 47 : 48;
                     else if (r < 0.29 && lush > 0.25) data[surfIdx] = 44;
                 }
-                if (biome === BIOMES.SNOW && rng() < 0.012) {
-                    data[surfIdx] = rng() < 0.7 ? 46 : 44;
+                if (isSnowLandscape) {
+                    const snowFeatureRng = mulberry32(Math.imul(wx, 374761393) ^ Math.imul(wz, 668265263));
+                    const snowFeatureRoll = snowFeatureRng();
+                    if (snowFeatureRoll < 0.018) spawnSnowRock(data, x, h, z, wx, wz);
+                    else if (snowFeatureRoll < 0.03) spawnIceMound(data, x, h, z, wx, wz);
+                    else if (snowFeatureRoll < 0.06) data[surfIdx] = 46;
+                }
+                if (isSnowLandscape) {
+                    const snowPlantRoll = rng();
+                    if (data[surfIdx] === 0 && snowPlantRoll < 0.012) {
+                        data[surfIdx] = rng() < 0.7 ? 46 : 44;
+                    }
                 }
                 if (h === WATER_LEVEL + 1 && (biome === BIOMES.PLAINS || biome === BIOMES.JUNGLE)) {
                     const isShore = rng() < 0.08;
@@ -1954,8 +2013,9 @@ function generateTerrain(cx, cz, buffer) {
                         }
                     }
                 }
-                const tc = (biome === BIOMES.JUNGLE) ? 0.08 : (biome === BIOMES.PLAINS) ? 0.015 : (biome === BIOMES.SNOW) ? 0.018 : 0;
-                if (rng() < tc) spawnTree(data, x, h, z, biome, rng, wx, wz);
+                const treeBiome = isSnowLandscape ? BIOMES.SNOW : biome;
+                const tc = (treeBiome === BIOMES.JUNGLE) ? 0.08 : (treeBiome === BIOMES.PLAINS) ? 0.015 : (treeBiome === BIOMES.SNOW) ? 0.0015 : 0;
+                if (rng() < tc) spawnTree(data, x, h, z, treeBiome, rng, wx, wz);
                 if (biome === BIOMES.DESERT && rng() < 0.008 && canSpawnPalmAt(wx, wz, h)) {
                     spawnPalm(data, x, h, z, wx, wz);
                 }
@@ -1963,6 +2023,7 @@ function generateTerrain(cx, cz, buffer) {
         }
     }
 
+    frostSnowyTreeCanopies(data, cx, cz);
     drawVillageRoads(data, cx, cz);
 
     // Prozedurale Strukturen: Im 3×3-Nachbar-Chunk-Bereich prüfen, ob eine Struktur startet,
