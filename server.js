@@ -5,6 +5,8 @@ const bodyParser = require('body-parser');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const sanitizeHtml = require('sanitize-html');
+const nodemailer = require('nodemailer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -17,6 +19,10 @@ const websiteHosts = new Set(
         .filter(Boolean)
 );
 const gameOrigin = process.env.GAME_ORIGIN || '';
+function isWebsiteRequest(req) {
+    const hostname = req.hostname.toLowerCase();
+    return websiteHosts.has(hostname) || (!isProduction && ['localhost', '127.0.0.1', '::1'].includes(hostname));
+}
 app.use(compression());
 
 app.get('/health', (req, res) => {
@@ -48,9 +54,27 @@ const adminUsername = process.env.SITE_ADMIN_USER || 'admin';
 const adminPassword = process.env.SITE_ADMIN_PASSWORD || '';
 const adminSessions = new Map();
 const loginAttempts = new Map();
+const contactAttempts = new Map();
 const ADMIN_COOKIE = 'butzcraft_admin';
 const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
 const CONTENT_KEY = /^[a-z0-9.-]{1,80}$/;
+const CONTACT_WINDOW_MS = 15 * 60 * 1000;
+const CONTACT_LIMIT = 5;
+const CONTACT_SUBJECTS = new Set(['Frage zum Spiel', 'Fehler melden', 'Idee und Feedback', 'Sonstiges']);
+const contactToEmail = process.env.CONTACT_TO_EMAIL || '';
+const contactFromEmail = process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER || '';
+const smtpHost = process.env.SMTP_HOST || '';
+const smtpPort = Number(process.env.SMTP_PORT || 587);
+const smtpUser = process.env.SMTP_USER || '';
+const smtpPassword = process.env.SMTP_PASSWORD || '';
+const contactTransport = smtpHost && smtpUser && smtpPassword && contactToEmail && contactFromEmail
+    ? nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: process.env.SMTP_SECURE === 'true' || smtpPort === 465,
+        auth: { user: smtpUser, pass: smtpPassword }
+    })
+    : null;
 
 fs.mkdirSync(siteMediaDir, { recursive: true });
 
@@ -58,12 +82,23 @@ function emptySiteContent() {
     return { texts: {}, images: {}, updatedAt: null };
 }
 
+function sanitizeSiteMarkup(value) {
+    return sanitizeHtml(String(value), {
+        allowedTags: ['br', 'strong', 'em', 'u', 'a'],
+        allowedAttributes: { a: ['href'] },
+        allowedSchemes: ['http', 'https'],
+        allowProtocolRelative: false
+    });
+}
+
 function readSiteContent() {
     if (!fs.existsSync(siteContentFile)) return emptySiteContent();
     try {
         const content = JSON.parse(fs.readFileSync(siteContentFile, 'utf8'));
         return {
-            texts: content.texts && typeof content.texts === 'object' ? content.texts : {},
+            texts: content.texts && typeof content.texts === 'object'
+                ? Object.fromEntries(Object.entries(content.texts).map(([key, value]) => [key, sanitizeSiteMarkup(value)]))
+                : {},
             images: content.images && typeof content.images === 'object' ? content.images : {},
             updatedAt: content.updatedAt || null
         };
@@ -114,13 +149,15 @@ function validateSiteContent(input) {
     const imageEntries = Object.entries(images);
     if (textEntries.length > 100 || imageEntries.length > 30) return null;
 
+    const sanitizedTexts = {};
     for (const [key, value] of textEntries) {
         if (!CONTENT_KEY.test(key) || typeof value !== 'string' || value.length > 4000) return null;
+        sanitizedTexts[key] = sanitizeSiteMarkup(value);
     }
     for (const [key, value] of imageEntries) {
         if (!CONTENT_KEY.test(key) || typeof value !== 'string' || !/^\/site-media\/[a-z0-9-]+\.(webp|png|jpg)$/.test(value)) return null;
     }
-    return { texts, images, updatedAt: new Date().toISOString() };
+    return { texts: sanitizedTexts, images, updatedAt: new Date().toISOString() };
 }
 
 function validImageSignature(buffer, mimeType) {
@@ -194,8 +231,47 @@ app.post('/api/admin/image', requireSiteAdmin, (req, res) => {
     res.status(201).json({ url: `/site-media/${filename}` });
 });
 
+app.post('/api/contact', async (req, res) => {
+    if (req.body?.website) return res.json({ success: true });
+    if (!contactTransport) {
+        return res.status(503).json({ error: 'Der Nachrichtenversand ist noch nicht eingerichtet.' });
+    }
+
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : '';
+    const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
+    const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (!name || name.length > 80 || /[\r\n]/.test(name) || !emailIsValid || email.length > 160 || !CONTACT_SUBJECTS.has(subject) || !message || message.length > 4000 || req.body?.privacy !== true) {
+        return res.status(400).json({ error: 'Bitte prüfe deine Angaben und versuche es erneut.' });
+    }
+
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    const now = Date.now();
+    const recentAttempts = (contactAttempts.get(ip) || []).filter(timestamp => timestamp > now - CONTACT_WINDOW_MS);
+    if (recentAttempts.length >= CONTACT_LIMIT) {
+        return res.status(429).json({ error: 'Zu viele Nachrichten. Bitte versuche es später erneut.' });
+    }
+    recentAttempts.push(now);
+    contactAttempts.set(ip, recentAttempts);
+
+    try {
+        await contactTransport.sendMail({
+            from: contactFromEmail,
+            to: contactToEmail,
+            replyTo: { name, address: email },
+            subject: `[Butzcraft] ${subject}`,
+            text: `Name: ${name}\nE-Mail: ${email}\nThema: ${subject}\n\n${message}`
+        });
+        res.json({ success: true });
+    } catch (error) {
+        console.error(`Contact mail could not be sent: ${error.message}`);
+        res.status(502).json({ error: 'Die Nachricht konnte gerade nicht versendet werden. Bitte versuche es später erneut.' });
+    }
+});
+
 app.get('/admin', (req, res) => {
-    res.redirect(302, '/butzcraft-preview.html?edit=1');
+    res.redirect(302, '/?edit=1');
 });
 
 const savesDir = path.join(__dirname, 'saves');
@@ -355,11 +431,33 @@ const staticOptions = {
 };
 
 app.get('/index.html', (req, res, next) => {
-    if (isProduction && gameOrigin && websiteHosts.has(req.hostname.toLowerCase())) {
+    if (isProduction && gameOrigin && isWebsiteRequest(req)) {
         return res.redirect(302, gameOrigin);
     }
     next();
 });
+
+function sendSitePage(res, filename) {
+    const root = staticRoots.find(candidate => fs.existsSync(path.join(candidate, filename)));
+    if (!root) return res.status(503).send('Production build missing. Run npm run build.');
+    res.sendFile(path.join(root, filename));
+}
+
+const cleanSiteRoutes = new Map([
+    ['/guide', 'guide.html'],
+    ['/faq', 'faq.html'],
+    ['/impressum', 'impressum.html'],
+    ['/datenschutz', 'datenschutz.html']
+]);
+
+app.get('/butzcraft-preview.html', (req, res) => {
+    const query = req.originalUrl.includes('?') ? req.originalUrl.slice(req.originalUrl.indexOf('?')) : '';
+    res.redirect(301, `/${query}`);
+});
+for (const [route, filename] of cleanSiteRoutes) {
+    app.get(`${route}.html`, (req, res) => res.redirect(301, route));
+    app.get(route, (req, res) => sendSitePage(res, filename));
+}
 
 staticRoots.forEach(root => {
     app.use(express.static(root, { ...staticOptions, index: false }));
@@ -374,13 +472,10 @@ app.get('/', (req, res) => {
     if (isProduction && !hasDistIndex) {
         return res.status(503).send('Production build missing. Run npm run build.');
     }
-    const entryFile = isProduction && websiteHosts.has(req.hostname.toLowerCase())
+    const entryFile = isWebsiteRequest(req)
         ? 'butzcraft-preview.html'
         : 'index.html';
-    const indexPath = hasDistIndex
-        ? path.join(distDir, entryFile)
-        : path.join(__dirname, 'index.html');
-    res.sendFile(indexPath);
+    sendSitePage(res, entryFile);
 });
 
 // Bind-Default: Localhost-only. Wer LAN-Zugriff (z.B. zum Testen vom Handy) braucht,

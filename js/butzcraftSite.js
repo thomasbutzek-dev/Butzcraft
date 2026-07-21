@@ -120,20 +120,37 @@ window.addEventListener('message', event => {
 });
 
 const contactForm = document.querySelector('[data-contact-form]');
-contactForm?.addEventListener('submit', event => {
+contactForm?.addEventListener('submit', async event => {
     event.preventDefault();
     const status = contactForm.querySelector('[data-contact-status]');
-    const recipient = contactForm.dataset.recipient?.trim();
-    if (!recipient) {
-        status.textContent = 'Die Versandadresse muss vor der Veröffentlichung noch hinterlegt werden.';
-        return;
-    }
-
     const data = new FormData(contactForm);
-    const subject = `[Butzcraft] ${data.get('subject')}`;
-    const body = `Name: ${data.get('name')}\nE-Mail: ${data.get('email')}\n\n${data.get('message')}`;
-    window.location.href = `mailto:${recipient}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-    status.textContent = 'Dein E-Mail-Programm wird geöffnet. Bitte sende die vorbereitete Nachricht dort ab.';
+    const submitButton = contactForm.querySelector('button[type="submit"]');
+    submitButton.disabled = true;
+    status.textContent = 'Deine Nachricht wird versendet …';
+
+    try {
+        const response = await fetch('/api/contact', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                name: data.get('name'),
+                email: data.get('email'),
+                subject: data.get('subject'),
+                message: data.get('message'),
+                privacy: data.get('privacy') === 'on',
+                website: data.get('website')
+            })
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(result.error || 'Die Nachricht konnte nicht versendet werden.');
+        contactForm.reset();
+        status.textContent = 'Deine Nachricht ist am Lagerfeuer angekommen. Danke!';
+    } catch (error) {
+        status.textContent = error.message;
+    } finally {
+        submitButton.disabled = false;
+    }
 });
 
 const COOKIE_NOTICE_KEY = 'butzcraft-cookie-notice-v1';
@@ -144,7 +161,7 @@ document.body.insertAdjacentHTML('beforeend', `
         <div class="cookie-actions">
             <button class="button button-primary" type="button" data-cookie-accept>Verstanden</button>
             <button class="cookie-link" type="button" data-cookie-open>Einstellungen ansehen</button>
-            <a class="cookie-link" href="datenschutz.html">Datenschutz</a>
+            <a class="cookie-link" href="/datenschutz">Datenschutz</a>
         </div>
     </aside>
     <dialog class="cookie-dialog" data-cookie-dialog aria-labelledby="cookie-dialog-title">
@@ -158,7 +175,7 @@ document.body.insertAdjacentHTML('beforeend', `
             </div>
             <div class="cookie-actions">
                 <button class="button button-primary" type="button" data-cookie-save>Einstellungen speichern</button>
-                <a class="cookie-link" href="datenschutz.html">Details im Datenschutz</a>
+                <a class="cookie-link" href="/datenschutz">Details im Datenschutz</a>
             </div>
         </div>
     </dialog>

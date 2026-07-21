@@ -22,7 +22,7 @@ export async function initializeSiteContent() {
 function applyContent(content) {
     for (const element of document.querySelectorAll('[data-content-key]')) {
         const value = content.texts[element.dataset.contentKey];
-        if (typeof value === 'string') element.textContent = value;
+        if (typeof value === 'string') element.innerHTML = value.replace(/\r?\n/g, '<br>');
     }
 
     for (const image of document.querySelectorAll('[data-image-key]')) {
@@ -54,6 +54,14 @@ function setupAdminMode(initialContent) {
         </aside>
         <aside class="site-admin-bar" data-admin-bar hidden aria-label="Redaktionswerkzeuge">
             <div><strong>Bearbeitungsmodus</strong><p data-admin-status>Texte anklicken oder ein Bild auswählen.</p></div>
+            <div class="site-editor-tools" data-admin-tools role="toolbar" aria-label="Text formatieren">
+                <button type="button" data-editor-command="bold" title="Fett" aria-label="Fett"><strong>F</strong></button>
+                <button type="button" data-editor-command="italic" title="Kursiv" aria-label="Kursiv"><em>K</em></button>
+                <button type="button" data-editor-command="underline" title="Unterstreichen" aria-label="Unterstreichen"><u>U</u></button>
+                <button type="button" data-editor-link title="Link einfügen" aria-label="Link einfügen">Link</button>
+                <button type="button" data-editor-break title="Zeilenumbruch" aria-label="Zeilenumbruch">↵</button>
+                <button type="button" data-editor-command="removeFormat" title="Formatierung entfernen" aria-label="Formatierung entfernen">Tx</button>
+            </div>
             <div class="site-admin-actions">
                 <button class="button site-admin-logout" type="button" data-admin-logout>Abmelden</button>
                 <button class="button button-primary" type="button" data-admin-save>Änderungen speichern</button>
@@ -67,7 +75,9 @@ function setupAdminMode(initialContent) {
     const loginStatus = document.querySelector('[data-admin-login-status]');
     const adminBar = document.querySelector('[data-admin-bar]');
     const adminStatus = document.querySelector('[data-admin-status]');
+    const editorTools = document.querySelector('[data-admin-tools]');
     const imageInput = document.querySelector('[data-admin-image-input]');
+    let activeEditable = null;
 
     checkSession();
 
@@ -110,7 +120,43 @@ function setupAdminMode(initialContent) {
         try {
             await requestJson(LOGOUT_ENDPOINT, { method: 'POST' });
         } finally {
-            window.location.replace('butzcraft-preview.html');
+            window.location.replace('/');
+        }
+    });
+
+    editorTools.addEventListener('mousedown', event => event.preventDefault());
+    editorTools.addEventListener('click', event => {
+        const button = event.target.closest('button');
+        if (!button || !activeEditable) return;
+        activeEditable.focus();
+
+        if (button.dataset.editorCommand) {
+            document.execCommand(button.dataset.editorCommand, false);
+        } else if (button.hasAttribute('data-editor-break')) {
+            document.execCommand('insertHTML', false, '<br>');
+        } else if (button.hasAttribute('data-editor-link')) {
+            const href = window.prompt('Zieladresse des Links (https:// …)');
+            if (!href) return;
+            if (!/^https?:\/\//i.test(href) && !href.startsWith('/')) {
+                adminStatus.textContent = 'Links müssen mit https:// oder / beginnen.';
+                return;
+            }
+            document.execCommand('createLink', false, href);
+        }
+
+        adminStatus.textContent = 'Text geändert. Zum Veröffentlichen noch speichern.';
+    });
+
+    document.addEventListener('focusin', event => {
+        const editable = event.target.closest?.('[data-content-key]');
+        if (!editable || !document.body.classList.contains('site-edit-mode')) return;
+        activeEditable = editable;
+        editorTools.classList.add('is-active');
+    });
+
+    document.addEventListener('input', event => {
+        if (event.target.closest?.('[data-content-key]')) {
+            adminStatus.textContent = 'Text geändert. Zum Veröffentlichen noch speichern.';
         }
     });
 
@@ -184,7 +230,7 @@ function setupAdminMode(initialContent) {
 function collectContent(currentContent) {
     const texts = {};
     for (const element of document.querySelectorAll('[data-content-key]')) {
-        texts[element.dataset.contentKey] = element.textContent.trim();
+        texts[element.dataset.contentKey] = serializeEditableContent(element);
     }
 
     const images = { ...currentContent.images };
@@ -192,6 +238,48 @@ function collectContent(currentContent) {
         if (image.dataset.siteImageValue) images[image.dataset.imageKey] = image.dataset.siteImageValue;
     }
     return { texts, images };
+}
+
+function serializeEditableContent(element) {
+    const serializeChildren = parent => {
+        let html = '';
+        for (const node of parent.childNodes) {
+            if (node.nodeType === Node.TEXT_NODE) {
+                html += escapeHtml(node.textContent).replace(/\r?\n/g, '<br>');
+                continue;
+            }
+            if (node.nodeType !== Node.ELEMENT_NODE) continue;
+
+            const tag = node.tagName.toLowerCase();
+            const children = serializeChildren(node);
+            if (tag === 'br') html += '<br>';
+            else if (tag === 'b' || tag === 'strong') html += `<strong>${children}</strong>`;
+            else if (tag === 'i' || tag === 'em') html += `<em>${children}</em>`;
+            else if (tag === 'u') html += `<u>${children}</u>`;
+            else if (tag === 'a') {
+                const href = node.getAttribute('href') || '';
+                html += (/^https?:\/\//i.test(href) || href.startsWith('/'))
+                    ? `<a href="${escapeHtml(href)}">${children}</a>`
+                    : children;
+            } else if (tag === 'div' || tag === 'p') {
+                if (html && !html.endsWith('<br>')) html += '<br>';
+                html += children;
+            } else {
+                html += children;
+            }
+        }
+        return html;
+    };
+
+    return serializeChildren(element).replace(/^(<br>)+|(<br>)+$/g, '').trim();
+}
+
+function escapeHtml(value) {
+    return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
 }
 
 function normalizeContent(value) {

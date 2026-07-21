@@ -17,6 +17,13 @@ services:
       SITE_ADMIN_USER: ${SITE_ADMIN_USER:-admin}
       SITE_ADMIN_PASSWORD: ${SITE_ADMIN_PASSWORD:-}
       SITE_CONTENT_DIR: /app/site-content
+      CONTACT_TO_EMAIL: ${CONTACT_TO_EMAIL:-kontakt@butzcraft.de}
+      CONTACT_FROM_EMAIL: ${CONTACT_FROM_EMAIL:-kontakt@butzcraft.de}
+      SMTP_HOST: ${SMTP_HOST:-smtp.hostinger.com}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-true}
+      SMTP_USER: ${SMTP_USER:-kontakt@butzcraft.de}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
     expose:
       - "3000"
     volumes:
