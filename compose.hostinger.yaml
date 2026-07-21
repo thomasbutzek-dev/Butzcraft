@@ -2,8 +2,8 @@ name: butzcraft
 
 services:
   app:
-    build:
-      context: https://github.com/thomasbutzek-dev/Butzcraft.git#stabilization/game-optimization
+    image: ghcr.io/thomasbutzek-dev/butzcraft:stabilization
+    pull_policy: always
     restart: unless-stopped
     init: true
     environment:
