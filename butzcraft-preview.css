@@ -165,9 +165,11 @@ button, input, select, textarea { font: inherit; }
 .contact-form input:not([type="checkbox"]), .contact-form select, .contact-form textarea { width: 100%; color: var(--ink); border: 1px solid var(--edge); border-radius: 8px 6px 9px 5px; background: rgba(255,255,255,.72); box-shadow: inset 0 1px 3px rgba(73,54,30,.08); }
 .contact-form input:not([type="checkbox"]), .contact-form select { height: 48px; padding: 0 13px; }
 .contact-form textarea { min-height: 180px; padding: 13px; resize: vertical; }
+.contact-trap { position: absolute !important; left: -10000px; width: 1px; height: 1px; overflow: hidden; }
 .consent-check { grid-template-columns: 20px 1fr !important; align-items: start; color: var(--muted) !important; font-weight: 500 !important; line-height: 1.5; }
 .consent-check input { width: 17px; height: 17px; margin: 3px 0 0; accent-color: var(--green); }
 .contact-form .button { justify-self: start; }
+.contact-form .button:disabled { cursor: wait; opacity: .65; }
 .form-status { min-height: 22px; margin: 0; font-size: 13px; }
 
 .final-cta { position: relative; min-height: 80svh; display: grid; place-items: center; overflow: hidden; isolation: isolate; }
@@ -259,14 +261,19 @@ button, input, select, textarea { font: inherit; }
 .site-admin-login-card form { display: grid; gap: 14px; margin-top: 22px; }
 .site-admin-login-card label { display: grid; gap: 7px; color: var(--parchment); font-size: 13px; font-weight: 750; }
 .site-admin-login-card input { height: 46px; padding: 0 12px; color: var(--parchment); border: 1px solid rgba(224,195,137,.45); border-radius: 8px 6px 9px 5px; background: rgba(20,17,12,.45); }
-.site-admin-bar { position: fixed; right: 18px; bottom: 18px; left: 18px; z-index: 110; min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 18px; width: min(900px, calc(100% - 36px)); margin: 0 auto; padding: 10px 12px 10px 18px; color: var(--parchment); border: 1px solid rgba(224,195,137,.58); border-radius: 13px 9px 14px 8px; background: rgba(37,42,31,.97); box-shadow: 0 18px 46px rgba(20,17,12,.4); backdrop-filter: blur(10px); }
+.site-admin-bar { position: fixed; right: 18px; bottom: 18px; left: 18px; z-index: 110; min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 18px; width: min(1120px, calc(100% - 36px)); margin: 0 auto; padding: 10px 12px 10px 18px; color: var(--parchment); border: 1px solid rgba(224,195,137,.58); border-radius: 13px 9px 14px 8px; background: rgba(37,42,31,.97); box-shadow: 0 18px 46px rgba(20,17,12,.4); backdrop-filter: blur(10px); }
 .site-admin-bar strong { color: var(--gold-light); }
 .site-admin-bar p { margin: 3px 0 0; color: rgba(242,223,183,.72); font-size: 12px; }
+.site-editor-tools { display: flex; align-items: center; gap: 5px; padding: 5px; border: 1px solid rgba(224,195,137,.28); border-radius: 8px 6px 9px 5px; opacity: .62; }
+.site-editor-tools.is-active { opacity: 1; }
+.site-editor-tools button { min-width: 34px; height: 34px; padding: 0 8px; color: var(--parchment); border: 1px solid transparent; border-radius: 5px; background: rgba(255,255,255,.06); cursor: pointer; }
+.site-editor-tools button:hover, .site-editor-tools button:focus-visible { color: var(--ink); border-color: var(--gold-light); background: var(--gold-light); }
 .site-admin-actions { display: flex; gap: 8px; }
 .site-admin-actions .button { min-height: 42px; padding: 0 15px; font-size: 13px; }
 .site-admin-logout { color: var(--parchment); border-color: rgba(224,195,137,.42); background: rgba(75,76,54,.7); }
 .site-edit-mode [data-content-key] { border-radius: 5px; outline: 1px dashed rgba(225,189,85,.72); outline-offset: 4px; cursor: text; }
 .site-edit-mode [data-content-key]:hover, .site-edit-mode [data-content-key]:focus { outline: 3px solid var(--gold); background: rgba(240,214,129,.12); }
+.site-edit-mode [data-content-key] a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 .site-edit-mode [data-image-key] { cursor: pointer; outline: 3px dashed var(--gold); outline-offset: -8px; }
 .site-edit-mode .world-card::before { content: "Bild ändern"; position: absolute; z-index: 3; top: 16px; right: 16px; padding: 7px 10px; color: var(--ink); border-radius: 7px 5px 8px 4px; background: var(--gold-light); box-shadow: 0 5px 14px rgba(20,17,12,.3); font-size: 11px; font-weight: 850; pointer-events: none; }
 .site-edit-mode .cookie-notice { display: none; }
@@ -304,6 +311,8 @@ button, input, select, textarea { font: inherit; }
     .site-footer { grid-template-columns: 1fr; justify-items: start; padding: 42px 0; }
     .site-footer nav { justify-content: flex-start; }
     .site-footer p { justify-self: start; }
+    .site-admin-bar { flex-wrap: wrap; }
+    .site-editor-tools { order: 3; width: 100%; }
 }
 
 @media (max-width: 620px) {
@@ -328,6 +337,7 @@ button, input, select, textarea { font: inherit; }
     .form-row { grid-template-columns: 1fr; }
     .contact-form .button { width: 100%; }
     .site-admin-bar { align-items: stretch; flex-direction: column; }
+    .site-editor-tools { width: auto; flex-wrap: wrap; }
     .site-admin-actions { display: grid; grid-template-columns: 1fr 1fr; }
     .site-admin-actions .button { width: 100%; }
     .cookie-notice { right: 14px; bottom: 14px; width: calc(100% - 28px); }

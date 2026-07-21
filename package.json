@@ -21,6 +21,8 @@
     "compression": "^1.8.1",
     "cors": "^2.8.6",
     "express": "^5.2.1",
+    "nodemailer": "^9.0.3",
+    "sanitize-html": "^2.17.6",
     "three": "^0.160.0"
   },
   "devDependencies": {
