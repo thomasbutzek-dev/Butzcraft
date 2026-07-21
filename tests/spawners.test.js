@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from '../js/spawners.js';
+import { canParrotSpawnInBiome, canSpawnerSpawnAt, findSpawnerBlocksInRange } from '../js/spawners.js';
 
 describe('spawner helpers', () => {
+    it('verbietet Papageien im Schneefeld', () => {
+        expect(canParrotSpawnInBiome('Schneefeld')).toBe(false);
+    });
+
     it('findet Spawner auch wenn sie nicht auf einem Vierer-Raster liegen', () => {
         const blocks = new Map([['3,5,7', 83]]);
         const world = {

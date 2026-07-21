@@ -3,7 +3,7 @@
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717z';
-        import { World, getBiomeAt, BIOMES } from './world.js?v=20260721b';
+        import { World, getBiomeAt, BIOMES } from './world.js?v=20260721d';
         import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260720q';
         import { BloodMoonBoss } from './bloodMoonBoss.js?v=20260720a';
 
@@ -30,7 +30,7 @@
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260718b';
         import { SaveRepository } from './saveRepository.js?v=20260718a';
         import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260719a';
-        import { canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260515a';
+        import { canParrotSpawnInBiome, canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260721a';
         import { findSafeBedRespawn, normalizeRespawnBed } from './respawn.js?v=20260716a';
         import { TorchLightSystem, TORCH_TYPE } from './torchLights.js?v=20260719a';
         import { DamageFeedback } from './damageFeedback.js?v=20260718a';
@@ -1909,7 +1909,7 @@
                         }
 
                         // Papageien: tagsüber, unabhängig vom Land-Mob-Cap (eigenes Cap: 5)
-                        if (!isNight && parrotCount < 5 && !isWaterSpawn && !waterNearby && spawnY > 0 && spawnY <= 46) {
+                        if (canParrotSpawnInBiome(getBiomeAt(ox, oz)) && !isNight && parrotCount < 5 && !isWaterSpawn && !waterNearby && spawnY > 0 && spawnY <= 46) {
                             let leavesNearby = false;
                             outer2: for (let dy = -2; dy <= 12; dy++) {
                                 for (let dx = -4; dx <= 4; dx++) {

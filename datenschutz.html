@@ -28,58 +28,68 @@
 
     <main id="main-content" class="content-section">
         <article class="legal-layout legal-copy">
-            <p class="legal-placeholder"><strong>Vor Veröffentlichung vervollständigen:</strong> Verantwortlicher, Hosting-Vertragspartner, Speicherfristen und zuständige Aufsichtsbehörde müssen anhand der echten Betreiber- und Hostingdaten ergänzt werden.</p>
-
             <section>
                 <h2>1. Verantwortlicher</h2>
-                <p class="legal-placeholder">[VOLLSTÄNDIGER NAME ODER FIRMA]<br>[LADUNGSFÄHIGE ANSCHRIFT]<br>E-Mail: [DATENSCHUTZ-KONTAKT]</p>
+                <p>Thomas Butzek<br>Nicolaistraße 16<br>39576 Stendal<br>Deutschland<br>E-Mail: <a href="mailto:kontakt@butzcraft.de">kontakt@butzcraft.de</a></p>
             </section>
 
             <section>
                 <h2>2. Aufruf der Website und Hosting</h2>
-                <p>Beim Aufruf von butzcraft.de oder play.butzcraft.de werden technisch erforderliche Verbindungsdaten verarbeitet. Dazu können IP-Adresse, Zeitpunkt, aufgerufene Adresse, Referrer, Browser- und Betriebssystemangaben sowie der HTTP-Status gehören. Die Verarbeitung dient der sicheren und stabilen Bereitstellung des Angebots. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt im sicheren Betrieb der Website.</p>
-                <p class="legal-placeholder">Hosting-Anbieter/Auftragsverarbeiter: [VERTRAGSPARTNER MIT ANSCHRIFT]. Löschfrist für Server- und Proxy-Logs: [TATSÄCHLICHE FRIST]. Drittlandübermittlung und Garantien: [ANGABE NACH VERTRAG UND SERVERSTANDORT].</p>
+                <p>Beim Aufruf von butzcraft.de oder play.butzcraft.de werden die IP-Adresse und die technischen Angaben der HTTP-Anfrage vorübergehend an den Server und den vorgeschalteten Reverse-Proxy Traefik übertragen. Das ist erforderlich, um die Verbindung herzustellen und die angeforderten Inhalte auszuliefern. Butzcraft und Traefik erstellen dabei keine HTTP-Zugriffsprotokolle. Insbesondere wird keine fortlaufende Liste der Seitenaufrufe gespeichert. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; das berechtigte Interesse liegt im sicheren und zuverlässigen Betrieb der Website.</p>
+                <p>Hosting- und E-Mail-Anbieter ist nach den Hostinger-Vertragsbedingungen:</p>
+                <p>Hostinger International Ltd.<br>61 Lordou Vironos Street<br>Larnaca 6023<br>Cyprus</p>
+                <p>Der selbst verwaltete VPS befindet sich in Frankfurt am Main, Deutschland. Für den VPS wird kein Hostinger-CDN eingesetzt. Hostinger verarbeitet die für die Bereitstellung der VPS-Infrastruktur und des E-Mail-Dienstes erforderlichen Daten als Auftragsverarbeiter. Der Auftragsverarbeitungsvertrag ist in die Hostinger-Vertragsbedingungen einbezogen.</p>
+                <p>Die Betriebs- und Fehlerausgaben der Butzcraft- und Traefik-Container werden lokal auf dem VPS gespeichert. Pro Container sind höchstens drei Protokolldateien mit jeweils höchstens 10 MB vorgesehen. Die Begrenzung erfolgt nach Dateigröße und nicht nach einer festen Zahl von Tagen; beim Erreichen der Grenze werden die ältesten Ausgaben überschrieben. Solche Fehlerausgaben können je nach Ereignis Zeitangaben, die betroffene Komponente, Domains und einzelne technische Verbindungsangaben wie IP-Adressen enthalten. Sie dienen ausschließlich der Fehleranalyse und Serversicherheit.</p>
+                <p>Das Systemjournal des VPS ist auf eine Aufbewahrung von höchstens sieben Tagen und eine Gesamtnutzung von höchstens 1 GB begrenzt. Einzelne Journaldateien werden spätestens nach einem Tag gewechselt und sind auf höchstens 100 MB begrenzt. Soweit eine der Grenzen früher erreicht wird, werden ältere Einträge vorher entfernt. Hostinger legt für diese selbst verwalteten VPS-Dateien keine zusätzliche feste Löschfrist fest.</p>
             </section>
 
             <section>
                 <h2>3. Lokale Spiel- und Charakterdaten</h2>
-                <p>Butzcraft speichert Charakterprofile, Spielstände sowie ausgewählte Spiel- und Grafikeinstellungen lokal im Speicher deines Browsers. Diese Daten verbleiben grundsätzlich auf deinem Gerät. Bei der Charakterübernahme an play.butzcraft.de wird das Profil in einem URL-Fragment übertragen; dieser Fragmentteil wird nicht an den Webserver gesendet und nach der Übernahme aus der Adresszeile entfernt.</p>
-                <p>Die Speicherung ist erforderlich, um die ausdrücklich gewünschte Spiel-, Speicher- und Übernahmefunktion bereitzustellen. Sie erfolgt nach § 25 Abs. 2 Nr. 2 TDDDG; soweit personenbezogene Daten betroffen sind, stützt sich die Verarbeitung auf Art. 6 Abs. 1 lit. b DSGVO. Du kannst diese Daten über die Spiel-, Export- und Browserfunktionen verwalten oder löschen. Beim Löschen der Browserdaten können lokale Spielstände verloren gehen.</p>
+                <p>Butzcraft benötigt kein Spielerkonto. Spielstände liegen lokal in der IndexedDB-Datenbank <code>butzcraft-saves</code> im Objektspeicher <code>saves</code>. Im lokalen Speicher des Browsers werden das Charakterprofil unter <code>butzcraft.characterProfile</code>, die Sichtweite unter <code>butzcraft.renderDistance</code> und die Renderauflösung unter <code>butzcraft.renderScale</code> abgelegt. Der Sitzungsspeicher-Eintrag <code>butzcraft.autoLoad</code> unterstützt das automatische Laden eines gewählten Spielstands und endet grundsätzlich mit der Browsersitzung.</p>
+                <p>Die produktive Serverfunktion für Spielstände ist deaktiviert. Spielstände und Charakterdaten werden daher nicht an den Butzcraft-Server übertragen. Bei der Charakterübernahme von butzcraft.de an play.butzcraft.de wird das Profil in einem URL-Fragment übergeben. Dieser Fragmentteil wird nicht als Bestandteil der HTTP-Anfrage an den Webserver gesendet und nach der Übernahme aus der Adresszeile entfernt.</p>
+                <p>Die Speicherung ist erforderlich, um die ausdrücklich gewünschte Spiel-, Speicher- und Übernahmefunktion bereitzustellen, und erfolgt nach § 25 Abs. 2 Nr. 2 TDDDG. Soweit dabei personenbezogene Daten verarbeitet werden, ist Art. 6 Abs. 1 lit. f DSGVO die Rechtsgrundlage; das berechtigte Interesse liegt in der browserseitigen Bereitstellung dieser Funktionen ohne Benutzerkonto und ohne serverseitiges Spielerprofil. Die Daten bleiben gespeichert, bis du sie im Spiel überschreibst beziehungsweise löschst oder die Website-Daten im Browser entfernst. Du kannst Spielstände außerdem über die Import- und Exportfunktionen selbst verwalten. Beim Löschen der Browserdaten können lokale Spielstände verloren gehen.</p>
             </section>
 
             <section>
-                <h2>4. Cookie- und Datenschutzeinstellungen</h2>
-                <p>Auf dieser Website sind derzeit keine Analyse-, Werbe- oder Social-Media-Trackingdienste eingebunden. Es werden auch keine externen Webfonts geladen. Die Entscheidung, dass du den Datenschutzhinweis gesehen hast, wird lokal unter dem Schlüssel <code>butzcraft-cookie-notice-v1</code> gespeichert. Sie hat keinen Werbe- oder Analysezweck und kann durch Löschen der Website-Daten zurückgesetzt werden.</p>
-                <p>Nur bei einer Anmeldung im nicht öffentlich verlinkten Redaktionsbereich setzt der Server das technisch notwendige, HTTP-only geschützte Session-Cookie <code>butzcraft_admin</code>. Es dient ausschließlich der Zugriffskontrolle, wird nicht für Tracking verwendet und läuft spätestens nach acht Stunden oder bei der Abmeldung ab.</p>
+                <h2>4. Tracking, Cookies und externe Inhalte</h2>
+                <p>Auf den öffentlich zugänglichen Seiten sind keine Analyse-, Werbe- oder Social-Media-Trackingdienste eingebunden. Es werden keine externen Webfonts oder JavaScript-CDNs geladen und keine Marketing- oder Analyse-Cookies gesetzt. Die in Abschnitt 3 beschriebenen lokalen Speicherungen dienen ausschließlich den von dir aufgerufenen Spiel-, Speicher- und Einstellungsfunktionen. Da keine einwilligungspflichtigen Dienste eingesetzt werden, erscheint kein Einwilligungsbanner.</p>
             </section>
 
             <section>
                 <h2>5. Kontaktaufnahme</h2>
-                <p>Wenn du das Kontaktformular absendest, werden Name, E-Mail-Adresse, gewähltes Thema, Nachricht und deine Bestätigung der Datenschutzhinweise verschlüsselt an den Butzcraft-Webserver übertragen und von dort über den konfigurierten E-Mail-Dienst an unser Kontaktpostfach zugestellt. Die Formulardaten werden nicht dauerhaft in einer eigenen Butzcraft-Datenbank gespeichert.</p>
-                <p>Zum Schutz vor automatisiertem Missbrauch verarbeitet der Server die IP-Adresse vorübergehend im Arbeitsspeicher und begrenzt die Anzahl der Nachrichten innerhalb von 15 Minuten. Wir verwenden deine Angaben ausschließlich zur Bearbeitung der Anfrage. Rechtsgrundlage ist Art. 6 Abs. 1 lit. b DSGVO bei vorvertraglichen oder spielbezogenen Anfragen und im Übrigen Art. 6 Abs. 1 lit. f DSGVO auf Grundlage unseres Interesses an der Beantwortung von Nachrichten und am Schutz des Formulars. Nachrichten werden gelöscht, sobald die Anfrage abschließend bearbeitet ist und keine gesetzlichen Aufbewahrungspflichten entgegenstehen.</p>
+                <p>Du kannst per E-Mail oder über das Kontaktformular Kontakt aufnehmen. Im Formular werden E-Mail-Adresse, gewähltes Thema, Nachricht und die Bestätigung der Kenntnisnahme dieser Datenschutzhinweise verarbeitet. Die Angabe eines Namens ist freiwillig. Die Formulardaten werden verschlüsselt an den Butzcraft-Webserver übertragen und von dort über den E-Mail-Dienst von Hostinger an <a href="mailto:kontakt@butzcraft.de">kontakt@butzcraft.de</a> zugestellt. Sie werden nicht dauerhaft in einer eigenen Butzcraft-Datenbank gespeichert.</p>
+                <p>Zum Schutz vor automatisiertem Missbrauch verarbeitet der Server die IP-Adresse und die Zeitpunkte der letzten Versandversuche ausschließlich im Arbeitsspeicher und erlaubt höchstens fünf Nachrichten innerhalb von 15 Minuten. Der Eintrag wird spätestens 15 Minuten nach dem letzten erfassten Versuch automatisch gelöscht; ein Neustart des Servers löscht ihn früher.</p>
+                <p>Wir verwenden deine Angaben ausschließlich zur Bearbeitung der Anfrage. Rechtsgrundlage ist Art. 6 Abs. 1 lit. f DSGVO; die berechtigten Interessen liegen in der Beantwortung von Nachrichten und im Schutz des Kontaktformulars. Die Nachricht und die zugehörige Korrespondenz werden spätestens sechs Monate nach abschließender Bearbeitung gelöscht. Eine längere Aufbewahrung erfolgt nur, soweit eine gesetzliche Pflicht besteht oder die Daten zur Geltendmachung, Ausübung oder Verteidigung von Rechtsansprüchen benötigt werden.</p>
+                <p>Hostinger Email hält Zugriffs- und Zustellungsprotokolle für 30 Tage bereit. Diese können insbesondere Zeitpunkt, beteiligte E-Mail-Konten beziehungsweise Absender und Empfänger, IP-Adresse bei Kontozugriffen, verwendetes Protokoll und Zustellungsstatus enthalten. Die Verarbeitung dient der Zustellung, Sicherheit und Fehleranalyse.</p>
+                <p>Die Bereitstellung der Angaben ist weder gesetzlich noch vertraglich vorgeschrieben. Das Formular kann ohne Namen verwendet werden. Ohne erreichbare E-Mail-Adresse, Thema, Nachricht und Bestätigung der Kenntnisnahme kann die Anfrage über das Formular nicht abgesendet beziehungsweise beantwortet werden.</p>
             </section>
 
             <section>
                 <h2>6. Empfänger und Drittlandübermittlung</h2>
-                <p>Empfänger können die für Hosting und E-Mail eingesetzten Auftragsverarbeiter sein, soweit dies für Betrieb und Kommunikation erforderlich ist. Eine Weitergabe zu Werbezwecken findet nicht statt.</p>
-                <p class="legal-placeholder">[E-MAIL-ANBIETER, AUFTRAGSVERARBEITER, SERVERSTANDORTE UND GEGEBENENFALLS GARANTIEN FÜR DRITTLANDÜBERMITTLUNGEN ERGÄNZEN.]</p>
+                <p>Empfänger der technisch erforderlichen Verbindungs- und Kommunikationsdaten ist Hostinger International Ltd. als Anbieter der VPS-Infrastruktur und des E-Mail-Dienstes. Hostinger kann die im Auftragsverarbeitungsvertrag aufgeführten Unterauftragsverarbeiter für Infrastruktur, E-Mail-Zustellung und Sicherheit einsetzen. Welche davon tatsächlich eingesetzt werden, hängt von den gebuchten und aktivierten Diensten ab. Eine Weitergabe zu Werbezwecken findet nicht statt.</p>
+                <p>Der Butzcraft-VPS steht in Deutschland und verwendet kein Hostinger-CDN. Hostinger kann Daten im Rahmen des E-Mail-Dienstes oder durch weitere Unterauftragsverarbeiter dennoch außerhalb der Europäischen Union und des Europäischen Wirtschaftsraums verarbeiten. Für Übermittlungen in Drittländer ohne Angemessenheitsbeschluss sieht der Auftragsverarbeitungsvertrag von Hostinger die Standardvertragsklauseln der Europäischen Kommission vor.</p>
             </section>
 
             <section>
                 <h2>7. Deine Rechte</h2>
-                <p>Du hast nach Maßgabe der DSGVO insbesondere das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit. Soweit eine Verarbeitung auf Art. 6 Abs. 1 lit. f DSGVO beruht, kannst du aus Gründen, die sich aus deiner besonderen Situation ergeben, widersprechen. Eine erteilte Einwilligung kannst du jederzeit mit Wirkung für die Zukunft widerrufen.</p>
-                <p>Außerdem kannst du dich bei einer Datenschutzaufsichtsbehörde beschweren.</p>
-                <p class="legal-placeholder">Zuständige Aufsichtsbehörde: [BEHÖRDE, ANSCHRIFT UND WEBSEITE NACH SITZ DES VERANTWORTLICHEN].</p>
+                <p>Du hast nach Maßgabe der DSGVO insbesondere das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit. Soweit eine Verarbeitung auf Art. 6 Abs. 1 lit. f DSGVO beruht, kannst du aus Gründen, die sich aus deiner besonderen Situation ergeben, widersprechen.</p>
+                <p>Außerdem kannst du dich bei einer Datenschutzaufsichtsbehörde beschweren. Für den Wohnsitz des Verantwortlichen ist zuständig:</p>
+                <p>Landesbeauftragte für den Datenschutz Sachsen-Anhalt<br>Otto-von-Guericke-Straße 34a<br>39104 Magdeburg<br><a href="https://datenschutz.sachsen-anhalt.de/" rel="noreferrer">datenschutz.sachsen-anhalt.de</a></p>
             </section>
 
             <section>
-                <h2>8. Stand und Änderungen</h2>
+                <h2>8. Automatisierte Entscheidungen</h2>
+                <p>Eine automatisierte Entscheidungsfindung einschließlich Profiling findet nicht statt.</p>
+            </section>
+
+            <section>
+                <h2>9. Stand und Änderungen</h2>
                 <p>Stand: 21. Juli 2026. Diese Hinweise werden angepasst, wenn sich Funktionen, Dienstleister oder die Rechtslage ändern.</p>
             </section>
         </article>
     </main>
 
-    <footer class="site-footer"><a href="/"><img src="logo.png" alt="Butzcraft"></a><nav aria-label="Fußnavigation"><a href="/guide">Guide</a><a href="/faq">FAQ</a><a href="/#kontakt">Kontakt</a><a href="/impressum">Impressum</a><a href="/datenschutz" aria-current="page">Datenschutz</a><button type="button" data-cookie-settings>Cookie-Einstellungen</button></nav><p>Baue. Entdecke. Überlebe.</p></footer>
+    <footer class="site-footer"><a href="/"><img src="logo.png" alt="Butzcraft"></a><nav aria-label="Fußnavigation"><a href="/guide">Guide</a><a href="/faq">FAQ</a><a href="/#kontakt">Kontakt</a><a href="/impressum">Impressum</a><a href="/datenschutz" aria-current="page">Datenschutz</a></nav><p>Baue. Entdecke. Überlebe.</p></footer>
     <script type="module" src="js/butzcraftSite.js"></script>
 </body>
 </html>

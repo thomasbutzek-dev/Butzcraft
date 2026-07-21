@@ -58,7 +58,7 @@ const contactAttempts = new Map();
 const ADMIN_COOKIE = 'butzcraft_admin';
 const ADMIN_SESSION_MS = 8 * 60 * 60 * 1000;
 const CONTENT_KEY = /^[a-z0-9.-]{1,80}$/;
-const CONTACT_WINDOW_MS = 15 * 60 * 1000;
+const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const CONTACT_LIMIT = 5;
 const CONTACT_SUBJECTS = new Set(['Frage zum Spiel', 'Fehler melden', 'Idee und Feedback', 'Sonstiges']);
 const contactToEmail = process.env.CONTACT_TO_EMAIL || '';
@@ -75,6 +75,14 @@ const contactTransport = smtpHost && smtpUser && smtpPassword && contactToEmail 
         auth: { user: smtpUser, pass: smtpPassword }
     })
     : null;
+
+function setExpiringEntry(map, key, value, ttl = ATTEMPT_WINDOW_MS) {
+    map.set(key, value);
+    const timer = setTimeout(() => {
+        if (map.get(key) === value) map.delete(key);
+    }, ttl);
+    timer.unref?.();
+}
 
 fs.mkdirSync(siteMediaDir, { recursive: true });
 
@@ -190,7 +198,10 @@ app.post('/api/admin/login', (req, res) => {
     const passwordMatches = safeEqual(req.body?.password || '', adminPassword);
     if (!usernameMatches || !passwordMatches) {
         const count = (attempt?.count || 0) + 1;
-        loginAttempts.set(ip, count >= 5 ? { count: 0, blockedUntil: Date.now() + 15 * 60 * 1000 } : { count, blockedUntil: 0 });
+        const nextAttempt = count >= 5
+            ? { count: 0, blockedUntil: Date.now() + ATTEMPT_WINDOW_MS }
+            : { count, blockedUntil: 0 };
+        setExpiringEntry(loginAttempts, ip, nextAttempt);
         return res.status(401).json({ error: 'Benutzername oder Passwort ist falsch.' });
     }
 
@@ -242,26 +253,26 @@ app.post('/api/contact', async (req, res) => {
     const subject = typeof req.body?.subject === 'string' ? req.body.subject.trim() : '';
     const message = typeof req.body?.message === 'string' ? req.body.message.trim() : '';
     const emailIsValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-    if (!name || name.length > 80 || /[\r\n]/.test(name) || !emailIsValid || email.length > 160 || !CONTACT_SUBJECTS.has(subject) || !message || message.length > 4000 || req.body?.privacy !== true) {
+    if (name.length > 80 || /[\r\n]/.test(name) || !emailIsValid || email.length > 160 || !CONTACT_SUBJECTS.has(subject) || !message || message.length > 4000 || req.body?.privacy !== true) {
         return res.status(400).json({ error: 'Bitte prüfe deine Angaben und versuche es erneut.' });
     }
 
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const now = Date.now();
-    const recentAttempts = (contactAttempts.get(ip) || []).filter(timestamp => timestamp > now - CONTACT_WINDOW_MS);
+    const recentAttempts = (contactAttempts.get(ip) || []).filter(timestamp => timestamp > now - ATTEMPT_WINDOW_MS);
     if (recentAttempts.length >= CONTACT_LIMIT) {
         return res.status(429).json({ error: 'Zu viele Nachrichten. Bitte versuche es später erneut.' });
     }
     recentAttempts.push(now);
-    contactAttempts.set(ip, recentAttempts);
+    setExpiringEntry(contactAttempts, ip, recentAttempts);
 
     try {
         await contactTransport.sendMail({
             from: contactFromEmail,
             to: contactToEmail,
-            replyTo: { name, address: email },
+            replyTo: name ? { name, address: email } : email,
             subject: `[Butzcraft] ${subject}`,
-            text: `Name: ${name}\nE-Mail: ${email}\nThema: ${subject}\n\n${message}`
+            text: `Name: ${name || 'Nicht angegeben'}\nE-Mail: ${email}\nThema: ${subject}\n\n${message}`
         });
         res.json({ success: true });
     } catch (error) {

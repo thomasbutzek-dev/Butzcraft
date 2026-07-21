@@ -1,5 +1,9 @@
 export const SPAWNER_BLOCK_TYPE = 83;
 
+export function canParrotSpawnInBiome(biome) {
+    return biome !== 'Schneefeld';
+}
+
 function parseSpawnerKey(key) {
     const parts = key.split(',');
     return {

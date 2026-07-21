@@ -147,7 +147,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
                 };
 
                 // Diese direkte Form wird von Vite als Modul-Worker erkannt und gebündelt.
-                this.worker = new Worker(new URL('./chunkWorker.js?v=20260721b', import.meta.url), { type: 'module' });
+                this.worker = new Worker(new URL('./chunkWorker.js?v=20260721d', import.meta.url), { type: 'module' });
                 // Init: Sende Config + Block-Daten an Worker
                 this.worker.postMessage({
                     type: 'init',
