@@ -55,13 +55,13 @@ describe('pause menu focus', () => {
         expect(styles).toContain('body.game-paused #top-ui');
     });
 
-    it('explains camera switching and third-person zoom', () => {
+    it('does not reveal screenshot camera controls', () => {
         const html = readFileSync('index.html', 'utf8');
         const document = new DOMParser().parseFromString(html, 'text/html');
         const pauseMenu = document.getElementById('instructions');
 
-        expect(pauseMenu.textContent).toContain('V = Kamera wechseln');
-        expect(pauseMenu.textContent).toContain('MAUSRAD = Third-Person-Zoom');
+        expect(pauseMenu.textContent).not.toContain('V = Kamera wechseln');
+        expect(pauseMenu.textContent).not.toContain('MAUSRAD = Third-Person-Zoom');
     });
 });
 
