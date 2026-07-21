@@ -27,6 +27,10 @@ export default defineConfig({
             '/api': {
                 target: 'http://localhost:3000',
                 changeOrigin: true
+            },
+            '/site-media': {
+                target: 'http://localhost:3000',
+                changeOrigin: true
             }
         },
         fs: { strict: false }
@@ -38,7 +42,11 @@ export default defineConfig({
             input: {
                 main: 'index.html',
                 characterEditor: 'character-editor.html',
-                preview: 'butzcraft-preview.html'
+                preview: 'butzcraft-preview.html',
+                guide: 'guide.html',
+                faq: 'faq.html',
+                imprint: 'impressum.html',
+                privacy: 'datenschutz.html'
             }
         }
     },

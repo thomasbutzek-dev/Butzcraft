@@ -741,6 +741,18 @@ body {
             visibility: hidden;
         }
 
+        body.ghost-mode:not(.game-paused) #top-ui,
+        body.ghost-mode:not(.game-paused) #bottom-ui,
+        body.ghost-mode:not(.game-paused) #crosshair,
+        body.ghost-mode:not(.game-paused) #controls-hint,
+        body.ghost-mode:not(.game-paused) #first-objective,
+        body.ghost-mode:not(.game-paused) #quest-compass,
+        body.ghost-mode:not(.game-paused) #boss-status,
+        body.ghost-mode:not(.game-paused) #underwater-overlay,
+        body.ghost-mode:not(.game-paused) #touch-overlay {
+            visibility: hidden !important;
+        }
+
         @media (prefers-reduced-motion: reduce) {
             *,
             *::before,

@@ -14,10 +14,14 @@ services:
       ENABLE_REMOTE_SAVES: "false"
       WEBSITE_HOSTS: butzcraft.de,www.butzcraft.de
       GAME_ORIGIN: https://play.butzcraft.de/
+      SITE_ADMIN_USER: ${SITE_ADMIN_USER:-admin}
+      SITE_ADMIN_PASSWORD: ${SITE_ADMIN_PASSWORD:-}
+      SITE_CONTENT_DIR: /app/site-content
     expose:
       - "3000"
     volumes:
       - butzcraft_saves:/app/saves
+      - butzcraft_site_content:/app/site-content
     security_opt:
       - no-new-privileges:true
     healthcheck:
@@ -36,3 +40,4 @@ services:
 
 volumes:
   butzcraft_saves:
+  butzcraft_site_content:

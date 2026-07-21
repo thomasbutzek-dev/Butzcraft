@@ -1,5 +1,6 @@
 node_modules/
 saves/
+site-content/
 js_backup_*/
 .claude/
 _backups/

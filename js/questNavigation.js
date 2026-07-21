@@ -1,5 +1,18 @@
 const BED_TYPES = new Set([38, 39]);
 
+function normalizeDegrees(degrees) {
+    return ((degrees + 180) % 360 + 360) % 360 - 180;
+}
+
+export function getCompassHeadingDegrees(cameraYawRadians) {
+    if (!Number.isFinite(cameraYawRadians)) return 0;
+    return normalizeDegrees(-cameraYawRadians * 180 / Math.PI);
+}
+
+export function getRelativeCompassBearing(bearing, headingDegrees) {
+    return normalizeDegrees((Number(bearing) || 0) - (Number(headingDegrees) || 0));
+}
+
 function getDirectionName(dx, dz) {
     const eastWest = dx >= 0 ? 'östlich' : 'westlich';
     const northSouth = dz >= 0 ? 'südlich' : 'nördlich';
