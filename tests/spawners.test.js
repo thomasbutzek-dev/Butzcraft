@@ -7,6 +7,13 @@ describe('spawner helpers', () => {
         expect(canParrotSpawnInBiome('Schneefeld')).toBe(false);
     });
 
+    it('allows parrots only in the jungle', () => {
+        expect(canParrotSpawnInBiome('Urwald')).toBe(true);
+        expect(canParrotSpawnInBiome('Wüste')).toBe(false);
+        expect(canParrotSpawnInBiome('Grasland')).toBe(false);
+        expect(canParrotSpawnInBiome('Ozean')).toBe(false);
+    });
+
     it('findet Spawner auch wenn sie nicht auf einem Vierer-Raster liegen', () => {
         const blocks = new Map([['3,5,7', 83]]);
         const world = {

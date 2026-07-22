@@ -2,8 +2,8 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260719a';
 import { openFurnace } from './furnace.js?v=20260721c';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260721c';
-        import { BLOCK_COLORS } from './blocks.js?v=20260717z';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260722a';
+        import { BLOCK_COLORS } from './blocks.js?v=20260722a';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260718b';
 import { getAttackProfile, getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
@@ -11,8 +11,8 @@ import { PlayerArrowProjectile } from './playerArrow.js?v=20260720q';
 import { getFoodInfo } from './foodRules.js?v=20260716a';
 import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260719a';
 import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-import { openTradeUI } from './tradeUI.js?v=20260721c';
-import { STORY_EVENTS } from './storyProgress.js?v=20260721b';
+import { openTradeUI } from './tradeUI.js?v=20260722e';
+import { STORY_EVENTS } from './storyProgress.js?v=20260722e';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 const { MAX_HUNGER, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
@@ -721,7 +721,7 @@ export class PlayerInteraction {
                 // Werkzeuge, Barren, Items können nicht platziert werden
                 const unplaceable = [17, 18, 21, 22, 23, 24, 25, 31, 34, 39, 51,
                     60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
-                    89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100];
+                    89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 105];
                 
                 if (currentItem.count <= 0 || currentItem.type === 0 || unplaceable.includes(currentItem.type)) {
                     return; 
@@ -877,6 +877,24 @@ export class PlayerInteraction {
         const key = `chest,${x},${y},${z}`;
         const structureChest = this.world.structureChests?.get(key);
         const wasLooted = this.world.lootedChests.has(key);
+        const structureKind = structureChest?.role === 'mine_reward'
+            ? 'mine'
+            : (structureChest?.role === 'dungeon_reward' ? 'dungeon' : null);
+        if (!wasLooted && structureKind && typeof window.tryActivateStructureBoss === 'function') {
+            const result = window.tryActivateStructureBoss({
+                structureId: structureChest.structureId,
+                structureKind,
+                position: {
+                    x: x - 2,
+                    y: y + 1,
+                    z: z - 2
+                }
+            });
+            if (result?.blocked) {
+                this.showMessage(result.message, '#ff647c', 18);
+                return;
+            }
+        }
         // Loot nur einmal generieren: lootedChests merkt sich alle je geöffneten Kisten.
         // Auch nach Save/Load wird kein Loot mehr nachgefüllt.
         if (!wasLooted) {

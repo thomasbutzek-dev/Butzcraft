@@ -7,6 +7,7 @@ const path = require('path');
 const crypto = require('crypto');
 const sanitizeHtml = require('sanitize-html');
 const nodemailer = require('nodemailer');
+const { createStatisticsStore } = require('./serverStatistics');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -19,6 +20,13 @@ const websiteHosts = new Set(
         .filter(Boolean)
 );
 const gameOrigin = process.env.GAME_ORIGIN || '';
+const gameHost = (() => {
+    try {
+        return new URL(gameOrigin).hostname.toLowerCase();
+    } catch {
+        return '';
+    }
+})();
 function isWebsiteRequest(req) {
     const hostname = req.hostname.toLowerCase();
     return websiteHosts.has(hostname) || (!isProduction && ['localhost', '127.0.0.1', '::1'].includes(hostname));
@@ -48,6 +56,8 @@ app.use('/api', cors(corsOptions));
 app.use(bodyParser.json({ limit: '5mb' }));
 
 const siteContentDir = path.resolve(process.env.SITE_CONTENT_DIR || path.join(__dirname, 'site-content'));
+const statisticsDir = path.resolve(process.env.STATISTICS_DIR || path.join(__dirname, 'statistics'));
+const statisticsStore = createStatisticsStore({ directory: statisticsDir });
 const siteMediaDir = path.join(siteContentDir, 'uploads');
 const siteContentFile = path.join(siteContentDir, 'content.json');
 const adminUsername = process.env.SITE_ADMIN_USER || 'admin';
@@ -85,6 +95,21 @@ function setExpiringEntry(map, key, value, ttl = ATTEMPT_WINDOW_MS) {
 }
 
 fs.mkdirSync(siteMediaDir, { recursive: true });
+
+app.use((req, res, next) => {
+    const tracked = isProduction
+        && gameHost
+        && req.hostname.toLowerCase() === gameHost
+        && (req.method === 'GET' || req.method === 'HEAD');
+    if (tracked) {
+        const gamePage = req.path === '/' || req.path === '/index.html';
+        res.once('finish', () => statisticsStore.recordResponse({
+            statusCode: res.statusCode,
+            gamePage: gamePage && res.statusCode >= 200 && res.statusCode < 300
+        }));
+    }
+    next();
+});
 
 function emptySiteContent() {
     return { texts: {}, images: {}, updatedAt: null };
@@ -186,6 +211,11 @@ app.get('/api/admin/session', (req, res) => {
     res.set('Cache-Control', 'no-store');
     if (!adminPassword) return res.status(503).json({ error: 'Der Adminmodus ist auf dem Server noch nicht aktiviert.' });
     res.json({ authenticated: Boolean(getAdminSession(req)) });
+});
+
+app.get('/api/admin/statistics', requireSiteAdmin, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(statisticsStore.snapshot());
 });
 
 app.post('/api/admin/login', (req, res) => {
@@ -500,6 +530,22 @@ app.get('/', (req, res) => {
 // werden bedient, LAN bleibt ausgeschlossen (keine Wildcard-Bindung).
 const http = require('http');
 const HOST = process.env.HOST || '127.0.0.1';
+
+function flushStatistics() {
+    try {
+        statisticsStore.close();
+    } catch (error) {
+        console.error(`Statistics could not be written: ${error.message}`);
+    }
+}
+process.once('SIGTERM', () => {
+    flushStatistics();
+    process.exit(0);
+});
+process.once('SIGINT', () => {
+    flushStatistics();
+    process.exit(0);
+});
 
 if (HOST === '127.0.0.1') {
     // Dual-Stack-Localhost

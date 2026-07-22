@@ -5,7 +5,7 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName, inventorySlots, tryAddItemsToInventory, tryExchangeInventory } from './inventory.js?v=20260721c';
+import { createBlockHTML, getItemName, inventorySlots, tryAddItemsToInventory, tryExchangeInventory } from './inventory.js?v=20260722a';
 import {
     acceptSideQuest,
     completeSideQuest,
@@ -17,7 +17,7 @@ import {
 } from './quests.js?v=20260721b';
 import { getNpcConversation } from './npcDialogue.js?v=20260721b';
 import { Game } from './Game.js?v=20260716b';
-import { STORY_EVENTS } from './storyProgress.js?v=20260721b';
+import { STORY_EVENTS } from './storyProgress.js?v=20260722e';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 let currentNPC = null;

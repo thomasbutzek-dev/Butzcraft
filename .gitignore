@@ -1,6 +1,12 @@
 node_modules/
 saves/
 site-content/
+statistics/
+social-status/
+assets/generated/butzcraft-profile-2k*.png
+boss-showcase.html
+HOSTINGER_DATENSCHUTZ_RECHERCHE.md
+SPIELSTATISTIK_DATENSCHUTZ_RECHERCHE.md
 js_backup_*/
 .claude/
 _backups/

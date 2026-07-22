@@ -1,7 +1,9 @@
 import { createCharacterPlayUrl, getCharacterPlayTarget } from './characterTransfer.js';
 import { initializeSiteContent } from './siteContent.js';
+import { APP_VERSION } from './version.js';
 
 initializeSiteContent();
+document.querySelectorAll('[data-app-version]').forEach(element => { element.textContent = APP_VERSION; });
 
 const hero = document.querySelector('[data-cinematic-hero]');
 const heroVideo = document.querySelector('[data-hero-video]');

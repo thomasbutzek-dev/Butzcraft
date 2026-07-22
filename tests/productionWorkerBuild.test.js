@@ -10,6 +10,7 @@ import { build } from 'vite';
 const projectRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const outputDir = mkdtempSync(join(tmpdir(), 'butzcraft-worker-build-'));
 let workerCode;
+let mainCode;
 
 beforeAll(async () => {
     await build({
@@ -26,6 +27,11 @@ beforeAll(async () => {
     const workerFiles = readdirSync(assetsDir).filter(name => /^chunkWorker-.*\.js$/.test(name));
     expect(workerFiles).toHaveLength(1);
     workerCode = readFileSync(join(assetsDir, workerFiles[0]), 'utf8');
+
+    const indexHtml = readFileSync(join(outputDir, 'index.html'), 'utf8');
+    const mainFile = indexHtml.match(/<script[^>]+src="\.\/assets\/([^"]+\.js)"/)?.[1];
+    expect(mainFile).toBeTruthy();
+    mainCode = readFileSync(join(assetsDir, mainFile), 'utf8');
 }, 30000);
 
 afterAll(() => {
@@ -42,5 +48,11 @@ describe('production worker build', () => {
         });
 
         expect(missingImports).toEqual([]);
+    });
+});
+
+describe('production game build', () => {
+    it('does not leave the village spawn state as an unresolved global', () => {
+        expect(mainCode).not.toMatch(/\b_spawnedVillageKeys\b/);
     });
 });

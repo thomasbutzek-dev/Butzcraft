@@ -82,6 +82,7 @@ describe('PlayerInteraction through the Game seam', () => {
         delete window.butzcraftCanInteract;
         delete window.trySleepInBed;
         delete window.tryActivateBloodMoonRitual;
+        delete window.tryActivateStructureBoss;
     });
 
     it('starts an empty-hand animation without showing or sounding like a free sword', async () => {
@@ -421,6 +422,31 @@ describe('PlayerInteraction through the Game seam', () => {
         expect(interaction._tryUnlockStructureGate(4, 18, 6)).toBe(true);
         expect(world.setBlock).toHaveBeenCalledTimes(9);
         expect(world.structureProgress[structureId]).toEqual({ keyFound: true, gateOpened: true });
+    }, 15000);
+
+    it.each([
+        { role: 'mine_reward', structureKind: 'mine', structureId: 'mine:0,0:v2' },
+        { role: 'dungeon_reward', structureKind: 'dungeon', structureId: 'dungeon:0,0:v2' }
+    ])('keeps a $structureKind reward chest sealed until its boss is defeated', async ({ role, structureKind, structureId }) => {
+        const { interaction, world } = await createInteraction();
+        world.structureChests = new Map([['chest,8,18,10', {
+            structureId,
+            role
+        }]]);
+        window.tryActivateStructureBoss = vi.fn(() => ({
+            blocked: true,
+            message: 'Der Tiefenwächter erwacht!'
+        }));
+
+        interaction._openChest(8, 18, 10);
+
+        expect(window.tryActivateStructureBoss).toHaveBeenCalledWith({
+            structureId,
+            structureKind,
+            position: { x: 6, y: 19, z: 8 }
+        });
+        expect(world.lootedChests).not.toContain('chest,8,18,10');
+        expect(interaction.showMessage).toHaveBeenCalledWith('Der Tiefenwächter erwacht!', '#ff647c', 18);
     }, 15000);
 
     it('activates the blood moon ritual through the generated dungeon altar', async () => {

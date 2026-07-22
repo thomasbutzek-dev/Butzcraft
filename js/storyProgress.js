@@ -37,9 +37,9 @@ const STORY_OBJECTIVES = [
     },
     {
         label: 'Spuren in der Tiefe',
-        text: 'Durchsuche eine große Mine',
-        hint: 'Folge Mineneingängen und Schienen bis zur Belohnungskammer.',
-        touchHint: 'Folge Mineneingängen und Schienen bis zur Belohnungskammer.'
+        text: 'Besiege den Tiefenwächter',
+        hint: 'Folge den Schienen bis zur Belohnungskammer. Besiege den gepanzerten Wächter und plündere danach seine Truhe.',
+        touchHint: 'Folge den Schienen bis zur Belohnungskammer. Besiege den gepanzerten Wächter und plündere danach seine Truhe.'
     },
     {
         label: 'Die versiegelte Tiefe',
@@ -55,9 +55,9 @@ const STORY_OBJECTIVES = [
     },
     {
         label: 'Die Blutmondquelle',
-        text: 'Erreiche die Endkammer',
-        hint: 'Überwinde die Spawner und öffne die Belohnungstruhe hinter dem Tor.',
-        touchHint: 'Überwinde die Spawner und öffne die Belohnungstruhe hinter dem Tor.'
+        text: 'Besiege den Siegelhüter',
+        hint: 'Überwinde die Spawner und zerstöre die Schutzrunen des Siegelhüters. Danach kannst du die Belohnungstruhe öffnen.',
+        touchHint: 'Überwinde die Spawner und zerstöre die Schutzrunen des Siegelhüters. Danach kannst du die Belohnungstruhe öffnen.'
     },
     {
         label: 'Die Blutmondquelle',

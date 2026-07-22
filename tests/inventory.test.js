@@ -10,12 +10,15 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+const blocksMock = vi.hoisted(() => ({ atlasDataURL: '' }));
+const actualQuerySelectorAll = document.querySelectorAll.bind(document);
+
 // blocks.js importiert three (nur via CDN-importmap im Browser verfügbar) → mocken.
 // Wir geben die fürs Inventory nötigen Konstanten zurück, ohne Three.js zu laden.
 vi.mock('../js/blocks.js', () => ({
     BLOCK_TYPES: { GRASS: 1, DIRT: 2, STONE: 3, WATER: 4, WOOD: 5 },
     BLOCK_TEX: {},
-    atlasDataURL: ''
+    get atlasDataURL() { return blocksMock.atlasDataURL; }
 }));
 // recipe_book.js + sound.js sind UI/Audio-only — für Inventory-Logic-Tests irrelevant.
 vi.mock('../js/recipe_book.js', () => ({ initRecipeBook: () => {} }));
@@ -34,6 +37,8 @@ const {
 
 // updateInventoryUI hängt am DOM; wir machen sie zum No-Op via document.querySelectorAll-stub.
 beforeEach(() => {
+    blocksMock.atlasDataURL = '';
+    document.body.innerHTML = '';
     // Reset Slots
     for (let i = 0; i < inventorySlots.length; i++) {
         inventorySlots[i].type = 0;
@@ -121,6 +126,20 @@ describe('addItemToInventory – Basis', () => {
         updateInventoryUI();
 
         expect(icon.innerHTML).not.toBe('');
+    });
+
+    it('repaints existing item icons when the async texture atlas becomes ready', () => {
+        document.querySelectorAll = actualQuerySelectorAll;
+        const slot = createSlotElement(0, 'inventory');
+        document.body.appendChild(slot);
+        inventorySlots[0] = { type: 3, count: 1 };
+        updateInventoryUI();
+
+        blocksMock.atlasDataURL = 'blob:inventory-atlas';
+        window.dispatchEvent(new CustomEvent('butzcraft:atlas-ready'));
+
+        const face = slot.querySelector('.mc-face');
+        expect(face.style.backgroundImage).toContain('blob:inventory-atlas');
     });
 });
 

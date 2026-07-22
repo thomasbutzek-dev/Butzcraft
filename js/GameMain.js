@@ -1,11 +1,14 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import { APP_VERSION } from './version.js?v=20260722a';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260717z';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260722a';
         import { World, getBiomeAt, BIOMES } from './world.js?v=20260721d';
-        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260720q';
+        import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260722c';
         import { BloodMoonBoss } from './bloodMoonBoss.js?v=20260720a';
+        import { createCelestialSystem, updateCelestialSystem } from './celestialBodies.js?v=20260722b';
+        import { DeepGuardian, SealKeeper } from './structureBosses.js?v=20260722c';
 
         import { Input } from './Input.js?v=20260507b';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260720q';
@@ -13,11 +16,11 @@
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260720a';
         import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260721c';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260721c';
+        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260722e';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260722a';
         import { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } from './itemCollection.js?v=20260721c';
         import { getOnboardingProgress } from './onboarding.js?v=20260718f';
-        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260721b';
+        import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260722e';
         import { applyQuestEvent, createQuestState, ensureVillageState, getNpcIdentity, getVillageId, grantQuestItem, hasQuestItems, normalizeQuestState, refreshVillageOffers } from './quests.js?v=20260721b';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260719a';
         import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260721c';
@@ -26,11 +29,12 @@
         import { NPC } from './npc.js?v=20260720q';
         import { preloadEntityMaterials } from './entityMaterials.js?v=20260719a';
         import { Minecart } from './minecart.js?v=20260719a';
-        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260721c';
+        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260722e';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260718b';
         import { SaveRepository } from './saveRepository.js?v=20260718a';
         import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260719a';
-        import { canParrotSpawnInBiome, canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260721a';
+        import { canParrotSpawnInBiome, canSpawnerSpawnAt, findSpawnerBlocksInRange } from './spawners.js?v=20260722a';
+        import { selectBiomeAnimal } from './biomeSpawnRules.js?v=20260722a';
         import { findSafeBedRespawn, normalizeRespawnBed } from './respawn.js?v=20260716a';
         import { TorchLightSystem, TORCH_TYPE } from './torchLights.js?v=20260719a';
         import { DamageFeedback } from './damageFeedback.js?v=20260718a';
@@ -60,13 +64,14 @@
 
         // --- KONSTANTEN & KONFIGURATION ---
         const { CHUNK_SIZE, CHUNK_HEIGHT, WATER_LEVEL, RENDER_DIST, CLOUD_HEIGHT } = CONFIG.WORLD;
+        document.querySelectorAll('[data-app-version]').forEach(element => { element.textContent = APP_VERSION; });
         const { DAY_DURATION, MAX_HEALTH, MAX_HUNGER, HUNGER_LOSS_PASSIVE, HUNGER_LOSS_MOVE, REGEN_RATE, REGEN_THRESHOLD, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULT } = CONFIG.GAMEPLAY;
         const { GRAVITY, GRAVITY_MULTIPLIER, WATER_DRAG, JUMP_FORCE, PLAYER_JUMP_FORCE, WALK_SPEED, FRICTION, PLAYER_WIDTH } = CONFIG.PHYSICS;
-        const { MAX_COUNT, SPAWN_CHANCE, SPAWN_DIST_MIN, SPAWN_DIST_MAX, ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS , WEIGHT_COW, WEIGHT_PIG, WEIGHT_SHEEP, WEIGHT_CHICKEN } = CONFIG.MOBS;
+        const { MAX_COUNT, SPAWN_CHANCE, SPAWN_DIST_MIN, SPAWN_DIST_MAX, ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS } = CONFIG.MOBS;
         const MOB_JUMP_FORCE = 5.5; // Konstante für das Springen von Tieren/Zombies (ca. 1.5 Blöcke hoch bei g=9.8)
 
         // --- GAME STATE ---
-        let camera, scene, renderer, controls, world, sun, sunGroup, ambient;
+        let camera, scene, renderer, controls, world, ambient, celestialSystem;
         let skyUniforms, skyMesh;
         // Spielstart auf Mittag setzen
         let time = DAY_DURATION * 0.45, prevTime = performance.now(), spawnTimer = 0;
@@ -77,6 +82,7 @@
         let storyObjectiveIndex = 0;
         let questState = createQuestState();
         let activeBloodMoonBoss = null;
+        let activeStructureBoss = null;
         let bossEncounterCounter = 0;
         const velocity = new THREE.Vector3(), direction = new THREE.Vector3();
         const mobs = [];
@@ -92,6 +98,7 @@
             damageFeedback.trigger(damage);
         }
         const npcs = [];            // Tier 3: NPC-Array
+        const _spawnedVillageKeys = new Set();
         window.npcs = npcs;
         window.getQuestState = () => questState;
         window.getQuestDayCount = () => Math.floor(time / DAY_DURATION);
@@ -140,6 +147,70 @@
             questState.storyFlags.bossActive = false;
         }
 
+        function resetStructureBossEncounter() {
+            if (!activeStructureBoss) return;
+            activeStructureBoss.isDead = true;
+            activeStructureBoss = null;
+        }
+
+        function spawnStructureBoss(structureId, structureKind, position) {
+            const BossType = structureKind === 'mine' ? DeepGuardian : SealKeeper;
+            const boss = new BossType(scene, new THREE.Vector3(position.x, position.y, position.z), {
+                onDefeated: defeatedBoss => {
+                    activeStructureBoss = null;
+                    if (!world.structureProgress) world.structureProgress = {};
+                    const progress = world.structureProgress[structureId] || {};
+                    world.structureProgress[structureId] = {
+                        ...progress,
+                        bossDefeated: true,
+                        bossType: defeatedBoss.type
+                    };
+                    window.dispatchEvent(new CustomEvent('butzcraft:quest-action', {
+                        detail: { type: 'boss', bossType: defeatedBoss.type, count: 1 }
+                    }));
+                    window.playerInteraction?.showMessage(
+                        `${defeatedBoss.displayName} besiegt. Die Belohnungstruhe ist entsiegelt.`,
+                        '#ffe066',
+                        18
+                    );
+                }
+            });
+            boss.structureId = structureId;
+            activeStructureBoss = boss;
+            mobs.push(boss);
+            return boss;
+        }
+
+        window.tryActivateStructureBoss = ({ structureId, structureKind, position } = {}) => {
+            if (!structureId || !['mine', 'dungeon'].includes(structureKind)) {
+                return { ok: false, blocked: true, message: 'Das Siegel reagiert nicht.' };
+            }
+            if (!position || !Number.isFinite(position.x) || !Number.isFinite(position.y) || !Number.isFinite(position.z)) {
+                return { ok: false, blocked: true, message: 'Der Wächter kann hier nicht erscheinen.' };
+            }
+            if (!world.structureProgress) world.structureProgress = {};
+            const progress = world.structureProgress[structureId] || {};
+            if (progress.bossDefeated) return { ok: true, blocked: false };
+            if (activeBloodMoonBoss && !activeBloodMoonBoss.isDead) {
+                return { ok: false, blocked: true, message: 'Zuerst musst du den Blutmondwächter besiegen.' };
+            }
+            if (activeStructureBoss && !activeStructureBoss.isDead) {
+                return {
+                    ok: false,
+                    blocked: true,
+                    message: activeStructureBoss.structureId === structureId
+                        ? `${activeStructureBoss.displayName} bewacht weiterhin die Truhe.`
+                        : 'Ein anderer Wächter ist bereits erwacht.'
+                };
+            }
+            const boss = spawnStructureBoss(structureId, structureKind, position);
+            return {
+                ok: false,
+                blocked: true,
+                message: `${boss.displayName} erwacht und versiegelt die Belohnungstruhe!`
+            };
+        };
+
         function spawnBloodMoonBoss(position, echo = false) {
             const encounterId = `blood-moon:${++bossEncounterCounter}`;
             const summonMinions = (bossPosition, phase) => {
@@ -184,6 +255,9 @@
 
         window.tryActivateBloodMoonRitual = ({ position, structureId } = {}) => {
             updateStoryObjectiveFromTime();
+            if (activeStructureBoss && !activeStructureBoss.isDead) {
+                return { ok: false, message: 'Ein anderer Wächter muss zuerst fallen.' };
+            }
             if (activeBloodMoonBoss && !activeBloodMoonBoss.isDead) {
                 return { ok: false, message: 'Der Blutmondwächter ist bereits erwacht.' };
             }
@@ -903,6 +977,7 @@
 
         function resetRuntimeForLoadedGame() {
             activeBloodMoonBoss = null;
+            activeStructureBoss = null;
             while (mobs.length > 0) {
                 const mob = mobs.pop();
                 if (mob && typeof mob.dispose === 'function') mob.dispose();
@@ -935,6 +1010,7 @@
             respawnBed = null;
             questState = createQuestState();
             activeBloodMoonBoss = null;
+            activeStructureBoss = null;
             SoundManager.init();
             manuallyPaused = false;
             lockControlsForDesktop();
@@ -1171,6 +1247,7 @@
             if (!point) return false;
 
             resetBloodMoonEncounter();
+            resetStructureBossEncounter();
             controls.getObject().position.set(point.x, point.y, point.z);
             Game.player.velocity.set(0, 0, 0);
             velocity.set(0, 0, 0);
@@ -1264,23 +1341,7 @@
             camera.position.set(spawn.x, spawn.height + 5, spawn.z); // Näher am Boden spawnen
 
             ambient = new THREE.AmbientLight(0xffffff, 0.4); scene.add(ambient);
-            sunGroup = new THREE.Group(); scene.add(sunGroup);
-            sun = new THREE.DirectionalLight(0xffffff, 1.0); sun.position.set(0, 50, 0); sunGroup.add(sun);
-
-            const celestialGroup = new THREE.Group();
-            scene.add(celestialGroup);
-            
-            const sunGeo = new THREE.CircleGeometry(30, 32);
-            const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffcc, fog: false, transparent: true, blending: THREE.AdditiveBlending, side: THREE.DoubleSide });
-            const sunMesh = new THREE.Mesh(sunGeo, sunMat);
-            sunMesh.position.set(0, 400, 0);
-            celestialGroup.add(sunMesh);
-
-            const moonGeo = new THREE.CircleGeometry(25, 32);
-            const moonMat = new THREE.MeshBasicMaterial({ color: 0xdddddf, fog: false, transparent: true, side: THREE.DoubleSide });
-            const moonMesh = new THREE.Mesh(moonGeo, moonMat);
-            moonMesh.position.set(0, -400, 0);
-            celestialGroup.add(moonMesh);
+            celestialSystem = createCelestialSystem(scene);
 
             const starsGeo = new THREE.BufferGeometry();
             const starsPos = [];
@@ -1424,7 +1485,6 @@
             window.weatherSystem = weatherSystem;
 
             // Tier 3: NPC-Spawning bei Dorf-Generierung
-            const _spawnedVillageKeys = new Set();
             window.addEventListener('villageGenerated', (e) => {
                 const vInfo = e.detail;
                 const vKey = `${vInfo.cx},${vInfo.cz}`;
@@ -1643,11 +1703,15 @@
                 DOM.healthFill.style.width = Math.max(0, Game.player.health) + '%';
                 DOM.hungerFill.style.width = Math.max(0, Game.player.hunger) + '%';
                 if (DOM.bossStatus) {
-                    const bossVisible = activeBloodMoonBoss && !activeBloodMoonBoss.isDead;
+                    const activeBoss = activeBloodMoonBoss && !activeBloodMoonBoss.isDead
+                        ? activeBloodMoonBoss
+                        : (activeStructureBoss && !activeStructureBoss.isDead ? activeStructureBoss : null);
+                    const bossVisible = Boolean(activeBoss);
                     DOM.bossStatus.hidden = !bossVisible;
                     if (bossVisible) {
-                        DOM.bossStatusLabel.textContent = activeBloodMoonBoss.echo ? 'Blutmondecho' : 'Blutmondwächter';
-                        DOM.bossStatusFill.style.width = `${Math.max(0, activeBloodMoonBoss.health / activeBloodMoonBoss.maxHealth * 100)}%`;
+                        DOM.bossStatusLabel.textContent = activeBoss.displayName
+                            || (activeBoss.echo ? 'Blutmondecho' : 'Blutmondwächter');
+                        DOM.bossStatusFill.style.width = `${Math.max(0, activeBoss.health / activeBoss.maxHealth * 100)}%`;
                     }
                 }
                 const tm = Math.floor((time / DAY_DURATION) * 1440), hh = Math.floor(tm / 60) % 24, mm = tm % 60, dd = Math.floor(time / DAY_DURATION) + 1;
@@ -1733,7 +1797,8 @@
             const dayRatio = (isNaN(time) || DAY_DURATION <= 0) ? 0.45 : (time % DAY_DURATION) / DAY_DURATION;
             const dayCount = Math.floor(time / DAY_DURATION);
             const isBloodMoon = dayCount % BLOOD_MOON_INTERVAL === (BLOOD_MOON_INTERVAL - 1); // Erste Nächte friedlich
-            sunGroup.rotation.x = dayRatio * Math.PI * 2 + Math.PI;
+            const weatherSkyMult = weatherSystem ? weatherSystem.getSkyMultiplier() : 1.0;
+            updateCelestialSystem(celestialSystem, camera.position, dayRatio, isBloodMoon, weatherSkyMult, !Game.player.inWater);
 
             // Nacht-Farben: normal oder Blutmond
             const nightH = isBloodMoon ? SKY.bloodMoonH : SKY.nightH;
@@ -1752,7 +1817,6 @@
             } else if (dayRatio > 0.75 && dayRatio <= 0.80) {
                 const f = (dayRatio - 0.75) / 0.05; SKY.hColor.lerpColors(SKY.sunriseH, nightH, f); SKY.zColor.lerpColors(SKY.sunriseZ, nightZ, f);
             } else { SKY.hColor.copy(nightH); SKY.zColor.copy(nightZ); }
-            sun.intensity = skyInty;
             if (ambient?.userData.painterlyDayIntensity !== undefined) {
                 ambient.intensity = getAmbientLightIntensity(
                     skyInty,
@@ -1766,7 +1830,6 @@
                 if (scene.fog) { scene.fog.color.copy(SKY.underwaterColor); scene.fog.density = 0.12; }
             } else {
                 // Tier 3: Wetter-System beeinflusst Sky + Fog
-                const weatherSkyMult = weatherSystem ? weatherSystem.getSkyMultiplier() : 1.0;
                 const weatherFogExtra = weatherSystem ? weatherSystem.getExtraFogDensity() : 0;
 
                 // Blitz-Flash: kurzzeitig weißer Himmel
@@ -1845,7 +1908,7 @@
 
                 const heldItemType = inventorySlots[getSelectedSlot()]?.type || 0;
                 mobs.forEach(m => {
-                    if ((dayRatio < 0.25 || dayRatio > 0.75) === false && (m.type === 'zombie' || m.type === 'skeleton')) m.isDead = true;
+                    if ((dayRatio < 0.25 || dayRatio > 0.75) === false && (m.type === 'zombie' || m.type === 'skeleton' || m.type === 'scorpion')) m.isDead = true;
                     else m.update(delta, playerPos, world, applyPlayerDamage, dayRatio, now, heldItemType);
                 });
                 for (let i = mobs.length - 1; i >= 0; i--) {
@@ -1869,13 +1932,16 @@
                 }
 
                 // --- Mob Spawning (optimiert: eine Schleife statt 3x filter) ---
-                let landMobsCount = 0, waterMobsCount = 0, geistCount = 0, parrotCount = 0;
+                let landMobsCount = 0, waterMobsCount = 0, geistCount = 0, parrotCount = 0, polarBearCount = 0;
                 for (let i = 0; i < mobs.length; i++) {
                     if (mobs[i].isDead) continue;
-                    if (mobs[i].type === 'fish' || mobs[i].type === 'octopus' || mobs[i].type === 'turtle') waterMobsCount++;
+                    if (mobs[i].type === 'fish' || mobs[i].type === 'octopus' || mobs[i].type === 'turtle' || mobs[i].type === 'penguin' || mobs[i].type === 'seal') waterMobsCount++;
                     else if (mobs[i].type === 'geist') geistCount++;
                     else if (mobs[i].type === 'parrot') parrotCount++;
-                    else if (!mobs[i].isPenned) landMobsCount++;
+                    else if (!mobs[i].isPenned) {
+                        landMobsCount++;
+                        if (mobs[i].type === 'polarBear') polarBearCount++;
+                    }
                 }
                 
                 if ((landMobsCount < MAX_COUNT || waterMobsCount < 15 || parrotCount < 5) && Math.random() < SPAWN_CHANCE) {
@@ -1892,6 +1958,7 @@
                         }
                     }
                     if (spawnY > 0) {
+                        const spawnBiome = getBiomeAt(ox, oz);
                         // Prüfe nur direkte Umgebung auf Wasser (Radius 1) an der Oberfläche
                         let waterNearby = false;
                         for (let x = -1; x <= 1; x++) {
@@ -1909,7 +1976,7 @@
                         }
 
                         // Papageien: tagsüber, unabhängig vom Land-Mob-Cap (eigenes Cap: 5)
-                        if (canParrotSpawnInBiome(getBiomeAt(ox, oz)) && !isNight && parrotCount < 5 && !isWaterSpawn && !waterNearby && spawnY > 0 && spawnY <= 46) {
+                        if (canParrotSpawnInBiome(spawnBiome) && !isNight && parrotCount < 5 && !isWaterSpawn && !waterNearby && spawnY > 0 && spawnY <= 46) {
                             let leavesNearby = false;
                             outer2: for (let dy = -2; dy <= 12; dy++) {
                                 for (let dx = -4; dx <= 4; dx++) {
@@ -1926,27 +1993,19 @@
 
                         if (spawnY <= 46) {
                             if (isWaterSpawn && waterMobsCount < 15) {
-                                const WEIGHT_FISH = CONFIG.MOBS.WEIGHT_FISH || 40;
-                                const WEIGHT_OCTOPUS = CONFIG.MOBS.WEIGHT_OCTOPUS || 1;
-                                const WEIGHT_TURTLE = CONFIG.MOBS.WEIGHT_TURTLE || 15;
-                                const totalW = WEIGHT_FISH + WEIGHT_OCTOPUS + WEIGHT_TURTLE;
-                                const roll = Math.random() * totalW;
-                                if (roll < WEIGHT_FISH) mobs.push(new Mob(scene, 'fish', ox, spawnY, oz));
-                                else if (roll < WEIGHT_FISH + WEIGHT_TURTLE) mobs.push(new Mob(scene, 'turtle', ox, spawnY, oz));
-                                else mobs.push(new Mob(scene, 'octopus', ox, spawnY, oz));
+                                const animal = selectBiomeAnimal({ biome: spawnBiome, habitat: 'water', isNight });
+                                if (animal) mobs.push(new Mob(scene, animal.type, ox, spawnY, oz));
                             } else if (!waterNearby && landMobsCount < MAX_COUNT) {
                                 if (isNight && isBloodMoon) {
                                     // Blutmond-Nacht: Zombies & Skelette spawnen
                                     if (Math.random() < 0.5) mobs.push(new Mob(scene, 'zombie', ox, spawnY, oz));
                                     else mobs.push(new Mob(scene, 'skeleton', ox, spawnY, oz));
                                 }
-                                else if (dayRatio >= 0.25 && dayRatio <= 0.75) {
-                                    const totalWeight = WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP + WEIGHT_CHICKEN;
-                                    const r = Math.random() * totalWeight;
-                                    if (r < WEIGHT_COW) mobs.push(new Mob(scene, 'cow', ox, spawnY, oz));
-                                    else if (r < WEIGHT_COW + WEIGHT_PIG) mobs.push(new Mob(scene, 'pig', ox, spawnY, oz));
-                                    else if (r < WEIGHT_COW + WEIGHT_PIG + WEIGHT_SHEEP) mobs.push(new Mob(scene, 'sheep', ox, spawnY, oz));
-                                    else mobs.push(new Mob(scene, 'chicken', ox, spawnY, oz));
+                                else if (!isNight || spawnBiome === BIOMES.SNOW || spawnBiome === BIOMES.DESERT) {
+                                    const animal = selectBiomeAnimal({ biome: spawnBiome, habitat: 'land', isNight });
+                                    if (animal && (animal.type !== 'polarBear' || polarBearCount < 1)) {
+                                        mobs.push(new Mob(scene, animal.type, ox, spawnY, oz));
+                                    }
                                 }
                             }
                         }

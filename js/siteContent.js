@@ -3,6 +3,7 @@ const SESSION_ENDPOINT = '/api/admin/session';
 const LOGIN_ENDPOINT = '/api/admin/login';
 const LOGOUT_ENDPOINT = '/api/admin/logout';
 const IMAGE_ENDPOINT = '/api/admin/image';
+const STATISTICS_ENDPOINT = '/api/admin/statistics';
 
 export async function initializeSiteContent() {
     if (!document.body.hasAttribute('data-site-content-root')) return;
@@ -42,8 +43,8 @@ function setupAdminMode(initialContent) {
         <aside class="site-admin-login" data-admin-login aria-labelledby="admin-login-title">
             <div class="site-admin-login-card">
                 <p class="eyebrow">Geschützter Bereich</p>
-                <h2 id="admin-login-title">Butzcraft bearbeiten</h2>
-                <p>Melde dich an, um Texte direkt anzuklicken und Bilder auszutauschen.</p>
+                <h2 id="admin-login-title">Butzcraft verwalten</h2>
+                <p>Melde dich an, um Inhalte zu bearbeiten und die Spielaufrufe anzusehen.</p>
                 <form data-admin-login-form>
                     <label>Benutzername <input name="username" autocomplete="username" required></label>
                     <label>Passwort <input name="password" type="password" autocomplete="current-password" required></label>
@@ -63,11 +64,22 @@ function setupAdminMode(initialContent) {
                 <button type="button" data-editor-command="removeFormat" title="Formatierung entfernen" aria-label="Formatierung entfernen">Tx</button>
             </div>
             <div class="site-admin-actions">
+                <button class="button site-admin-logout" type="button" data-admin-statistics>Statistik</button>
                 <button class="button site-admin-logout" type="button" data-admin-logout>Abmelden</button>
                 <button class="button button-primary" type="button" data-admin-save>Änderungen speichern</button>
             </div>
             <input type="file" accept="image/jpeg,image/png,image/webp" data-admin-image-input hidden>
         </aside>
+        <dialog class="site-statistics-dialog" data-admin-statistics-dialog aria-labelledby="statistics-title">
+            <div class="site-statistics-heading">
+                <div>
+                    <p class="eyebrow">Serverstatistik</p>
+                    <h2 id="statistics-title">Aufrufe des Spiels</h2>
+                </div>
+                <button type="button" class="site-statistics-close" data-admin-statistics-close aria-label="Statistik schließen">×</button>
+            </div>
+            <div data-admin-statistics-content><p>Statistik wird geladen …</p></div>
+        </dialog>
     `);
 
     const loginOverlay = document.querySelector('[data-admin-login]');
@@ -77,6 +89,8 @@ function setupAdminMode(initialContent) {
     const adminStatus = document.querySelector('[data-admin-status]');
     const editorTools = document.querySelector('[data-admin-tools]');
     const imageInput = document.querySelector('[data-admin-image-input]');
+    const statisticsDialog = document.querySelector('[data-admin-statistics-dialog]');
+    const statisticsContent = document.querySelector('[data-admin-statistics-content]');
     let activeEditable = null;
 
     checkSession();
@@ -122,6 +136,20 @@ function setupAdminMode(initialContent) {
         } finally {
             window.location.replace('/');
         }
+    });
+
+    document.querySelector('[data-admin-statistics]').addEventListener('click', async () => {
+        statisticsContent.innerHTML = '<p>Statistik wird geladen …</p>';
+        statisticsDialog.showModal();
+        try {
+            renderStatistics(statisticsContent, await requestJson(STATISTICS_ENDPOINT));
+        } catch (error) {
+            statisticsContent.textContent = error.message;
+        }
+    });
+    document.querySelector('[data-admin-statistics-close]').addEventListener('click', () => statisticsDialog.close());
+    statisticsDialog.addEventListener('click', event => {
+        if (event.target === statisticsDialog) statisticsDialog.close();
     });
 
     editorTools.addEventListener('mousedown', event => event.preventDefault());
@@ -225,6 +253,53 @@ function setupAdminMode(initialContent) {
             image.setAttribute('aria-label', 'Bild ändern');
         }
     }
+}
+
+function renderStatistics(target, statistics) {
+    const totals = statistics?.totals || {};
+    const hours = Array.isArray(statistics?.hours) ? statistics.hours : [];
+    const days = Array.isArray(statistics?.days) ? statistics.days : [];
+    target.innerHTML = `
+        <p class="site-statistics-note">Gezählt werden erfolgreiche Aufrufe von play.butzcraft.de. Ein Aufruf ist kein eindeutiger Spieler; Bots und Neuladen können enthalten sein. Es werden keine IP-Adressen oder einzelnen Zugriffe gespeichert.</p>
+        <div class="site-statistics-cards">
+            ${statisticCard('Heute', totals.todayGamePageRequests)}
+            ${statisticCard('Letzte 7 Tage', totals.last7DaysGamePageRequests)}
+            ${statisticCard('Letzte 30 Tage', totals.last30DaysGamePageRequests)}
+            ${statisticCard('Fehler · 30 Tage', totals.last30DaysErrors)}
+        </div>
+        <section class="site-statistics-section">
+            <h3>Letzte 24 Stunden</h3>
+            <div class="site-statistics-bars">${renderStatisticBars(hours, 'start', true)}</div>
+        </section>
+        <section class="site-statistics-section">
+            <h3>Letzte 30 Tage</h3>
+            <div class="site-statistics-bars">${renderStatisticBars(days, 'date', false)}</div>
+        </section>
+        <p class="site-statistics-generated">Stand: ${formatStatisticTimestamp(statistics?.generatedAt)} · Zeitzone: ${statistics?.timeZone || 'Europe/Berlin'}</p>
+    `;
+}
+
+function statisticCard(label, value) {
+    return `<div class="site-statistics-card"><span>${label}</span><strong>${formatStatisticCount(value)}</strong></div>`;
+}
+
+function renderStatisticBars(items, labelField, hourly) {
+    const maximum = Math.max(1, ...items.map(item => Number(item?.gamePageRequests) || 0));
+    return items.map(item => {
+        const count = Number(item?.gamePageRequests) || 0;
+        const key = /^\d{4}-\d{2}-\d{2}(T\d{2})?$/.test(item?.[labelField]) ? item[labelField] : '';
+        const label = hourly ? `${key.slice(11, 13)} Uhr` : key.split('-').reverse().join('.');
+        return `<div class="site-statistics-row"><span>${label}</span><i><b style="width:${Math.round(count / maximum * 100)}%"></b></i><strong>${formatStatisticCount(count)}</strong></div>`;
+    }).join('');
+}
+
+function formatStatisticCount(value) {
+    return new Intl.NumberFormat('de-DE').format(Number.isFinite(Number(value)) ? Number(value) : 0);
+}
+
+function formatStatisticTimestamp(value) {
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'unbekannt' : date.toLocaleString('de-DE');
 }
 
 function collectContent(currentContent) {

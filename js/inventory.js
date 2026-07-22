@@ -2,7 +2,7 @@
 import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260721b';
 import { craftingRecipes, getRecipeTrustLockReason } from './recipes.js?v=20260721b';
 import { initRecipeBook } from './recipe_book.js?v=20260721c';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717z';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260722a';
 import { SoundManager } from './sound.js?v=20260507b';
 import { Game } from './Game.js?v=20260716b';
 import { getToolInfo } from './miningRules.js?v=20260716a';
@@ -94,7 +94,8 @@ const TRANSLATIONS = {
     'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil',
     'COOKED_FISH': 'Gebratener Fisch', 'COOKED_MEAT': 'Gebratenes Fleisch', 'COOKED_CHICKEN': 'Gebratenes Hähnchen',
     'COOKED_MUTTON': 'Gebratenes Hammelfleisch', 'COOKED_TURTLE_MEAT': 'Gebratenes Schildkrötenfleisch',
-    'TORCH': 'Fackel', 'WOOD_FENCE': 'Holzzaun', 'WOOD_GATE': 'Holzgatter', 'VILLAGE_LANTERN': 'Dorflaterne'
+    'TORCH': 'Fackel', 'WOOD_FENCE': 'Holzzaun', 'WOOD_GATE': 'Holzgatter', 'VILLAGE_LANTERN': 'Dorflaterne',
+    'POLAR_BEAR_FUR': 'Eisbärenfell'
 };
 
 
@@ -235,7 +236,7 @@ export function addItemToInventory(type, count) {
 // Erzeugt HTML für ein Block-/Item-Icon (2D flat oder 3D Cube)
 export function createBlockHTML(type) {
     const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
-        || (type >= 60 && type <= 74) || (type >= 89 && type <= 101)); // Kohle, Barren, Werkzeuge, Waffen, Nahrung und Fackel als 2D-Icons
+        || (type >= 60 && type <= 74) || (type >= 89 && type <= 101) || type === BLOCK_TYPES.POLAR_BEAR_FUR); // Kohle, Barren, Werkzeuge, Waffen, Nahrung, Fackel und Fell als 2D-Icons
     let texIdx = 0;
     if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
     const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
@@ -371,6 +372,12 @@ export function updateInventoryUI() {
     const craftButton = document.getElementById('crafting-create-btn');
     if (craftButton) craftButton.disabled = craftingResultData.count <= 0;
 }
+
+window.addEventListener('butzcraft:atlas-ready', () => {
+    document.querySelectorAll('.slot-color-preview .flat-icon, .slot-color-preview .mc-face').forEach(element => {
+        element.style.backgroundImage = `url("${atlasDataURL}")`;
+    });
+});
 
 function handleSlotClick(e, sType, index) {
     if (e.button !== 0 && e.button !== 2) return; 
