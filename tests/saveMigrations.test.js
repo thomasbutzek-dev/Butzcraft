@@ -15,6 +15,22 @@ import {
     CURRENT_SAVE_VERSION
 } from '../js/saveMigrations.js';
 
+describe('migrateSave - v14 to v15 (item metadata)', () => {
+    it('preserves durability and spoilage metadata while advancing the schema', () => {
+        const migrated = migrateSave({
+            version: 14,
+            inventory: [
+                { type: 17, count: 2, spoilAt: 900 },
+                { type: 106, count: 1, durability: 40 }
+            ]
+        });
+
+        expect(migrated.version).toBe(15);
+        expect(migrated.inventory[0]).toEqual({ type: 17, count: 2, spoilAt: 900 });
+        expect(migrated.inventory[1]).toEqual({ type: 106, count: 1, durability: 40 });
+    });
+});
+
 describe('migrateSave - v13 to v14 (quest state)', () => {
     it('preserves the existing journey index in the new quest state', () => {
         const migrated = migrateSave({ version: 13, inventory: [], storyObjectiveIndex: 3 });

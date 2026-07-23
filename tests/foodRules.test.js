@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getFoodInfo, isFoodType } from '../js/foodRules.js';
+import { getFoodFreshness, getFoodInfo, isFoodType, updateFoodSpoilage } from '../js/foodRules.js';
 
 describe('food rules', () => {
     it('makes cooked food clearly more filling than its raw version', () => {
@@ -21,5 +21,19 @@ describe('food rules', () => {
         expect(isFoodType(51)).toBe(true);
         expect(isFoodType(100)).toBe(true);
         expect(isFoodType(3)).toBe(false);
+    });
+});
+
+describe('food spoilage', () => {
+    it('starts a shelf-life timer and turns expired food into spoiled food', () => {
+        const inventory = [{ type: 22, count: 3 }];
+
+        expect(updateFoodSpoilage(inventory, 100)).toBe(0);
+        expect(inventory[0].spoilAt).toBe(700);
+        expect(getFoodFreshness(inventory[0], 400)).toBeCloseTo(0.5);
+
+        expect(updateFoodSpoilage(inventory, 700)).toBe(3);
+        expect(inventory[0]).toEqual({ type: 136, count: 3 });
+        expect(getFoodInfo(136).damageChance).toBe(1);
     });
 });

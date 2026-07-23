@@ -1,13 +1,15 @@
-import { normalizeRecipe } from './recipes.js?v=20260721b';
+import { normalizeRecipe } from './recipes.js?v=20260723e';
+import { getArmorIconHTML, getArmorInfo } from './equipmentRules.js?v=20260723e';
 
 const recipeBookStates = new WeakMap();
 
 export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick, options = {}) {
     const EMOJI_MAP = { 21: '🐟', 22: '🥩', 23: '🍗', 24: '🧟', 25: '🍖' };
-    const RECIPE_CATEGORIES = ['Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Versorgung'];
+    const RECIPE_CATEGORIES = ['Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Rüstung', 'Versorgung'];
 
     const createMiniHTML = (type) => {
         if (type === 0) return '';
+        if (getArmorInfo(type)) return getArmorIconHTML(type, true);
         if (EMOJI_MAP[type]) return `<span class="mini-emoji">${EMOJI_MAP[type]}</span>`;
         if (type === BLOCK_TYPES.WOOD_FENCE) {
             return '<div class="mini-structure-icon mini-fence-icon" data-recipe-icon="fence" aria-hidden="true"></div>';
@@ -28,6 +30,8 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
     // Blocknamen-Helfer
     const getBlockName = (type) => {
         if (type === 0) return '';
+        const armor = getArmorInfo(type);
+        if (armor) return armor.name;
         const key = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === type) || '';
         return TRANSLATIONS[key] || key;
     };
@@ -215,7 +219,7 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
             resultContainer.className = 'recipe-result-container';
 
             const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === recipe.result.type) || '';
-            const translatedName = TRANSLATIONS[bName] || bName;
+            const translatedName = getArmorInfo(recipe.result.type)?.name || TRANSLATIONS[bName] || bName;
             const formattedName = translatedName.toLowerCase().split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 
             const resultSlot = document.createElement('div');

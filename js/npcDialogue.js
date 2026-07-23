@@ -1,4 +1,4 @@
-import { getProfessionChainStatus, getSideQuestProgress } from './quests.js?v=20260721b';
+import { getProfessionChainStatus, getSideQuestProgress } from './quests.js?v=20260723e';
 
 const GREETINGS = [
     'Die Esse verrät mir mehr über ein Dorf als jedes Gerücht.',

@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260719a';
-import { openFurnace } from './furnace.js?v=20260721c';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260722a';
-        import { BLOCK_COLORS } from './blocks.js?v=20260722a';
+import { openFurnace } from './furnace.js?v=20260723e';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260723e';
+        import { BLOCK_COLORS } from './blocks.js?v=20260723e';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260718b';
 import { getAttackProfile, getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
 import { PlayerArrowProjectile } from './playerArrow.js?v=20260720q';
-import { getFoodInfo } from './foodRules.js?v=20260716a';
+import { getFoodInfo } from './foodRules.js?v=20260723e';
 import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260719a';
 import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-import { openTradeUI } from './tradeUI.js?v=20260722e';
+import { openTradeUI } from './tradeUI.js?v=20260723e';
 import { STORY_EVENTS } from './storyProgress.js?v=20260722e';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
@@ -723,7 +723,7 @@ export class PlayerInteraction {
                     60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74,
                     89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 105];
                 
-                if (currentItem.count <= 0 || currentItem.type === 0 || unplaceable.includes(currentItem.type)) {
+                if (currentItem.count <= 0 || currentItem.type === 0 || currentItem.type >= 106 || unplaceable.includes(currentItem.type)) {
                     return; 
                 }
                 
@@ -1030,7 +1030,8 @@ export class PlayerInteraction {
         if (this.activePressurePlateKey === plateKey) return false;
 
         this.activePressurePlateKey = plateKey;
-        Game.player.health = Math.max(0, Game.player.health - 2);
+        if (typeof this.context.applyPlayerDamage === 'function') this.context.applyPlayerDamage(2);
+        else Game.player.health = Math.max(0, Game.player.health - 2);
         this.SoundManager.playSound('damage', 0.8, 1.0);
         this.showMessage('Falle! -2 HP', '#ff0000', 18);
         return true;

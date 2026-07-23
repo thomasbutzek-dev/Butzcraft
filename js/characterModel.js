@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
+import { EQUIPMENT_SLOTS, getArmorInfo } from './equipmentRules.js?v=20260723e';
 
 let textureSerial = 0;
 
@@ -62,6 +63,87 @@ export function createCharacterModel(profile, options = {}) {
     characterGroup.position.y = options.positionY ?? 0.08;
     characterGroup.scale.setScalar(options.scale ?? 0.72);
     return characterGroup;
+}
+
+export function updateCharacterEquipment(characterGroup, inventorySlots) {
+    const rig = characterGroup?.rig;
+    if (!rig) return;
+    for (const layer of rig.armorLayers || []) {
+        layer.parent?.remove(layer);
+        disposeLayer(layer);
+    }
+    rig.armorLayers = [];
+
+    for (const slot of EQUIPMENT_SLOTS) {
+        const item = inventorySlots?.[slot.inventoryIndex];
+        const armor = item && item.count > 0 ? getArmorInfo(item.type) : null;
+        if (!armor) continue;
+        const material = makeMaterial(armor.color, {
+            kind: armor.material === 'bloodMoon' ? 'gloss' : 'fabric',
+            detail: armor.material.includes('Iron') || armor.material === 'iron' ? 'iron' : (armor.material === 'fur' ? 'woven' : 'leather')
+        });
+        const accent = makeMaterial(armor.accent, {
+            kind: armor.material === 'bloodMoon' ? 'gloss' : 'plain',
+            detail: armor.material.includes('Iron') || armor.material === 'iron' ? 'iron' : 'plain'
+        });
+        addArmorLayer(rig, slot.id, material, accent, rig.armorLayers);
+    }
+}
+
+function addArmorLayer(rig, slotId, material, accent, layers) {
+    const addLayer = (parent, name) => {
+        const layer = new THREE.Group();
+        layer.name = name;
+        parent.add(layer);
+        layers.push(layer);
+        return layer;
+    };
+
+    if (slotId === 'head') {
+        const layer = addLayer(rig.headPivot, 'equippedHelmet');
+        addBox(layer, [0, 0.63, 0], [0.88, 0.28, 0.82], material, { radius: 0.08 });
+        addBox(layer, [0, 0.5, 0.39], [0.72, 0.09, 0.08], accent, { radius: 0.02 });
+        return;
+    }
+    if (slotId === 'body') {
+        const layer = addLayer(rig.torso, 'equippedBodyArmor');
+        addBox(layer, [0, 0.58, 0.255], [1.01, 0.82, 0.12], material, { radius: 0.05 });
+        addBox(layer, [0, 0.53, 0.325], [0.5, 0.1, 0.06], accent, { radius: 0.02 });
+        return;
+    }
+    if (slotId === 'arms') {
+        for (const arm of [rig.leftArmPivot, rig.rightArmPivot]) {
+            const layer = addLayer(arm, 'equippedArmArmor');
+            addBox(layer, [0, -0.28, 0], [0.42, 0.58, 0.44], material, { radius: 0.05 });
+            addBox(layer, [0, -0.53, 0.19], [0.36, 0.08, 0.08], accent, { radius: 0.02 });
+        }
+        return;
+    }
+    if (slotId === 'legs') {
+        for (const leg of [rig.leftLegPivot, rig.rightLegPivot]) {
+            const layer = addLayer(leg, 'equippedLegArmor');
+            addBox(layer, [0, -0.38, 0.04], [0.48, 0.76, 0.45], material, { radius: 0.05 });
+            addBox(layer, [0, -0.31, 0.27], [0.36, 0.09, 0.06], accent, { radius: 0.02 });
+        }
+        return;
+    }
+    for (const leg of [rig.leftLegPivot, rig.rightLegPivot]) {
+        const layer = addLayer(leg, 'equippedBootArmor');
+        addBox(layer, [0, -0.79, 0.08], [0.53, 0.34, 0.55], material, { radius: 0.06 });
+        addBox(layer, [0, -0.72, 0.36], [0.4, 0.08, 0.08], accent, { radius: 0.02 });
+    }
+}
+
+function disposeLayer(layer) {
+    layer.traverse(child => {
+        child.geometry?.dispose?.();
+        if (!child.material) return;
+        const materials = Array.isArray(child.material) ? child.material : [child.material];
+        for (const material of materials) {
+            material.map?.dispose?.();
+            material.dispose?.();
+        }
+    });
 }
 
 function createPivot(parent, name, position) {

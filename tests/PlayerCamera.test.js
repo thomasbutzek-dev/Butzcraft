@@ -95,4 +95,25 @@ describe('Player third-person camera', () => {
             'new Player(scene, camera, document.body, CONFIG, activeCharacterProfile, renderer.domElement)'
         );
     });
+
+    it('keeps selected swords and tools visible in first person and animates tools', () => {
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera();
+        const player = new Player(scene, camera, document.createElement('canvas'), CONFIG, null);
+
+        player.updateHeldItem(63);
+        player.updateSword(0.016);
+        expect(player.toolGroup.visible).toBe(true);
+        expect(player.swordGroup.visible).toBe(false);
+
+        player.startAttackAnimation(null);
+        player.updateSword(0.016);
+        expect(player.toolGroup.visible).toBe(true);
+
+        player.isSwinging = false;
+        player.updateHeldItem(91);
+        player.updateSword(0.016);
+        expect(player.swordGroup.visible).toBe(true);
+        expect(player.toolGroup.visible).toBe(false);
+    });
 });

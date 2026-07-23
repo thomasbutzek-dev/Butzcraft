@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260721c">
+    <link rel="stylesheet" href="style.css?v=20260723e">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -287,7 +287,7 @@
         <div id="instructions" role="dialog" aria-modal="true" aria-labelledby="pause-title" aria-hidden="true">
             <img src="logo.png" alt="BUTZCRAFT" style="width: 200px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">
             <h1 id="pause-title">Pause</h1>
-            <p style="margin: -4px 0 0; color: #aaa; font-size: 12px;">Butzcraft Version <span data-app-version>0.2.1</span></p>
+            <p style="margin: -4px 0 0; color: #aaa; font-size: 12px;">Butzcraft Version <span data-app-version>0.2.2</span></p>
             <div style="display: flex; gap: 20px; justify-content: center; margin: 20px 0;">
                 <button class="save-btn" type="button" data-resume-game style="padding: 15px 30px; font-size: 18px; cursor: pointer;" onclick="window.resumeGame && window.resumeGame();">Weiter spielen</button>
                 <button id="pause-character-editor-button" class="save-btn" type="button" data-open-character-editor onclick="event.stopPropagation()">Charakter</button>
@@ -379,6 +379,7 @@
             <h2 id="inventory-title">Inventar</h2>
             <div id="inventory-view-tabs" role="tablist" aria-label="Inventaransicht">
                 <button id="inventory-view-tab" type="button" role="tab" aria-selected="true">Inventar</button>
+                <button id="equipment-view-tab" type="button" role="tab" aria-selected="false">Ausrüstung</button>
                 <button id="quest-view-tab" type="button" role="tab" aria-selected="false">Questjournal</button>
             </div>
             <button
@@ -401,6 +402,28 @@
             <section><h2>Nebenquests</h2><div id="quest-journal-side"></div></section>
             <section><h2>Dörfer</h2><div id="quest-journal-villages"></div></section>
             <section><h2>Orientierung</h2><div id="quest-journal-home"></div></section>
+        </div>
+        <div id="equipment-panel" hidden>
+            <div class="equipment-panel-heading">
+                <div>
+                    <span class="equipment-kicker">Aktive Ausrüstung</span>
+                    <strong id="equipment-protection">0 % Schutz</strong>
+                </div>
+                <span id="equipment-status" role="status" aria-live="polite"></span>
+            </div>
+            <div id="equipment-paperdoll">
+                <div class="equipment-silhouette" aria-hidden="true">
+                    <span class="equipment-silhouette-head"></span>
+                    <span class="equipment-silhouette-body"></span>
+                    <span class="equipment-silhouette-arm left"></span>
+                    <span class="equipment-silhouette-arm right"></span>
+                    <span class="equipment-silhouette-leg left"></span>
+                    <span class="equipment-silhouette-leg right"></span>
+                </div>
+                <div id="equipment-slots"></div>
+            </div>
+            <h2>Ausrüstbar</h2>
+            <div id="equipment-items"></div>
         </div>
 
         <!-- NEUES CRAFTING AREA (3×3) -->
@@ -501,7 +524,7 @@
     <script type="module" src="./js/characterTransferBootstrap.js?v=20260720a"></script>
     <script
         type="module"
-        src="./js/GameMain.js?v=20260723b"
+        src="./js/GameMain.js?v=20260723e"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>

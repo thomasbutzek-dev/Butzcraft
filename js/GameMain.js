@@ -3,10 +3,10 @@
         import { APP_VERSION } from './version.js?v=20260723a';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260507b';
-        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260722a';
+        import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260723e';
         import { World, getBiomeAt, BIOMES } from './world.js?v=20260721d';
         import { Mob, updateProjectiles, projectiles } from './mobs.js?v=20260722c';
-        import { BloodMoonBoss } from './bloodMoonBoss.js?v=20260720a';
+        import { BloodMoonBoss } from './bloodMoonBoss.js?v=20260723a';
         import { createCelestialSystem, updateCelestialSystem } from './celestialBodies.js?v=20260722b';
         import { DeepGuardian, SealKeeper } from './structureBosses.js?v=20260722c';
 
@@ -14,22 +14,22 @@
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260720q';
         import { getWorldGenerationLoadNotice, prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260720q';
         import { Game } from './Game.js?v=20260716b'; // Central state container
-        import { Player } from './Player.js?v=20260723b';
+        import { Player } from './Player.js?v=20260723e';
         import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
-        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260722e';
-        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260722a';
+        import { PlayerInteraction, canUseMouseInteraction } from './PlayerInteraction.js?v=20260723e';
+        import { inventorySlots, getSelectedSlot, setSelectedSlot, addItemToInventory, tryAddItemsToInventory, updateInventoryUI, toggleInventory, openWorkbenchCrafting, prepareInventoryUI, setupInventoryEvents, oldInventoryMap, isInventoryOpened } from './inventory.js?v=20260723e';
         import { addItemOrCreateDrop, tryCollectDroppedItem, updateDroppedItemVisual } from './itemCollection.js?v=20260721c';
         import { getOnboardingProgress } from './onboarding.js?v=20260718f';
         import { STORY_EVENTS, advanceStoryProgress, getStoryProgress } from './storyProgress.js?v=20260722e';
-        import { applyQuestEvent, createQuestState, ensureVillageState, getNpcIdentity, getVillageId, grantQuestItem, hasQuestItems, normalizeQuestState, refreshVillageOffers } from './quests.js?v=20260721b';
+        import { applyQuestEvent, createQuestState, ensureVillageState, getNpcIdentity, getVillageId, grantQuestItem, hasQuestItems, normalizeQuestState, refreshVillageOffers } from './quests.js?v=20260723e';
         import { findNewGameSpawn } from './newGameSpawn.js?v=20260719a';
-        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260721c';
+        import { tickFurnace, isFurnaceOpen } from './furnace.js?v=20260723e';
         import { WeatherSystem } from './weather.js?v=20260719a';
         import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-        import { NPC } from './npc.js?v=20260720q';
+        import { NPC } from './npc.js?v=20260723e';
         import { preloadEntityMaterials } from './entityMaterials.js?v=20260719a';
         import { Minecart } from './minecart.js?v=20260719a';
-        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260722e';
+        import { closeTradeUI, isTradeOpen } from './tradeUI.js?v=20260723e';
         import { listBrowserSaves, loadBrowserSave, saveBrowserSave, isValidSaveName, normalizeImportedSave, serializeSaveFile } from './saveStore.js?v=20260718b';
         import { SaveRepository } from './saveRepository.js?v=20260718a';
         import { getAmbientLightIntensity, getDayCycleSpeed, getDayRatio, getSkyLightIntensity, getSleepBlockReason, getWakeTime } from './sleep.js?v=20260719a';
@@ -41,7 +41,11 @@
         import { FrameRateTracker } from './frameRateTracker.js?v=20260718a';
         import { calculateRenderPixelRatio } from './renderResolution.js?v=20260718a';
         import { resolveUiInputCommand } from './inputCommand.js?v=20260720q';
-        import { initQuestJournal, showInventoryPanel, updateQuestCompass } from './questJournal.js?v=20260721e';
+        import { initQuestJournal, showInventoryPanel, updateQuestCompass } from './questJournal.js?v=20260723e';
+        import { initEquipmentUI } from './equipmentUI.js?v=20260723e';
+        import { applyArmorDamage } from './equipmentRules.js?v=20260723e';
+        import { updateFoodSpoilage } from './foodRules.js?v=20260723e';
+        import { isPlayerTouchingFire } from './environmentHazards.js?v=20260723e';
         import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
         window.__butzcraftGameMainEvaluating = true;
         window.addItemToInventory = addItemToInventory;
@@ -91,17 +95,29 @@
         let weatherSystem = null;  // Tier 3: Wetter-System (init nach World)
         let torchLightSystem = null;
         let damageFeedback = null;
+        let fireDamageCooldown = 0;
+        let foodSpoilageTimer = 0;
 
         function applyPlayerDamage(damage) {
             if (damage <= 0 || Game.player?.ghostMode) return;
-            Game.player.health -= damage;
-            damageFeedback.trigger(damage);
+            const result = applyArmorDamage(inventorySlots, damage);
+            Game.player.health -= result.damage;
+            damageFeedback?.trigger(result.damage);
+            if (result.broken.length > 0) {
+                window.playerInteraction?.showMessage(`${result.broken[0].name} ist zerbrochen!`, '#ff7043', 18);
+                Game.player?.setEquipment(inventorySlots);
+                updateInventoryUI();
+            }
         }
         const npcs = [];            // Tier 3: NPC-Array
         const _spawnedVillageKeys = new Set();
         window.npcs = npcs;
         window.getQuestState = () => questState;
         window.getQuestDayCount = () => Math.floor(time / DAY_DURATION);
+        window.getGameTime = () => time;
+        window.addEventListener('butzcraft:equipment-changed', () => {
+            Game.player?.setEquipment(inventorySlots);
+        });
         window.getHighestVillageTrust = () => Math.max(0, ...Object.values(questState.villages || {}).map(village => Number(village.trust) || 0));
         window.getCurrentStoryObjective = () => currentStoryObjective;
         window.getQuestNavigationContext = () => {
@@ -1066,6 +1082,7 @@
 
                     // migrateSave liefert immer exakt 64 Slots und ersetzt damit den vorherigen Inventarstand vollständig.
                     data.inventory.forEach((item, i) => inventorySlots[i] = item);
+                    Game.player.setEquipment(inventorySlots);
                     resetControlsHintForRun(data.onboardingObjectiveIndex, questState.mainQuestIndex);
                     
                     collectedWool = data.collectedWool || 0;
@@ -1275,6 +1292,7 @@
                 setupInventoryEvents();
                 prepareInventoryUI();
                 initQuestJournal();
+                initEquipmentUI();
                 init();
                 window.__butzcraftGameMainReady = true;
                 window.__butzcraftGameMainEvaluating = false;
@@ -1411,6 +1429,7 @@
             document.addEventListener('pointerdown', relockControlsFromPointer, true);
 
             Game.player = new Player(scene, camera, document.body, CONFIG, activeCharacterProfile, renderer.domElement);
+            Game.player.setEquipment(inventorySlots);
             controls = Game.player.controls;
 
             // Sicherheits-Reset: Falls aus einem früheren Sprint-5-Bug-Run noch ein roll-Drift
@@ -1578,6 +1597,7 @@
                 addItemToInventory: addItemToInventoryOrDrop,
                 updateInventoryUI: updateInventoryUI,
                 updateUI: updateUI,
+                applyPlayerDamage,
                 openWorkbenchCrafting: () => openWorkbenchCrafting(gameStarted, spawning, controls)
             });
             window.playerInteractions = window.playerInteraction; // Alias für Backwards-Compat
@@ -2074,6 +2094,27 @@
                 if (!Game.player.ghostMode) {
                     Game.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (Game.player.hunger <= 0) { Game.player.hunger = 0; Game.player.health -= 2 * delta; }
                     if (Game.player.hunger > REGEN_THRESHOLD && Game.player.health < MAX_HEALTH) Game.player.health += REGEN_RATE * delta;
+
+                    fireDamageCooldown -= delta;
+                    if (isPlayerTouchingFire(world, playerPos, BLOCK_TYPES.FIRE)) {
+                        if (fireDamageCooldown <= 0) {
+                            applyPlayerDamage(4);
+                            SoundManager.playSound('damage', 0.9, 1.05);
+                            fireDamageCooldown = 0.75;
+                        }
+                    } else {
+                        fireDamageCooldown = 0;
+                    }
+
+                    foodSpoilageTimer -= delta;
+                    if (foodSpoilageTimer <= 0) {
+                        const spoiled = updateFoodSpoilage(inventorySlots, time);
+                        if (spoiled > 0) {
+                            updateInventoryUI();
+                            window.playerInteraction?.showMessage(`${spoiled} Nahrung verdorben.`, '#9ea85b', 18);
+                        }
+                        foodSpoilageTimer = 1;
+                    }
                 }
 
                 // Druckplatten-Schaden
@@ -2091,6 +2132,7 @@
             updateVisibleChunksIfNeeded(playerPos);
             world.processPendingMeshResults();
             const selectedItem = inventorySlots[getSelectedSlot()];
+            Game.player.updateHeldItem(selectedItem && selectedItem.count > 0 ? selectedItem.type : 0);
             Game.player.updateHeldTorch(Boolean(selectedItem && selectedItem.count > 0 && selectedItem.type === TORCH_TYPE));
             torchLightSystem.update(delta, world.torchKeys, world.fireLightKeys, playerPos);
             Game.player.updateSword(delta);

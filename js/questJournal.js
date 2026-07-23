@@ -1,5 +1,5 @@
-import { inventorySlots } from './inventory.js?v=20260722a';
-import { abandonSideQuest, getSideQuestProgress, getTrustTier } from './quests.js?v=20260721b';
+import { inventorySlots } from './inventory.js?v=20260723e';
+import { abandonSideQuest, getSideQuestProgress, getTrustTier } from './quests.js?v=20260723e';
 import { getCompassGuidance, getCompassHeadingDegrees, getRelativeCompassBearing, resolveHomeTarget } from './questNavigation.js?v=20260721e';
 
 const PROFESSION_NAMES = ['Schmied', 'Bauer', 'Händler', 'Bibliothekar'];
@@ -138,13 +138,21 @@ export function renderQuestJournal() {
 export function showInventoryPanel(panel = 'inventory') {
     const overlay = document.getElementById('inventory-overlay');
     const journal = document.getElementById('quest-journal');
+    const equipment = document.getElementById('equipment-panel');
     if (!overlay || !journal) return;
     const showJournal = panel === 'quests';
+    const showEquipment = panel === 'equipment';
     overlay.classList.toggle('quest-view', showJournal);
+    overlay.classList.toggle('equipment-view', showEquipment);
     journal.hidden = !showJournal;
-    document.getElementById('inventory-view-tab')?.setAttribute('aria-selected', showJournal ? 'false' : 'true');
+    if (equipment) equipment.hidden = !showEquipment;
+    document.getElementById('inventory-view-tab')?.setAttribute('aria-selected', showJournal || showEquipment ? 'false' : 'true');
+    document.getElementById('equipment-view-tab')?.setAttribute('aria-selected', showEquipment ? 'true' : 'false');
     document.getElementById('quest-view-tab')?.setAttribute('aria-selected', showJournal ? 'true' : 'false');
+    const title = document.getElementById('inventory-title');
+    if (title) title.textContent = showJournal ? 'Questjournal' : (showEquipment ? 'Ausrüstung' : 'Inventar');
     if (showJournal) renderQuestJournal();
+    if (showEquipment) window.renderEquipmentPanel?.();
 }
 
 function trackedTarget(state, context) {

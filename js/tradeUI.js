@@ -5,7 +5,7 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName, inventorySlots, tryAddItemsToInventory, tryExchangeInventory } from './inventory.js?v=20260722a';
+import { createBlockHTML, getItemName, inventorySlots, tryAddItemsToInventory, tryExchangeInventory } from './inventory.js?v=20260723e';
 import {
     acceptSideQuest,
     completeSideQuest,
@@ -14,13 +14,28 @@ import {
     getQuestProgress,
     getSideQuestProgress,
     getTrustTier
-} from './quests.js?v=20260721b';
+} from './quests.js?v=20260723e';
 import { getNpcConversation } from './npcDialogue.js?v=20260721b';
 import { Game } from './Game.js?v=20260716b';
 import { STORY_EVENTS } from './storyProgress.js?v=20260722e';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 let currentNPC = null;
+
+function rewardItems(reward) {
+    return Array.isArray(reward?.items) ? reward.items : [reward];
+}
+
+function rewardLabel(reward) {
+    if (reward?.label) return reward.label;
+    const item = rewardItems(reward)[0];
+    return item ? `${item.count}× ${getItemName(item.type)}` : 'Belohnung';
+}
+
+function rewardIcon(reward) {
+    const item = rewardItems(reward)[0];
+    return item ? createBlockHTML(item.type) : '';
+}
 
 /**
  * Öffnet das Handels-UI für einen NPC.
@@ -81,8 +96,8 @@ export function openTradeUI(npc, controls) {
         const receiveDiv = document.createElement('div');
         receiveDiv.className = 'trade-item';
         receiveDiv.innerHTML = `
-            <div class="trade-icon">${createBlockHTML(pricedTrade.receive.type)}</div>
-            <span class="trade-label">${pricedTrade.receive.count}× ${getItemName(pricedTrade.receive.type)}</span>
+            <div class="trade-icon">${rewardIcon(pricedTrade.receive)}</div>
+            <span class="trade-label">${rewardLabel(pricedTrade.receive)}</span>
         `;
 
         // Trade-Button
@@ -207,7 +222,7 @@ function buildVillageQuestOfferRow(offer, questState, isChain = false) {
     details.innerHTML = `<strong>${offer.title}</strong><span class="trade-label">${objectiveText(offer.objective)}</span>`;
     const reward = document.createElement('div');
     reward.className = 'trade-item';
-    reward.innerHTML = `<div class="trade-icon">${createBlockHTML(offer.reward.type)}</div><span class="trade-label">${offer.reward.count}× ${getItemName(offer.reward.type)} · +${offer.trustReward} Vertrauen</span>`;
+    reward.innerHTML = `<div class="trade-icon">${rewardIcon(offer.reward)}</div><span class="trade-label">${rewardLabel(offer.reward)} · +${offer.trustReward} Vertrauen</span>`;
     const btn = document.createElement('button');
     btn.className = 'trade-btn';
     btn.textContent = 'Annehmen';
@@ -233,7 +248,7 @@ function buildActiveVillageQuestRow(quest, questState) {
     details.innerHTML = `<strong>${quest.title}</strong><span class="trade-label">${progress.current}/${progress.required} · ${objectiveText(quest.objective)}</span>`;
     const reward = document.createElement('div');
     reward.className = 'trade-item';
-    reward.innerHTML = `<div class="trade-icon">${createBlockHTML(quest.reward.type)}</div><span class="trade-label">${quest.reward.count}× ${getItemName(quest.reward.type)}</span>`;
+    reward.innerHTML = `<div class="trade-icon">${rewardIcon(quest.reward)}</div><span class="trade-label">${rewardLabel(quest.reward)}</span>`;
     const btn = document.createElement('button');
     btn.className = 'trade-btn';
     btn.textContent = progress.complete ? 'Abgeben' : `Fehlt ${progress.required - progress.current}`;
@@ -251,7 +266,7 @@ function executeVillageQuest(quest, questState) {
             { type: quest.objective.itemType, count: quest.objective.required },
             quest.reward
         )
-        : tryAddItemsToInventory([quest.reward]);
+        : tryAddItemsToInventory(rewardItems(quest.reward));
     const succeeded = quest.objective.type === 'delivery' ? result.exchanged : result.added;
     if (!succeeded) {
         showTradeMessage('Inventar voll! ❌', '#ff9800');
@@ -319,7 +334,7 @@ function executeTrade(trade, idx) {
     // UI aktualisieren
     if (window.updateInventoryUI) window.updateInventoryUI();
 
-    showTradeMessage(`+${trade.receive.count}× ${getItemName(trade.receive.type)} ✅`, '#4caf50');
+    showTradeMessage(`+ ${rewardLabel(trade.receive)}`, '#4caf50');
 
     // Button kurz animieren
     const btn = document.querySelector(`#trade-row-${idx} .trade-btn`);

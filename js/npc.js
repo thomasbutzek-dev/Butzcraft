@@ -13,6 +13,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { Physics } from './Physics.js?v=20260717a';
 import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260719a';
+import { getArmorSetItems } from './equipmentRules.js?v=20260723e';
 
 const NPC_CFG = CONFIG.NPC;
 const NAME_TAG_VISIBLE_DISTANCE = 8;
@@ -46,6 +47,11 @@ const NPC_PROFESSIONS = [
             { give: { type: 60, count: 10 }, receive: { type: 61, count: 1 } },  // 10 Kohle → 1 Eisen-Barren
             { give: { type: 57, count: 5 },  receive: { type: 65, count: 1 } },  // 5 Eisen-Erz → 1 Eisen-Spitzhacke
             { give: { type: 62, count: 3 },  receive: { type: 66, count: 1 } },  // 3 Gold-Barren → 1 Gold-Spitzhacke
+            { give: { type: 61, count: 4 }, receive: { label: 'Leichtes Rüstungsset', items: getArmorSetItems('brush') } },
+            { give: { type: 61, count: 7 }, receive: { label: 'Fellrüstungsset', items: getArmorSetItems('fur') } },
+            { give: { type: 61, count: 12 }, receive: { label: 'Holzrüstungsset', items: getArmorSetItems('wood') } },
+            { give: { type: 62, count: 14 }, receive: { label: 'Eisenrüstungsset', items: getArmorSetItems('iron') } },
+            { give: { type: 62, count: 30 }, receive: { label: 'Verstärktes Eisenrüstungsset', items: getArmorSetItems('reinforcedIron') } },
         ]
     },
     {

@@ -114,7 +114,7 @@ describe('recipe book initialization', () => {
         );
 
         expect([...document.querySelectorAll('.recipe-category-tab')].map(tab => tab.textContent)).toEqual([
-            'Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Versorgung'
+            'Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Rüstung', 'Versorgung'
         ]);
         document.querySelector('[data-category="Werkzeuge"]').click();
         expect([...document.querySelectorAll('.recipe-entry')].map(entry => entry.hidden)).toEqual([true, false]);

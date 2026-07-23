@@ -189,12 +189,19 @@ const PROFESSION_QUEST_CHAINS = [
         {
             title: 'Echo der Quelle', requiredTrust: 7, requiredStoryIndex: 10,
             objective: { type: 'boss', bossType: 'bloodMoonEcho', required: 1 },
-            reward: { type: 92, count: 1 }, trustReward: 5,
+            reward: {
+                label: 'Blutmondrüstungsset',
+                items: [
+                    { type: 131, count: 1 }, { type: 132, count: 1 }, { type: 133, count: 1 },
+                    { type: 134, count: 1 }, { type: 135, count: 1 }
+                ]
+            },
+            trustReward: 5,
             dialogue: {
                 offer: 'Der Wächter ist gefallen, doch sein Echo kehrt zurück. Stelle dich ihm noch einmal am Altar.',
                 details: 'Aktiviere den Ritualaltar nach Abschluss der Hauptgeschichte und besiege das Blutmondecho.',
                 progress: 'Das Echo ist noch nicht verstummt. Der Altar wartet in der Endkammer.',
-                complete: 'Jetzt ist selbst der Nachhall gebrochen. Diese Klinge trägt die Geschichte deines Sieges.'
+                complete: 'Jetzt ist selbst der Nachhall gebrochen. Diese Rüstung trägt die Geschichte deines Sieges.'
             }
         }
     ]

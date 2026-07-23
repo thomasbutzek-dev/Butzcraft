@@ -1,10 +1,12 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { Physics } from './Physics.js?v=20260717a';
-import { createCharacterModel } from './characterModel.js?v=20260723b';
+import { createCharacterModel, updateCharacterEquipment } from './characterModel.js?v=20260723e';
 import { CharacterAnimator } from './characterAnimator.js';
 import { clampThirdPersonDistance, clampThirdPersonPitch, orbitDirection } from './characterCamera.js';
 import { createTorchModel, TORCH_LIGHT_COLOR } from './torchLights.js?v=20260719a';
+import { getToolInfo } from './miningRules.js?v=20260718b';
+import { getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
 
 const CAMERA_EXTRA_BLOCKING_BLOCKS = new Set([5, 6, 13, 14, 15, 16]);
 const THIRD_PERSON_CAMERA_CLEARANCE = 0.28;
@@ -49,6 +51,10 @@ export class Player {
         this.camera.add(this.swordGroup);
         this.bowGroup = this.createBow();
         this.camera.add(this.bowGroup);
+        this.toolGroup = this.createTool();
+        this.camera.add(this.toolGroup);
+        this.heldItemType = 0;
+        this.equipmentSlots = null;
         this.heldTorchGroup = createTorchModel();
         this.heldTorchGroup.scale.setScalar(0.55);
         this.heldTorchGroup.position.set(0.42, -0.43, -0.68);
@@ -124,8 +130,14 @@ export class Player {
             this.characterGroup.visible = this.cameraMode === 'third' && !this.characterOccludedByCamera;
             this.scene.add(this.characterGroup);
             this._attachThirdPersonTorch();
+            if (this.equipmentSlots) updateCharacterEquipment(this.characterGroup, this.equipmentSlots);
             this.updateCharacterModel();
         }
+    }
+
+    setEquipment(inventorySlots) {
+        this.equipmentSlots = inventorySlots;
+        if (this.characterGroup) updateCharacterEquipment(this.characterGroup, inventorySlots);
     }
 
     _attachThirdPersonTorch() {
@@ -173,6 +185,7 @@ export class Player {
         this.isSwinging = false;
         this.swordGroup.visible = false;
         this.bowGroup.visible = false;
+        this.toolGroup.visible = false;
         this.updateHeldTorch(this.heldTorchSelected);
         return this.ghostMode;
     }
@@ -197,6 +210,7 @@ export class Player {
             this._cameraOffsetReady = false;
             this.swordGroup.visible = false;
             this.bowGroup.visible = false;
+            this.toolGroup.visible = false;
         }
         this.updateHeldTorch(this.heldTorchSelected);
     }
@@ -466,6 +480,47 @@ export class Player {
         return bowGroup;
     }
 
+    createTool() {
+        const toolGroup = new THREE.Group();
+        const handle = new THREE.Mesh(
+            new THREE.BoxGeometry(0.08, 0.72, 0.08),
+            new THREE.MeshPhongMaterial({ color: 0x76502f })
+        );
+        handle.position.y = 0.08;
+        const head = new THREE.Mesh(
+            new THREE.BoxGeometry(0.5, 0.12, 0.1),
+            new THREE.MeshPhongMaterial({ color: 0x888888 })
+        );
+        head.position.y = 0.42;
+        toolGroup.add(handle, head);
+        toolGroup.position.set(0.42, -0.38, -0.55);
+        toolGroup.rotation.set(-0.25, -0.2, -0.18);
+        toolGroup.visible = false;
+        this.toolHead = head;
+        return toolGroup;
+    }
+
+    updateHeldItem(type) {
+        this.heldItemType = Number(type) || 0;
+        const tool = getToolInfo(this.heldItemType);
+        if (tool && this.toolHead) {
+            const colors = { Holz: 0x9a6b3f, Stein: 0x777777, Eisen: 0xb8c1c7, Gold: 0xe3b72f };
+            this.toolHead.material.color.setHex(colors[tool.material] || 0x888888);
+            if (tool.category === 'pickaxe') {
+                this.toolHead.scale.set(1, 1, 1);
+                this.toolHead.rotation.z = 0;
+            } else if (tool.category === 'axe') {
+                this.toolHead.scale.set(0.58, 2.2, 1.15);
+                this.toolHead.rotation.z = -0.2;
+            } else {
+                this.toolHead.scale.set(0.45, 1.9, 1.35);
+                this.toolHead.rotation.z = 0;
+            }
+        }
+        const sword = getSwordInfo(this.heldItemType);
+        if (sword && this.swordBlade?.material?.color) this.swordBlade.material.color.setHex(sword.color);
+    }
+
     swingSword() {
         this.startAttackAnimation(null);
     }
@@ -475,6 +530,7 @@ export class Player {
         this.swingProgress = 0;
         this.showSwordDuringSwing = Boolean(swordInfo);
         this.showBowDuringSwing = false;
+        this.showToolDuringSwing = Boolean(getToolInfo(this.heldItemType));
         this.swordSwingSpeed = swordInfo
             ? Math.max(10, Math.PI / Math.max(0.25, swordInfo.cooldown * 0.75))
             : 12;
@@ -491,6 +547,7 @@ export class Player {
         this.swingProgress = 0;
         this.showSwordDuringSwing = false;
         this.showBowDuringSwing = true;
+        this.showToolDuringSwing = false;
         this.swordSwingSpeed = Math.max(8, Math.PI / Math.max(0.3, bowInfo.cooldown * 0.85));
         const duration = Math.PI / this.swordSwingSpeed;
         this.characterAnimator?.triggerAction('bow', duration);
@@ -498,15 +555,21 @@ export class Player {
     }
 
     updateSword(delta) {
+        const firstPerson = this.cameraMode === 'first' && !this.ghostMode;
+        const selectedSword = getSwordInfo(this.heldItemType);
+        const selectedBow = getBowInfo(this.heldItemType);
+        const selectedTool = getToolInfo(this.heldItemType);
         if (this.isSwinging) {
-            this.swordGroup.visible = this.cameraMode === 'first' && this.showSwordDuringSwing;
-            this.bowGroup.visible = this.cameraMode === 'first' && this.showBowDuringSwing;
+            this.swordGroup.visible = firstPerson && this.showSwordDuringSwing;
+            this.bowGroup.visible = firstPerson && this.showBowDuringSwing;
+            this.toolGroup.visible = firstPerson && this.showToolDuringSwing;
             this.swingProgress += delta * this.swordSwingSpeed;
             if (this.swingProgress > Math.PI) { 
                 this.swingProgress = 0; 
                 this.isSwinging = false; 
                 this.swordGroup.visible = false; 
                 this.bowGroup.visible = false;
+                this.toolGroup.visible = false;
             }
             const v = Math.sin(this.swingProgress); 
             this.swordGroup.rotation.x = -0.2 - v * 1.5; 
@@ -515,9 +578,19 @@ export class Player {
             this.swordGroup.rotation.y = -0.35 - v * 0.15;
             this.bowGroup.position.z = -0.55 + v * 0.12;
             this.bowGroup.rotation.y = -0.35 - v * 0.12;
+            this.toolGroup.rotation.x = -0.25 - v * 1.25;
+            this.toolGroup.rotation.z = -0.18 + v * 0.42;
+            this.toolGroup.position.z = -0.55 + v * 0.18;
         } else {
-            this.swordGroup.visible = false;
-            this.bowGroup.visible = false;
+            this.swordGroup.visible = firstPerson && Boolean(selectedSword);
+            this.bowGroup.visible = firstPerson && Boolean(selectedBow);
+            this.toolGroup.visible = firstPerson && Boolean(selectedTool);
+            this.swordGroup.position.set(0.4, -0.35, -0.5);
+            this.swordGroup.rotation.set(-0.2, 0, 0);
+            this.bowGroup.position.set(0.42, -0.25, -0.55);
+            this.bowGroup.rotation.set(-0.15, -0.35, -0.15);
+            this.toolGroup.position.set(0.42, -0.38, -0.55);
+            this.toolGroup.rotation.set(-0.25, -0.2, -0.18);
         }
     }
 

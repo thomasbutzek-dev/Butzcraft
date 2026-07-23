@@ -16,10 +16,10 @@
 
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { normalizeCharacterProfile } from './characterProfile.js?v=20260602a';
-import { createQuestState, normalizeQuestState } from './quests.js?v=20260721b';
+import { createQuestState, normalizeQuestState } from './quests.js?v=20260723e';
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 14;
+export const CURRENT_SAVE_VERSION = 15;
 export const CURRENT_WORLD_GENERATION_VERSION = 2;
 
 export function getWorldGenerationLoadNotice(rawData, saveName) {
@@ -170,6 +170,10 @@ function migrateV13toV14(data) {
     return data;
 }
 
+function migrateV14toV15(data) {
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
@@ -185,7 +189,8 @@ const MIGRATIONS = {
     11: migrateV10toV11,
     12: migrateV11toV12,
     13: migrateV12toV13,
-    14: migrateV13toV14
+    14: migrateV13toV14,
+    15: migrateV14toV15
 };
 
 function normalizeCharacterSettings(data) {
