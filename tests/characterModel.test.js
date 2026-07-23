@@ -43,4 +43,16 @@ describe('character rig', () => {
         expect(model.rig.leftArmPivot.rotation.x).toBe(0);
         expect(model.rig.rightLegPivot.rotation.x).toBe(0);
     });
+
+    it('uses the painterly character silhouette and separates clothes from skin', () => {
+        const model = createCharacterModel(createCharacterProfile());
+        const names = [];
+        model.traverse(child => names.push(child.name));
+
+        expect(model.getObjectByName('head')?.geometry.constructor.name).toBe('RoundedBoxGeometry');
+        expect(names).toContain('sleeve');
+        expect(names).toContain('hand');
+        expect(names).toContain('eyeWhite');
+        expect(names).toContain('iris');
+    });
 });

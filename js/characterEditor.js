@@ -7,7 +7,7 @@ import {
     parseCharacterProfile,
     serializeCharacterProfile
 } from './characterProfile.js';
-import { createCharacterModel } from './characterModel.js?v=20260717a';
+import { createCharacterModel } from './characterModel.js?v=20260723b';
 import {
     CHARACTER_TRANSFER_STORAGE_KEY,
     createCharacterPlayUrl,

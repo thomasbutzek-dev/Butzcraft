@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
 
 let textureSerial = 0;
@@ -28,18 +29,16 @@ export function createCharacterModel(profile, options = {}) {
     const leftLegPivot = createPivot(bodyRoot, 'leftLegPivot', [-shape.legX, 0.92, 0]);
     const rightLegPivot = createPivot(bodyRoot, 'rightLegPivot', [shape.legX, 0.92, 0]);
 
-    addBox(headPivot, [0, 0.4, 0], [0.9 * shape.headScale, 0.84, 0.86 * shape.headScale], skin);
-    addBox(torso, [0, 0.86, 0], [0.26, 0.18, 0.26], skin);
+    addBox(headPivot, [0, 0.36, 0], [0.8 * shape.headScale, 0.76, 0.74 * shape.headScale], skin, { name: 'head' });
+    addBox(torso, [0, 0.88, 0], [0.25, 0.2, 0.24], skin, { name: 'neck' });
     addTorso(torso, shape, shirt, pants, accent);
-    addBox(leftArmPivot, [0, -0.44, 0], [shape.armWidth, 0.9, 0.3], skin);
-    addBox(rightArmPivot, [0, -0.44, 0], [shape.armWidth, 0.9, 0.3], skin);
+    addArm(leftArmPivot, shape, shirt, skin, accent);
+    addArm(rightArmPivot, shape, shirt, skin, accent);
     addLeg(leftLegPivot, shape, pants, boots);
     addLeg(rightLegPivot, shape, pants, boots);
 
     addOutfitLayers(torso, scaleX, colors, textures, accent);
-    addBox(headPivot, [-0.16, 0.49, 0.45], [0.1, 0.08, 0.035], makeMaterial(colors.eyes, { kind: 'gloss' }));
-    addBox(headPivot, [0.16, 0.49, 0.45], [0.1, 0.08, 0.035], makeMaterial(colors.eyes, { kind: 'gloss' }));
-    addFace(headPivot, colors);
+    addFace(headPivot, colors, hair);
     addFaceDetail(headPivot, textures.skinDetail, colors);
     const ponytailPivot = addHair(headPivot, profile.hairStyle, profile.gender, hair, colors);
     const accessoryPivots = addAccessory({ torso, headPivot }, profile.accessory, colors, accent);
@@ -74,17 +73,29 @@ function createPivot(parent, name, position) {
 }
 
 function addLeg(parent, shape, pants, boots) {
-    addBox(parent, [0, -0.43, 0], [shape.legWidth, 0.86, 0.36], pants);
-    addBox(parent, [0, -0.9, 0.04], [shape.legWidth + 0.06, 0.18, 0.46], boots);
+    addBox(parent, [0, -0.35, 0], [shape.legWidth, 0.7, 0.35], pants, { name: 'trouserLeg' });
+    addBox(parent, [0, -0.76, 0.025], [shape.legWidth + 0.035, 0.24, 0.38], boots, { name: 'bootShaft' });
+    addBox(parent, [0, -0.9, 0.08], [shape.legWidth + 0.06, 0.16, 0.5], boots, { name: 'boot' });
 }
 
-function addBox(parent, position, size, materialOrColor) {
+function addArm(parent, shape, shirt, skin, accent) {
+    addBox(parent, [0, -0.17, 0], [shape.armWidth + 0.06, 0.34, 0.37], shirt, { name: 'sleeve' });
+    addBox(parent, [0, -0.43, 0], [shape.armWidth, 0.24, 0.31], accent, { name: 'sleeveCuff' });
+    addBox(parent, [0, -0.62, 0], [shape.armWidth, 0.26, 0.3], skin, { name: 'forearm' });
+    addBox(parent, [0, -0.8, 0.025], [shape.armWidth + 0.045, 0.18, 0.34], skin, { name: 'hand' });
+}
+
+function addBox(parent, position, size, materialOrColor, options = {}) {
+    const radius = Math.min(options.radius ?? Math.min(...size) * 0.16, Math.min(...size) * 0.45);
     const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(size[0], size[1], size[2]),
+        graphicsPrototype.usesPainterlyTextures
+            ? new RoundedBoxGeometry(size[0], size[1], size[2], 3, radius)
+            : new THREE.BoxGeometry(size[0], size[1], size[2]),
         typeof materialOrColor === 'string'
             ? makeMaterial(materialOrColor, { kind: 'plain' })
             : materialOrColor
     );
+    if (options.name) mesh.name = options.name;
     mesh.position.set(position[0], position[1], position[2]);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -92,8 +103,8 @@ function addBox(parent, position, size, materialOrColor) {
 
     if (!usesOutlines(parent)) return mesh;
     const outline = new THREE.LineSegments(
-        new THREE.EdgesGeometry(mesh.geometry),
-        new THREE.LineBasicMaterial({ color: 0x161616, transparent: true, opacity: 0.38 })
+        new THREE.EdgesGeometry(mesh.geometry, graphicsPrototype.usesPainterlyTextures ? 34 : 1),
+        new THREE.LineBasicMaterial({ color: 0x241a12, transparent: true, opacity: graphicsPrototype.usesPainterlyTextures ? 0.26 : 0.38 })
     );
     mesh.add(outline);
     return mesh;
@@ -131,15 +142,11 @@ function getBodyShape(gender, bodyType) {
 }
 
 function addTorso(parent, shape, shirt, pants, accent) {
-    addBox(parent, [0, 0.65, 0], [shape.torsoWidth, 0.58, 0.46], shirt);
-    addBox(parent, [0, 0.22, 0], [shape.waistWidth, 0.3, 0.45], shirt);
-    addBox(parent, [0, -0.06, 0.01], [shape.hipWidth, 0.24, 0.46], pants);
-    addBox(parent, [0, 0.07, 0.25], [shape.hipWidth + 0.02, 0.07, 0.045], accent);
-
-    if (shape.gender === 'female') {
-        addBox(parent, [0, 0.66, 0.265], [0.52, 0.16, 0.045], shirt);
-        addBox(parent, [0, 0.5, 0.265], [0.36, 0.08, 0.045], accent);
-    }
+    addBox(parent, [0, 0.64, 0], [shape.torsoWidth, 0.56, 0.44], shirt, { name: 'upperTorso' });
+    addBox(parent, [0, 0.22, 0], [shape.waistWidth, 0.3, 0.43], shirt, { name: 'waist' });
+    addBox(parent, [0, -0.055, 0.01], [shape.hipWidth, 0.23, 0.44], pants, { name: 'hips' });
+    addBox(parent, [0, 0.075, 0.235], [shape.hipWidth + 0.02, 0.08, 0.055], accent, { name: 'belt' });
+    addBox(parent, [0, 0.76, 0.235], [0.28, 0.075, 0.045], accent, { name: 'collar' });
 
     if (shape.torsoWidth > shape.hipWidth) {
         addBox(parent, [-shape.torsoWidth / 2 - 0.035, 0.82, 0], [0.07, 0.18, 0.48], shirt);
@@ -151,53 +158,65 @@ function addTorso(parent, shape, shirt, pants, accent) {
     addBox(parent, [shape.hipWidth / 2, 0.06, 0.02], [0.07, 0.18, 0.46], pants);
 }
 
-function addFace(parent, colors) {
+function addFace(parent, colors, hair) {
+    const white = makeMaterial('#f3ead7', { kind: 'plain' });
+    const iris = makeMaterial(colors.eyes, { kind: 'gloss' });
+    const pupil = makeMaterial('#211d19', { kind: 'plain' });
     const nose = makeMaterial(lighten(colors.skin, 18), { kind: 'plain' });
-    const mouth = makeMaterial(darken(colors.skin, 58), { kind: 'plain' });
+    const mouth = makeMaterial(darken(colors.skin, 54), { kind: 'plain' });
 
-    addBox(parent, [0, 0.38, 0.47], [0.08, 0.1, 0.04], nose);
-    addBox(parent, [0, 0.24, 0.47], [0.22, 0.04, 0.04], mouth);
+    for (const x of [-0.16, 0.16]) {
+        addBox(parent, [x, 0.45, 0.374], [0.17, 0.1, 0.035], white, { name: 'eyeWhite', radius: 0.025 });
+        addBox(parent, [x, 0.45, 0.397], [0.085, 0.085, 0.025], iris, { name: 'iris', radius: 0.018 });
+        addBox(parent, [x, 0.45, 0.413], [0.032, 0.052, 0.018], pupil, { name: 'pupil', radius: 0.008 });
+        addBox(parent, [x, 0.555, 0.378], [0.18, 0.035, 0.03], hair, { name: 'eyebrow', radius: 0.01 });
+    }
+    addBox(parent, [0, 0.35, 0.39], [0.075, 0.11, 0.055], nose, { name: 'nose', radius: 0.02 });
+    addBox(parent, [0, 0.21, 0.386], [0.16, 0.035, 0.03], mouth, { name: 'mouth', radius: 0.01 });
 }
 
 function addHair(parent, style, gender, material, colors) {
     if (style === 'none') return null;
     if (style === 'short') {
-        addBox(parent, [0, 0.85, -0.02], [0.88, 0.18, 0.88], material);
-        addBox(parent, [0, 0.62, -0.41], [0.86, gender === 'female' ? 0.42 : 0.34, 0.12], material);
+        addBox(parent, [0, 0.745, -0.015], [0.78, 0.17, 0.76], material);
+        addBox(parent, [0, 0.57, -0.355], [0.76, gender === 'female' ? 0.38 : 0.3, 0.11], material);
+        addBox(parent, [-0.28, 0.65, 0.31], [0.2, 0.16, 0.08], material);
         return null;
     }
     if (style === 'flat') {
-        addBox(parent, [0, 0.8, 0], [0.9, 0.12, 0.9], material);
+        addBox(parent, [0, 0.735, 0], [0.79, 0.12, 0.76], material);
         return null;
     }
     if (style === 'curly') {
-        for (const x of [-0.28, 0, 0.28]) {
-            addBox(parent, [x, 0.88, 0.14], [0.23, 0.24, 0.23], material);
+        for (const x of [-0.27, 0, 0.27]) {
+            addBox(parent, [x, 0.76, 0.1], [0.24, 0.23, 0.23], material);
         }
-        addBox(parent, [0, 0.7, -0.38], [0.82, gender === 'female' ? 0.48 : 0.28, 0.16], material);
+        addBox(parent, [0, 0.58, -0.34], [0.75, gender === 'female' ? 0.44 : 0.28, 0.14], material);
         return null;
     }
     if (style === 'long') {
-        addBox(parent, [0, 0.84, -0.02], [0.9, 0.16, 0.88], material);
-        addBox(parent, [0, 0.4, -0.43], [0.86, 0.9, 0.16], material);
-        addBox(parent, [-0.43, 0.46, 0], [0.12, 0.72, 0.62], material);
-        addBox(parent, [0.43, 0.46, 0], [0.12, 0.72, 0.62], material);
+        addBox(parent, [0, 0.74, -0.02], [0.79, 0.15, 0.76], material);
+        addBox(parent, [0, 0.34, -0.355], [0.75, 0.78, 0.14], material);
+        for (const x of [-0.39, 0.39]) {
+            addBox(parent, [x, 0.46, -0.13], [0.11, 0.42, 0.36], material);
+            addBox(parent, [x, 0.18, -0.19], [0.09, 0.24, 0.25], material);
+        }
         return null;
     }
     if (style === 'ponytail') {
-        addBox(parent, [0, 0.84, -0.03], [0.86, 0.17, 0.82], material);
-        const ponytailPivot = createPivot(parent, 'ponytailPivot', [0, 0.72, -0.45]);
-        addBox(ponytailPivot, [0, -0.14, -0.03], [0.32, 0.72, 0.18], material);
-        addBox(ponytailPivot, [0, -0.52, -0.05], [0.24, 0.34, 0.16], material);
+        addBox(parent, [0, 0.74, -0.03], [0.77, 0.16, 0.73], material);
+        const ponytailPivot = createPivot(parent, 'ponytailPivot', [0, 0.64, -0.39]);
+        addBox(ponytailPivot, [0, -0.15, -0.03], [0.28, 0.58, 0.17], material);
+        addBox(ponytailPivot, [0, -0.47, -0.05], [0.22, 0.3, 0.15], material);
         return ponytailPivot;
     }
     if (style === 'cap') {
-        addBox(parent, [0, 0.83, 0], [0.9, 0.16, 0.9], makeMaterial(colors.accent, { kind: 'fabric', detail: 'woven' }));
-        addBox(parent, [0, 0.72, 0.48], [0.5, 0.08, 0.22], makeMaterial(colors.accent, { kind: 'fabric', detail: 'plain' }));
+        addBox(parent, [0, 0.735, 0], [0.8, 0.15, 0.77], makeMaterial(colors.accent, { kind: 'fabric', detail: 'woven' }));
+        addBox(parent, [0, 0.65, 0.4], [0.46, 0.07, 0.2], makeMaterial(colors.accent, { kind: 'fabric', detail: 'plain' }));
         return null;
     }
-    addBox(parent, [0, 0.99, 0], [0.24, 0.5, 0.32], material);
-    addBox(parent, [0, 0.76, -0.1], [0.76, 0.14, 0.72], material);
+    addBox(parent, [0, 0.88, 0], [0.22, 0.42, 0.29], material);
+    addBox(parent, [0, 0.7, -0.08], [0.7, 0.13, 0.67], material);
     return null;
 }
 
@@ -221,9 +240,15 @@ function addAccessory({ torso, headPivot }, accessory, colors, accent) {
     }
 
     if (accessory === 'goggles') {
-        addBox(headPivot, [-0.16, 0.51, 0.47], [0.2, 0.16, 0.06], makeMaterial(colors.accent, { kind: 'gloss' }));
-        addBox(headPivot, [0.16, 0.51, 0.47], [0.2, 0.16, 0.06], makeMaterial(colors.accent, { kind: 'gloss' }));
-        addBox(headPivot, [0, 0.51, 0.48], [0.12, 0.05, 0.05], makeMaterial(colors.boots, { kind: 'plain' }));
+        const strap = makeMaterial(colors.boots, { kind: 'fabric', detail: 'leather' });
+        const frame = makeMaterial(colors.accent, { kind: 'gloss' });
+        const lens = makeMaterial(lighten(colors.eyes, 38), { kind: 'gloss' });
+        addBox(headPivot, [0, 0.45, 0.401], [0.77, 0.055, 0.04], strap);
+        for (const x of [-0.16, 0.16]) {
+            addBox(headPivot, [x, 0.45, 0.425], [0.22, 0.17, 0.055], frame);
+            addBox(headPivot, [x, 0.45, 0.458], [0.15, 0.1, 0.025], lens);
+        }
+        addBox(headPivot, [0, 0.45, 0.444], [0.12, 0.045, 0.04], strap);
     }
     return pivots;
 }
@@ -254,23 +279,29 @@ function addOutfitLayers(parent, scaleX, colors, textures, accent) {
 function addFaceDetail(parent, detail, colors) {
     if (detail === 'freckles') {
         const freckle = makeMaterial(darken(colors.skin), { kind: 'plain' });
-        addBox(parent, [-0.29, 0.38, 0.43], [0.05, 0.04, 0.03], freckle);
-        addBox(parent, [0.28, 0.37, 0.43], [0.05, 0.04, 0.03], freckle);
-        addBox(parent, [0.0, 0.34, 0.43], [0.04, 0.035, 0.03], freckle);
+        addBox(parent, [-0.28, 0.35, 0.382], [0.045, 0.035, 0.025], freckle);
+        addBox(parent, [0.27, 0.34, 0.382], [0.045, 0.035, 0.025], freckle);
+        addBox(parent, [0.0, 0.31, 0.397], [0.035, 0.03, 0.025], freckle);
     }
     if (detail === 'scar') {
-        addBox(parent, [0.26, 0.54, 0.44], [0.06, 0.28, 0.035], makeMaterial('#8d4a3d', { kind: 'plain' }));
+        addBox(parent, [0.27, 0.48, 0.39], [0.045, 0.24, 0.028], makeMaterial('#8d4a3d', { kind: 'plain' }));
     }
     if (detail === 'sunmark') {
-        addBox(parent, [-0.3, 0.56, 0.44], [0.12, 0.12, 0.035], makeMaterial(colors.accent, { kind: 'plain' }));
+        addBox(parent, [-0.28, 0.5, 0.39], [0.1, 0.1, 0.028], makeMaterial(colors.accent, { kind: 'plain' }));
     }
 }
 
 function makeMaterial(baseColor, options = {}) {
     const texture = makeTexture(baseColor, options);
     const metalness = options.detail === 'iron' || options.kind === 'gloss' ? 0.35 : 0;
-    const roughness = options.kind === 'gloss' ? 0.28 : options.detail === 'leather' ? 0.62 : 0.78;
-    return new THREE.MeshStandardMaterial({ color: '#ffffff', map: texture, roughness, metalness });
+    const roughness = options.kind === 'gloss' ? 0.28 : options.detail === 'leather' ? 0.7 : 0.86;
+    return new THREE.MeshStandardMaterial({
+        color: '#ffffff',
+        map: texture,
+        roughness,
+        metalness,
+        flatShading: !graphicsPrototype.usesPainterlyTextures
+    });
 }
 
 function makeTexture(baseColor, { kind = 'plain', detail = 'plain', pattern = 'none', accent = '#d4a94f' } = {}) {
@@ -278,10 +309,14 @@ function makeTexture(baseColor, { kind = 'plain', detail = 'plain', pattern = 'n
     canvas.width = 64;
     canvas.height = 64;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = baseColor;
+    const base = ctx.createLinearGradient(0, 0, 64, 64);
+    base.addColorStop(0, lighten(baseColor, 14));
+    base.addColorStop(0.55, baseColor);
+    base.addColorStop(1, darken(baseColor, 16));
+    ctx.fillStyle = base;
     ctx.fillRect(0, 0, 64, 64);
 
-    addPixelNoise(ctx, baseColor, detail === 'iron' ? 28 : 14);
+    addPainterlyGrain(ctx, baseColor, detail === 'iron' ? 28 : 14);
     if (detail === 'woven') drawWoven(ctx, baseColor);
     if (detail === 'leather') drawLeather(ctx, baseColor);
     if (detail === 'iron') drawIron(ctx, baseColor);
@@ -301,11 +336,13 @@ function makeTexture(baseColor, { kind = 'plain', detail = 'plain', pattern = 'n
     return texture;
 }
 
-function addPixelNoise(ctx, color, amount) {
+function addPainterlyGrain(ctx, color, amount) {
     for (let i = 0; i < amount; i++) {
         ctx.fillStyle = i % 2 ? lighten(color, 18) : darken(color, 18);
-        ctx.globalAlpha = 0.16;
-        ctx.fillRect((i * 17) % 64, (i * 29) % 64, 8, 8);
+        ctx.globalAlpha = 0.11;
+        const x = (i * 17) % 64;
+        const y = (i * 29) % 64;
+        ctx.fillRect(x, y, 10 + (i % 3) * 4, 2 + (i % 2) * 2);
     }
     ctx.globalAlpha = 1;
 }

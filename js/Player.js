@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { Physics } from './Physics.js?v=20260717a';
-import { createCharacterModel } from './characterModel.js?v=20260718a';
+import { createCharacterModel } from './characterModel.js?v=20260723b';
 import { CharacterAnimator } from './characterAnimator.js';
 import { clampThirdPersonDistance, clampThirdPersonPitch, orbitDirection } from './characterCamera.js';
 import { createTorchModel, TORCH_LIGHT_COLOR } from './torchLights.js?v=20260719a';
