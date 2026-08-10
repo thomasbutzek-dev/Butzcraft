@@ -1,8 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { CONFIG } from '../config.js';
 import { Player } from '../js/Player.js';
+import { createCharacterProfile } from '../js/characterProfile.js';
+
+beforeAll(() => {
+    const gradient = { addColorStop() {} };
+    const context = new Proxy({}, {
+        get(target, property) {
+            if (property === 'createLinearGradient' || property === 'createRadialGradient') {
+                return () => gradient;
+            }
+            if (!(property in target)) target[property] = () => {};
+            return target[property];
+        }
+    });
+    HTMLCanvasElement.prototype.getContext = () => context;
+    HTMLCanvasElement.prototype.toDataURL = () => 'data:image/png;base64,';
+});
 
 describe('Player third-person camera', () => {
     it('keeps the camera in front of a solid wall on every orbit ray', () => {
@@ -115,5 +131,74 @@ describe('Player third-person camera', () => {
         player.updateSword(0.016);
         expect(player.swordGroup.visible).toBe(true);
         expect(player.toolGroup.visible).toBe(false);
+    });
+
+    it.each([
+        [63, 'pickaxeHead'],
+        [67, 'axeHead'],
+        [71, 'shovelHead']
+    ])('gives held tool %i its own multi-part silhouette', (itemType, activeHeadName) => {
+        const player = new Player(new THREE.Scene(), new THREE.PerspectiveCamera(), document.createElement('canvas'), CONFIG, null);
+
+        player.updateHeldItem(itemType);
+
+        const heads = ['pickaxeHead', 'axeHead', 'shovelHead'].map(name => player.toolGroup.getObjectByName(name));
+        expect(heads.every(Boolean)).toBe(true);
+        expect(heads.find(head => head.name === activeHeadName).visible).toBe(true);
+        expect(heads.filter(head => head.name !== activeHeadName).every(head => !head.visible)).toBe(true);
+        expect(heads.find(head => head.name === activeHeadName).children.length).toBeGreaterThan(1);
+    });
+
+    it('uses distinct painterly material textures for every tool and sword tier', () => {
+        const player = new Player(new THREE.Scene(), new THREE.PerspectiveCamera(), document.createElement('canvas'), CONFIG, null);
+        const toolMaps = [63, 64, 65, 66].map(type => {
+            player.updateHeldItem(type);
+            return player.toolGroup.userData.headMaterial?.map;
+        });
+        const swordMaps = [89, 90, 91, 92].map(type => {
+            player.updateHeldItem(type);
+            return player.swordGroup.userData.bladeMaterial?.map;
+        });
+
+        expect(toolMaps.every(Boolean)).toBe(true);
+        expect(swordMaps.every(Boolean)).toBe(true);
+        expect(new Set(toolMaps).size).toBe(4);
+        expect(new Set(swordMaps).size).toBe(4);
+        expect(new Set(Array.from(toolMaps[0].image.data))).not.toEqual(new Set([toolMaps[0].image.data[0]]));
+    });
+
+    it('builds the sword and bow from recognizable detailed parts', () => {
+        const player = new Player(new THREE.Scene(), new THREE.PerspectiveCamera(), document.createElement('canvas'), CONFIG, null);
+
+        expect(player.swordGroup.getObjectByName('swordBladeTip')).toBeTruthy();
+        expect(player.swordGroup.getObjectByName('swordBladeEdge')).toBeTruthy();
+        expect(player.swordGroup.getObjectByName('swordGripWrap')).toBeTruthy();
+        expect(player.bowGroup.getObjectByName('bowGrip')).toBeTruthy();
+        expect(player.bowGroup.userData.limbSegments).toBeGreaterThanOrEqual(6);
+        expect(player.bowGroup.userData.limbMaterial?.map).toBeTruthy();
+    });
+
+    it.each([
+        [63, 'toolGroup'],
+        [91, 'swordGroup'],
+        [94, 'bowGroup']
+    ])('shows held item %i on the third-person character', (itemType, groupName) => {
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera();
+        const player = new Player(
+            scene,
+            camera,
+            document.createElement('canvas'),
+            CONFIG,
+            createCharacterProfile()
+        );
+
+        player.setCameraMode('third');
+        player.updateHeldItem(itemType);
+        player.updateSword(0.016);
+
+        const heldGroup = player[groupName];
+        expect(heldGroup.parent).toBe(player.characterGroup.rig.rightArmPivot);
+        expect(heldGroup.visible).toBe(true);
     });
 });

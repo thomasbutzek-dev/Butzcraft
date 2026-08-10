@@ -98,6 +98,14 @@ Object.assign(LOOT_TABLES, {
 
 const DUNGEON_BLOCKS = new Set([29, 83, 84, 85]);
 
+export function applyVillageChestPenalty(questState, villageId, penalty = 3) {
+    const village = questState?.villages?.[villageId];
+    if (!village) return null;
+    const normalizedPenalty = Math.max(0, Math.floor(Number(penalty) || 0));
+    village.trust = Math.max(0, Math.floor(Number(village.trust) || 0) - normalizedPenalty);
+    return { penalty: normalizedPenalty, trust: village.trust };
+}
+
 export function classifyChestLoot({ x, y, z, biome = 'Grasland', villages = [], getBlock = () => 0 }) {
     const village = villages.find(candidate =>
         Array.isArray(candidate?.houses) && candidate.houses.some(house =>

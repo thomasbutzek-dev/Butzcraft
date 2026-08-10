@@ -1,13 +1,11 @@
 import * as THREE from 'three';
-import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
 
 const atlasUrls = [
-    new URL('../assets/graphics-prototype/entity-material-tiles-a.png', import.meta.url).href,
-    new URL('../assets/graphics-prototype/entity-material-tiles-b.png', import.meta.url).href
+    new URL('../assets/painterly/entity-material-tiles-a.png', import.meta.url).href,
+    new URL('../assets/painterly/entity-material-tiles-b.png', import.meta.url).href
 ];
 const atlasLoads = [];
-const atlases = graphicsPrototype.usesPainterlyTextures
-    ? atlasUrls.map((url) => {
+const atlases = atlasUrls.map((url) => {
         let finishLoad;
         const loaded = new Promise(resolve => { finishLoad = resolve; });
         atlasLoads.push(loaded);
@@ -17,8 +15,7 @@ const atlases = graphicsPrototype.usesPainterlyTextures
         texture.minFilter = THREE.LinearFilter;
         texture.generateMipmaps = false;
         return texture;
-    })
-    : [];
+    });
 const textureCache = new Map();
 
 export function preloadEntityMaterials() {
@@ -31,7 +28,6 @@ export function selectEntityTextureVariant(x, z, salt = 0) {
 }
 
 export function getPainterlyEntityTexture(tileIndex, variant = 0) {
-    if (!graphicsPrototype.usesPainterlyTextures) return null;
     const normalizedVariant = Math.abs(variant) % atlases.length;
     const key = `${normalizedVariant}:${tileIndex}`;
     let texture = textureCache.get(key);

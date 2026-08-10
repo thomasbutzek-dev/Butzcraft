@@ -334,6 +334,7 @@ export function createQuestState(legacyStoryIndex = 0) {
         abandonedQuestIds: [],
         villages: {},
         questItems: {},
+        storyMilestones: {},
         storyFlags: {}
     };
 }
@@ -358,6 +359,9 @@ export function normalizeQuestState(rawState, legacyStoryIndex = 0) {
             : {},
         questItems: rawState.questItems && typeof rawState.questItems === 'object' && !Array.isArray(rawState.questItems)
             ? rawState.questItems
+            : {},
+        storyMilestones: rawState.storyMilestones && typeof rawState.storyMilestones === 'object' && !Array.isArray(rawState.storyMilestones)
+            ? rawState.storyMilestones
             : {},
         storyFlags: rawState.storyFlags && typeof rawState.storyFlags === 'object' && !Array.isArray(rawState.storyFlags)
             ? rawState.storyFlags
@@ -413,7 +417,7 @@ export function generateVillageOffers(village, dayCount = 0, problemProfile = nu
         objective: {
             ...template.objective,
             current: 0,
-            ...(center ? { target: center } : {})
+            ...(template.objective.type === 'place' && center ? { target: center } : {})
         },
         reward: { ...template.reward },
         trustReward: template.trustReward,
@@ -494,7 +498,7 @@ export function getProfessionChainStatus(questState, villageId, professionIdx, m
             objective: {
                 ...template.objective,
                 current: 0,
-                ...(village.center ? { target: { ...village.center } } : {})
+                ...(template.objective.type === 'place' && village.center ? { target: { ...village.center } } : {})
             },
             reward: { ...template.reward },
             trustReward: template.trustReward,

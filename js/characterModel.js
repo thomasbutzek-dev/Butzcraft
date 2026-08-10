@@ -1,6 +1,5 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
-import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
 import { EQUIPMENT_SLOTS, getArmorInfo } from './equipmentRules.js?v=20260723e';
 
 let textureSerial = 0;
@@ -170,9 +169,7 @@ function addArm(parent, shape, shirt, skin, accent) {
 function addBox(parent, position, size, materialOrColor, options = {}) {
     const radius = Math.min(options.radius ?? Math.min(...size) * 0.16, Math.min(...size) * 0.45);
     const mesh = new THREE.Mesh(
-        graphicsPrototype.usesPainterlyTextures
-            ? new RoundedBoxGeometry(size[0], size[1], size[2], 3, radius)
-            : new THREE.BoxGeometry(size[0], size[1], size[2]),
+        new RoundedBoxGeometry(size[0], size[1], size[2], 3, radius),
         typeof materialOrColor === 'string'
             ? makeMaterial(materialOrColor, { kind: 'plain' })
             : materialOrColor
@@ -185,8 +182,8 @@ function addBox(parent, position, size, materialOrColor, options = {}) {
 
     if (!usesOutlines(parent)) return mesh;
     const outline = new THREE.LineSegments(
-        new THREE.EdgesGeometry(mesh.geometry, graphicsPrototype.usesPainterlyTextures ? 34 : 1),
-        new THREE.LineBasicMaterial({ color: 0x241a12, transparent: true, opacity: graphicsPrototype.usesPainterlyTextures ? 0.26 : 0.38 })
+        new THREE.EdgesGeometry(mesh.geometry, 34),
+        new THREE.LineBasicMaterial({ color: 0x241a12, transparent: true, opacity: 0.26 })
     );
     mesh.add(outline);
     return mesh;
@@ -382,7 +379,7 @@ function makeMaterial(baseColor, options = {}) {
         map: texture,
         roughness,
         metalness,
-        flatShading: !graphicsPrototype.usesPainterlyTextures
+        flatShading: false
     });
 }
 
@@ -412,8 +409,8 @@ function makeTexture(baseColor, { kind = 'plain', detail = 'plain', pattern = 'n
     texture.wrapS = THREE.RepeatWrapping;
     texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(1, 1);
-    texture.magFilter = graphicsPrototype.usesPainterlyTextures ? THREE.LinearFilter : THREE.NearestFilter;
-    texture.minFilter = graphicsPrototype.usesPainterlyTextures ? THREE.LinearFilter : THREE.NearestFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.minFilter = THREE.LinearFilter;
     texture.generateMipmaps = false;
     return texture;
 }

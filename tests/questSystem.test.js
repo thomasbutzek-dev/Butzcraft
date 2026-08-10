@@ -55,6 +55,31 @@ describe('persistent quest state', () => {
         expect(normalized.questItems).toEqual({});
     });
 
+    it('initializes and preserves recorded story milestones', () => {
+        expect(createQuestState().storyMilestones).toEqual({});
+
+        const normalized = normalizeQuestState({
+            storyMilestones: {
+                'butzcraft:dungeon-key-found': true
+            }
+        });
+
+        expect(normalized.storyMilestones).toEqual({
+            'butzcraft:dungeon-key-found': true
+        });
+    });
+
+    it('preserves the saved ritual site inside story flags', () => {
+        const ritualSite = {
+            structureId: 'dungeon:0,0:v2',
+            position: { x: 14, y: 18, z: -6 }
+        };
+
+        expect(normalizeQuestState({
+            storyFlags: { ritualSite }
+        }).storyFlags.ritualSite).toEqual(ritualSite);
+    });
+
     it('keeps story relics outside the normal inventory', () => {
         const state = createQuestState();
 
@@ -84,6 +109,9 @@ describe('village identity and offers', () => {
         expect(first).toHaveLength(3);
         expect(new Set(first.map(offer => offer.templateId))).toHaveLength(3);
         expect(first.every(offer => offer.villageId === 'village:4,-2')).toBe(true);
+        expect(first.every(offer => (
+            offer.objective.type === 'place' || offer.objective.target === undefined
+        ))).toBe(true);
     });
 
     it('stores trust and offers independently for every village', () => {
@@ -153,6 +181,23 @@ describe('profession quest chains', () => {
         const endgame = getProfessionChainStatus(state, village.id, 3, 10);
         expect(endgame.state).toBe('available');
         expect(endgame.quest.objective).toMatchObject({ type: 'boss', bossType: 'bloodMoonEcho' });
+    });
+
+    it('stores village coordinates only on objectives that happen in the village', () => {
+        const state = createQuestState();
+        const village = ensureVillageState(state, grassVillage, 0);
+        village.trust = 12;
+
+        const delivery = getProfessionChainStatus(state, village.id, 0, 10).quest;
+        expect(delivery.objective.target).toBeUndefined();
+
+        village.professionChainProgress[1] = 1;
+        const placement = getProfessionChainStatus(state, village.id, 1, 10).quest;
+        expect(placement.objective.target).toEqual(village.center);
+
+        village.professionChainProgress[2] = 1;
+        const structure = getProfessionChainStatus(state, village.id, 2, 10).quest;
+        expect(structure.objective.target).toBeUndefined();
     });
 });
 

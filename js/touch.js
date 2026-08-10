@@ -4,7 +4,7 @@
  *  - Wird beim Spielstart aufgerufen. Bei Nicht-Touch-Devices ist es ein No-Op.
  *  - Joystick (links): mappt auf Input.moveF/B/L/R
  *  - Look-Bereich (rechte Bildschirmhälfte ohne Buttons): swipt → camera/controls Rotation
- *  - Buttons: SPRINGEN (Input.moveUp), BAUEN (mousedown button=2), Inventar/Pause
+ *  - SPRINGEN kombiniert Sprung und Blicksteuerung, BAUEN nutzt mousedown button=2
  *  - Kurzer Tap in den Look-Bereich: ABBAUEN/Angreifen (mousedown button=0)
  *
  *  PointerLock funktioniert auf iOS/Android nicht (kein API-Support) → wir setzen
@@ -14,7 +14,7 @@
  *  Look-Empfindlichkeit: 0.005 rad pro Pixel — Daumen-tauglich, nicht wackelig.
  */
 
-import { Input } from './Input.js?v=20260507b';
+import { Input } from './Input.js?v=20260731a';
 import { Game } from './Game.js?v=20260716b';
 
 const LOOK_SENSITIVITY = 0.005;
@@ -64,15 +64,31 @@ export function applyTouchLookDelta(ctx, dx, dy) {
     }
 }
 
+function pressTouchJump() {
+    Input.touchJumpQueued = true;
+    Input.touchJumpHeld = true;
+}
+
+function releaseTouchJump(cancelled = false) {
+    Input.touchJumpHeld = false;
+    if (cancelled) Input.touchJumpQueued = false;
+}
+
+function isTouchInsideElement(touch, element) {
+    const rect = element.getBoundingClientRect();
+    return touch.clientX >= rect.left && touch.clientX <= rect.right
+        && touch.clientY >= rect.top && touch.clientY <= rect.bottom;
+}
+
 /**
  * Initialisiert Touch-UI. Idempotent (mehrfache Aufrufe sind sicher).
- * @param {object} ctx - { camera, controls, isInventoryOpenedProvider, toggleInventory, openPauseMenu }
+ * @param {object} ctx - { camera, controls, player, toggleCameraMode, isInventoryOpenedProvider }
  *
  * Mobile HUD:
  *   ⏸  Pause/Menü oben rechts
  *   📦 Inventar rechts unten
  *   ▣  Block platzieren rechts unten
- *   ⤒  Springen unten rechts (holdable)
+ *   ⤒  Springen unten rechts; Ziehen steuert zugleich den Blick
  *   Tap im Look-Bereich: Block abbauen / Mob angreifen
  */
 export function initTouchControls(ctx) {
@@ -91,6 +107,7 @@ export function initTouchControls(ctx) {
         </div>
         <div id="touch-look-area"></div>
         <div id="touch-top-actions">
+            <button id="touch-btn-camera" class="touch-btn touch-btn-small" aria-label="Zu Third Person wechseln">3P</button>
             <button id="touch-btn-pause" class="touch-btn touch-btn-small" aria-label="Pause">⏸</button>
         </div>
         <div id="touch-button-stack">
@@ -152,9 +169,14 @@ function _injectTouchStyles() {
             position: absolute;
             top: var(--touch-safe-top);
             right: var(--touch-safe-right);
-            width: clamp(46px, 8vw, 58px);
+            display: flex;
+            gap: clamp(8px, 1.5vw, 12px);
+            width: auto;
             height: clamp(46px, 8vw, 58px);
             pointer-events: auto;
+        }
+        #touch-top-actions .touch-btn {
+            width: clamp(46px, 8vw, 58px);
         }
         #touch-button-stack {
             position: absolute;
@@ -189,7 +211,7 @@ function _injectTouchStyles() {
         #touch-btn-inv { grid-column: 1; }
         #touch-btn-journal { grid-column: 1; grid-row: 2; }
         #touch-btn-place { grid-column: 2; }
-        #touch-btn-jump { grid-column: 2; grid-row: 2; }
+        #touch-btn-jump { grid-column: 2; grid-row: 2; touch-action: none; }
         @media (orientation: portrait) and (max-width: 560px) {
             #touch-overlay {
                 --touch-look-bottom: 150px;
@@ -296,6 +318,7 @@ function _bindJoystick() {
 
 function _bindLookArea(ctx) {
     const area = document.getElementById('touch-look-area');
+    const jumpBtn = document.getElementById('touch-btn-jump');
     let activeId = null;
     let lastX = 0, lastY = 0;
     let startX = 0, startY = 0, startTime = 0;
@@ -304,6 +327,7 @@ function _bindLookArea(ctx) {
     let miningTimer = null;
     let pinching = false;
     let pinchDistance = 0;
+    let jumpActivated = false;
 
     const distanceBetween = (touches) => Math.hypot(
         touches[0].clientX - touches[1].clientX,
@@ -341,6 +365,7 @@ function _bindLookArea(ctx) {
         startTime = performance.now();
         moved = false;
         miningStarted = false;
+        jumpActivated = false;
         if (miningTimer) clearTimeout(miningTimer);
         miningTimer = setTimeout(() => {
             miningTimer = null;
@@ -378,6 +403,10 @@ function _bindLookArea(ctx) {
                     miningStarted = false;
                 }
             }
+            if (!jumpActivated && isTouchInsideElement(t, jumpBtn)) {
+                jumpActivated = true;
+                pressTouchJump();
+            }
             applyTouchLookDelta(ctx, dx, dy);
         }
     }, { passive: false });
@@ -387,7 +416,10 @@ function _bindLookArea(ctx) {
             stopMining();
             moved = true;
             if (e.touches.length < 2) pinching = false;
-            if (e.touches.length === 0) activeId = null;
+            if (e.touches.length === 0) {
+                if (jumpActivated) releaseTouchJump();
+                activeId = null;
+            }
             return;
         }
         for (const t of e.changedTouches) {
@@ -404,6 +436,7 @@ function _bindLookArea(ctx) {
                     _dispatchInteraction(0, 'mousedown');
                     _dispatchInteraction(0, 'mouseup');
                 }
+                if (jumpActivated) releaseTouchJump();
                 activeId = null;
                 break;
             }
@@ -414,6 +447,7 @@ function _bindLookArea(ctx) {
         for (const t of e.changedTouches) {
             if (t.identifier !== activeId) continue;
             stopMining();
+            if (jumpActivated) releaseTouchJump(true);
             activeId = null;
             break;
         }
@@ -427,8 +461,19 @@ function _bindActionButtons(ctx) {
     const placeBtn = document.getElementById('touch-btn-place');
     const invBtn = document.getElementById('touch-btn-inv');
     const journalBtn = document.getElementById('touch-btn-journal');
+    const cameraBtn = document.getElementById('touch-btn-camera');
     const pauseBtn = document.getElementById('touch-btn-pause');
     const pauseOverlay = document.getElementById('instructions');
+
+    const updateCameraButton = (mode = ctx.player?.cameraMode) => {
+        if (!cameraBtn) return;
+        const isThirdPerson = mode === 'third';
+        cameraBtn.textContent = isThirdPerson ? '1P' : '3P';
+        cameraBtn.setAttribute('aria-label', isThirdPerson
+            ? 'Zu First Person wechseln'
+            : 'Zu Third Person wechseln');
+    };
+    updateCameraButton();
 
     if (pauseOverlay) {
         pauseOverlay.addEventListener('click', (e) => {
@@ -441,11 +486,48 @@ function _bindActionButtons(ctx) {
         });
     }
 
-    // Sprung als Holdable: Während Touch aktiv ist, Input.moveUp = true.
-    const holdJump = (down) => { Input.moveUp = down; };
-    jumpBtn.addEventListener('touchstart', (e) => { e.preventDefault(); holdJump(true); }, { passive: false });
-    jumpBtn.addEventListener('touchend', (e) => { e.preventDefault(); holdJump(false); }, { passive: false });
-    jumpBtn.addEventListener('touchcancel', () => holdJump(false));
+    let jumpTouchId = null;
+    let jumpLastX = 0;
+    let jumpLastY = 0;
+    jumpBtn.addEventListener('touchstart', (e) => {
+        if (jumpTouchId !== null) return;
+        e.preventDefault();
+        const touch = e.changedTouches[0];
+        jumpTouchId = touch.identifier;
+        jumpLastX = touch.clientX;
+        jumpLastY = touch.clientY;
+        pressTouchJump();
+    }, { passive: false });
+    jumpBtn.addEventListener('touchmove', (e) => {
+        if (jumpTouchId === null) return;
+        e.preventDefault();
+        for (const touch of e.touches) {
+            if (touch.identifier !== jumpTouchId) continue;
+            const dx = touch.clientX - jumpLastX;
+            const dy = touch.clientY - jumpLastY;
+            jumpLastX = touch.clientX;
+            jumpLastY = touch.clientY;
+            applyTouchLookDelta(ctx, dx, dy);
+            break;
+        }
+    }, { passive: false });
+    jumpBtn.addEventListener('touchend', (e) => {
+        for (const touch of e.changedTouches) {
+            if (touch.identifier !== jumpTouchId) continue;
+            e.preventDefault();
+            releaseTouchJump();
+            jumpTouchId = null;
+            break;
+        }
+    }, { passive: false });
+    jumpBtn.addEventListener('touchcancel', (e) => {
+        for (const touch of e.changedTouches) {
+            if (touch.identifier !== jumpTouchId) continue;
+            releaseTouchJump(true);
+            jumpTouchId = null;
+            break;
+        }
+    });
 
     // Place: synthetisches Rechtsklick-mousedown. Abbau liegt auf Tap im Look-Bereich.
     placeBtn.addEventListener('touchstart', (e) => { e.preventDefault(); _dispatchInteraction(2); }, { passive: false });
@@ -463,6 +545,13 @@ function _bindActionButtons(ctx) {
         journalBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ', key: 'j', bubbles: true }));
+        }, { passive: false });
+    }
+    if (cameraBtn) {
+        cameraBtn.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (typeof ctx.toggleCameraMode !== 'function') return;
+            updateCameraButton(ctx.toggleCameraMode());
         }, { passive: false });
     }
 

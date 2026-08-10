@@ -2,7 +2,7 @@ import { readChunkWorkerSource } from './chunkWorkerSource.js';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
-function loadPainterlyHelpers(graphicsVariant) {
+function loadPainterlyHelpers() {
     const self = {};
     const context = vm.createContext({
         self,
@@ -17,7 +17,6 @@ function loadPainterlyHelpers(graphicsVariant) {
     });
     const source = readChunkWorkerSource();
     vm.runInContext(`${source}\nself.__materials = { getBiomeAt, painterlyTextureFor, BIOMES };`, context);
-    vm.runInContext(`GRAPHICS_VARIANT = '${graphicsVariant}';`, context);
     return self.__materials;
 }
 
@@ -34,7 +33,7 @@ function collectTiles(helpers, biome, blockType, face, fallback) {
 
 describe('painterly biome material variants', () => {
     it('uses coherent variant families for desert, coast, snow, and jungle ground', () => {
-        const helpers = loadPainterlyHelpers('B');
+        const helpers = loadPainterlyHelpers();
         const top = { d: [0, 1, 0] };
 
         const desert = collectTiles(helpers, helpers.BIOMES.DESERT, 7, top, 6);
@@ -46,12 +45,5 @@ describe('painterly biome material variants', () => {
         expect([...coast]).toEqual(expect.arrayContaining([140, 141, 142, 143]));
         expect([...snow]).toEqual(expect.arrayContaining([8, 137, 138, 139]));
         expect([...jungle]).toEqual(expect.arrayContaining([144, 145, 146, 147]));
-    });
-
-    it('keeps comparison variant A on the original atlas tiles', () => {
-        const helpers = loadPainterlyHelpers('A');
-
-        expect(helpers.painterlyTextureFor(7, { d: [0, 1, 0] }, 0, 32, 0, 6)).toBe(6);
-        expect(helpers.painterlyTextureFor(11, { d: [0, 1, 0] }, 0, 32, 0, 8)).toBe(8);
     });
 });

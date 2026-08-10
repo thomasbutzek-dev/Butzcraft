@@ -24,8 +24,6 @@ async function generateChunks(coordinates) {
             config: { CHUNK_SIZE: 16, CHUNK_HEIGHT: 64, WATER_LEVEL: 32, CLOUD_HEIGHT: 58 },
             blockColors: {},
             blockTex: {},
-            graphicsVariant: 'B',
-            reducedGraphicsDetail: false,
             worldGenerationVersion: 2
         }
     });

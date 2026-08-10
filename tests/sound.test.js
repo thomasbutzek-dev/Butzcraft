@@ -1,4 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { SoundManager } from '../js/sound.js';
 
 class FakeAudioContext {
@@ -77,6 +78,31 @@ function resetSoundManager() {
     SoundManager._rainWanted = false;
     SoundManager._rainStarting = false;
 }
+
+describe('SoundManager file coverage', () => {
+    it('loads an existing file for every literal sound name used by the game', () => {
+        const soundSource = readFileSync('js/sound.js', 'utf8');
+        const loadedSounds = new Map(
+            [...soundSource.matchAll(/loadSound\('([^']+)', '([^']+)'\)/g)]
+                .map(([, name, path]) => [name, path])
+        );
+        const usedSounds = new Set(
+            readdirSync('js')
+                .filter(file => file.endsWith('.js'))
+                .flatMap(file => [...readFileSync(`js/${file}`, 'utf8').matchAll(/playSound\('([^']+)'/g)])
+                .map(([, name]) => name)
+        );
+
+        const directSounds = [...usedSounds].filter(name => !name.endsWith('_'));
+        const dynamicPrefixes = [...usedSounds].filter(name => name.endsWith('_'));
+
+        expect(directSounds.filter(name => !loadedSounds.has(name))).toEqual([]);
+        expect(dynamicPrefixes.flatMap(prefix => ['grass', 'stone', 'sand', 'wood']
+            .map(category => `${prefix}${category}`)
+            .filter(name => !loadedSounds.has(name)))).toEqual([]);
+        expect([...loadedSounds.values()].filter(path => !existsSync(path))).toEqual([]);
+    });
+});
 
 describe('SoundManager music loop', () => {
     beforeEach(() => {

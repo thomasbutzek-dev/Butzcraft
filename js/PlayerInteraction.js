@@ -1,19 +1,20 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
-import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260719a';
+import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260731c';
 import { openFurnace } from './furnace.js?v=20260723e';
-import { createBlockHTML, getItemName } from './inventory.js?v=20260723e';
-        import { BLOCK_COLORS } from './blocks.js?v=20260723e';
+import { createBlockHTML, getItemName } from './inventory.js?v=20260801c';
+        import { BLOCK_COLORS } from './blocks.js?v=20260801b';
 import { Game } from './Game.js?v=20260716b';
 import { getMiningPlan, getToolInfo } from './miningRules.js?v=20260718b';
 import { getAttackProfile, getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
 import { PlayerArrowProjectile } from './playerArrow.js?v=20260720q';
 import { getFoodInfo } from './foodRules.js?v=20260723e';
 import { getTorchMount, TORCH_TYPE } from './torchLights.js?v=20260719a';
-import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-import { openTradeUI } from './tradeUI.js?v=20260723e';
-import { STORY_EVENTS } from './storyProgress.js?v=20260722e';
+import { graphicsStyle } from './graphicsStyle.js?v=20260801a';
+import { openTradeUI } from './tradeUI.js?v=20260730b';
+import { STORY_EVENTS } from './storyProgress.js?v=20260730c';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
+import { resolveBlockInteractionTarget } from './blockInteractionTarget.js?v=20260801a';
 
 const { MAX_HUNGER, HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
@@ -21,10 +22,8 @@ const WOOD_BLOCKS = new Set([5, 13, 15, 102, 103]);
 const TORCH_NON_SUPPORT_BLOCKS = new Set([0, 4, 9, 10, 27, 32, 33, 34, 36, 38, 39, 43, 44, 46, 47, 48, 49, 50, 52, 54, 79, 80, 86, 104, TORCH_TYPE]);
 const MINING_HINT_COOLDOWN_MS = 1800;
 
-export function getBlockBreakParticleProfile(painterly = graphicsPrototype.usesPainterlyTextures, reducedDetail = graphicsPrototype.reducedDetail) {
-    return painterly
-        ? { count: reducedDetail ? 6 : 9, size: 0.08, opacity: 0.78, lifetimeMs: 480, gravity: 4.8 }
-        : { count: 10, size: 0.09, opacity: 0.9, lifetimeMs: 360, gravity: 5.5 };
+export function getBlockBreakParticleProfile(reducedDetail = graphicsStyle.reducedDetail) {
+    return { count: reducedDetail ? 6 : 9, size: 0.08, opacity: 0.78, lifetimeMs: 480, gravity: 4.8 };
 }
 
 export function canUseMouseInteraction({
@@ -67,11 +66,10 @@ export class PlayerInteraction {
     }
 
     spawnBlockBreakParticles(x, y, z, blockType, normal) {
-        const painterly = graphicsPrototype.usesPainterlyTextures;
-        const profile = getBlockBreakParticleProfile(painterly, graphicsPrototype.reducedDetail);
+        const profile = getBlockBreakParticleProfile();
         const color = new THREE.Color(BLOCK_COLORS[blockType] || 0xaaaaaa);
-        if (painterly) color.offsetHSL(0, -0.06, 0.035);
-        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: profile.opacity, depthWrite: !painterly });
+        color.offsetHSL(0, -0.06, 0.035);
+        const material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: profile.opacity, depthWrite: false });
         const geometry = new THREE.BoxGeometry(profile.size, profile.size, profile.size);
         const particles = [];
         const baseNormal = normal ? normal.clone() : new THREE.Vector3(0, 1, 0);
@@ -83,16 +81,14 @@ export class PlayerInteraction {
                 y + 0.5 + (Math.random() - 0.5) * 0.55,
                 z + 0.5 + (Math.random() - 0.5) * 0.55
             );
-            const baseScale = painterly
-                ? new THREE.Vector3(0.58 + Math.random() * 0.64, 0.42 + Math.random() * 0.76, 0.55 + Math.random() * 0.7)
-                : new THREE.Vector3(1, 1, 1);
+            const baseScale = new THREE.Vector3(0.58 + Math.random() * 0.64, 0.42 + Math.random() * 0.76, 0.55 + Math.random() * 0.7);
             mesh.scale.copy(baseScale);
             this.scene.add(mesh);
             particles.push({
                 mesh,
                 baseScale,
-                spinX: painterly ? 3.5 + Math.random() * 5 : 8,
-                spinY: painterly ? 2.5 + Math.random() * 5 : 6,
+                spinX: 3.5 + Math.random() * 5,
+                spinY: 2.5 + Math.random() * 5,
                 velocity: baseNormal.clone().multiplyScalar(1.6 + Math.random() * 1.4).add(new THREE.Vector3(
                     (Math.random() - 0.5) * 2.2,
                     Math.random() * 1.6,
@@ -640,6 +636,12 @@ export class PlayerInteraction {
                 p.add(h.face.normal.clone().multiplyScalar(-0.5));
                 const bx = Math.floor(p.x), by = Math.floor(p.y), bz = Math.floor(p.z);
                 const brokenType = this.world.getBlock(bx, by, bz);
+                const chestInfo = this.world.structureChests?.get(`chest,${bx},${by},${bz}`);
+                if (brokenType === 75 && chestInfo?.role === 'village_supply') {
+                    this.cancelMining();
+                    this._openChest(bx, by, bz);
+                    return;
+                }
                 if (this.world.structureAltars?.has(`${bx},${by},${bz}`)) {
                     this.cancelMining();
                     this.showMessage('Der Ritualaltar widersteht deinen Werkzeugen.', '#ff647c', 18);
@@ -653,9 +655,8 @@ export class PlayerInteraction {
             } else if (e.button === 2) {
                 // Block platzieren / Interagieren
                 // === BEERENBUSCH, OFEN, TRUHE RECHTSKLICK ===
-                p.add(h.face.normal.clone().multiplyScalar(-0.5));
-                const harvestX = Math.floor(p.x), harvestY = Math.floor(p.y), harvestZ = Math.floor(p.z);
-                const harvestBlock = this.world.getBlock(harvestX, harvestY, harvestZ);
+                const interactionTarget = resolveBlockInteractionTarget(this.world, p, h.face.normal);
+                const { x: harvestX, y: harvestY, z: harvestZ, block: harvestBlock } = interactionTarget;
 
                 if (this._tryActivateRitualAltar(harvestX, harvestY, harvestZ)) return;
                 if (this._tryUnlockStructureGate(harvestX, harvestY, harvestZ)) return;
@@ -877,6 +878,10 @@ export class PlayerInteraction {
         const key = `chest,${x},${y},${z}`;
         const structureChest = this.world.structureChests?.get(key);
         const wasLooted = this.world.lootedChests.has(key);
+        const isVillageChest = structureChest?.role === 'village_supply' && Boolean(structureChest.villageId);
+        const canApplyVillagePenalty = isVillageChest
+            && typeof this.context.hasVillageChestPenalty === 'function'
+            && typeof this.context.applyVillageChestPenalty === 'function';
         const structureKind = structureChest?.role === 'mine_reward'
             ? 'mine'
             : (structureChest?.role === 'dungeon_reward' ? 'dungeon' : null);
@@ -935,6 +940,10 @@ export class PlayerInteraction {
         }
         if (!this.world.chestContents[key]) this.world.chestContents[key] = [];
         const contents = this.world.chestContents[key];
+        const warning = document.getElementById('village-chest-warning');
+        const cancelWarning = document.getElementById('village-chest-cancel');
+        const confirmWarning = document.getElementById('village-chest-confirm');
+        if (warning) warning.hidden = true;
 
         // Truhen-UI befüllen
         const grid = document.getElementById('chest-grid');
@@ -960,10 +969,26 @@ export class PlayerInteraction {
                     slot.append(iconWrap, countEl);
                     slot.title = getItemName(item.type);
                     slot.style.cursor = 'pointer';
-                    slot.onclick = () => {
+                    const takeItem = () => {
                         const currentItem = contents[i];
                         if (!currentItem || currentItem.count <= 0) return;
-                        const result = this.context.addItemToInventory(currentItem.type, currentItem.count);
+                        const addChestItem = this.context.addChestItemToInventory || this.context.addItemToInventory;
+                        const originalCount = currentItem.count;
+                        const result = addChestItem(currentItem.type, originalCount);
+                        const remaining = result && Number.isFinite(result.remaining)
+                            ? Math.max(0, Math.floor(result.remaining))
+                            : 0;
+                        const moved = Math.max(0, originalCount - remaining);
+                        if (moved > 0 && canApplyVillagePenalty && !this.context.hasVillageChestPenalty(key)) {
+                            const penalty = this.context.applyVillageChestPenalty(key, structureChest.villageId);
+                            if (penalty) {
+                                this.showMessage(
+                                    `Dorfvorrat genommen: -${penalty.penalty} Vertrauen (jetzt ${penalty.trust}).`,
+                                    '#ff9800',
+                                    18
+                                );
+                            }
+                        }
                         if (result && result.remaining > 0) {
                             currentItem.count = result.remaining;
                             countEl.textContent = currentItem.count > 1 ? currentItem.count : '';
@@ -979,6 +1004,23 @@ export class PlayerInteraction {
                         slot.onclick = null;
                         this.context.updateInventoryUI();
                     };
+                    slot.onclick = () => {
+                        if (!canApplyVillagePenalty || this.context.hasVillageChestPenalty(key)) {
+                            takeItem();
+                            return;
+                        }
+                        if (!warning || !cancelWarning || !confirmWarning) return;
+                        warning.hidden = false;
+                        cancelWarning.onclick = () => {
+                            warning.hidden = true;
+                            slot.focus();
+                        };
+                        confirmWarning.onclick = () => {
+                            warning.hidden = true;
+                            takeItem();
+                        };
+                        queueMicrotask(() => cancelWarning.focus());
+                    };
                 }
                 grid.appendChild(slot);
             }
@@ -992,6 +1034,7 @@ export class PlayerInteraction {
         if (this._controls) this._controls.unlock();
 
         window.closeChest = () => {
+            if (warning) warning.hidden = true;
             deactivateDialog(overlay);
             if (overlay) overlay.style.display = 'none';
             if (this._controls && !Game.touchActive) {
@@ -1007,7 +1050,8 @@ export class PlayerInteraction {
         const result = typeof window.tryActivateBloodMoonRitual === 'function'
             ? window.tryActivateBloodMoonRitual({
                 structureId: altar.structureId,
-                position: { ...altar.spawn }
+                position: { ...altar.spawn },
+                ritualPosition: { ...altar.interaction }
             })
             : { ok: false, message: 'Der Ritualaltar bleibt still.' };
         if (result.ok) {

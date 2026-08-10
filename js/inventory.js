@@ -1,9 +1,9 @@
 /* js/inventory.js - Butzcraft Inventory Module */
 import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260721b';
 import { craftingRecipes, getRecipeTrustLockReason } from './recipes.js?v=20260723e';
-import { initRecipeBook } from './recipe_book.js?v=20260723e';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260723e';
-import { SoundManager } from './sound.js?v=20260507b';
+import { initRecipeBook } from './recipe_book.js?v=20260731b';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260801b';
+import { SoundManager } from './sound.js?v=20260731a';
 import { Game } from './Game.js?v=20260716b';
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
@@ -397,6 +397,7 @@ export function updateInventoryUI() {
 
     const craftButton = document.getElementById('crafting-create-btn');
     if (craftButton) craftButton.disabled = craftingResultData.count <= 0;
+    if (inventoryOpened) renderRecipeBook();
 }
 
 window.addEventListener('butzcraft:atlas-ready', () => {
@@ -857,7 +858,6 @@ function openCraftingOverlay(station, gameStarted, spawning, controls) {
             ? '3×3-Werkbank bereit. Wähle ein Rezept.'
             : '2×2-Crafting. Für Werkzeuge brauchst du eine Werkbank.'
     );
-    renderRecipeBook();
     updateInventoryUI();
     return true;
 }

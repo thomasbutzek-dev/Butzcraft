@@ -13,6 +13,14 @@ describe('start menu loading feedback', () => {
         expect(status.getAttribute('aria-live')).toBe('polite');
         expect(status.getAttribute('aria-atomic')).toBe('true');
     });
+
+    it('keeps the menu inside short desktop viewports with its own scroll area', () => {
+        const styles = readFileSync('style.css', 'utf8');
+        const baseRule = styles.match(/#start-menu-content\s*\{([^}]*)\}/)?.[1] || '';
+
+        expect(baseRule).toContain('max-height: calc(100svh - 24px)');
+        expect(baseRule).toContain('overflow-y: auto');
+    });
 });
 
 describe('first-day objective HUD', () => {

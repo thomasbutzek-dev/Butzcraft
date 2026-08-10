@@ -2,7 +2,7 @@ import { readChunkWorkerSource } from './chunkWorkerSource.js';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
-function loadPainterlyTextureFor(graphicsVariant) {
+function loadPainterlyTextureFor() {
     const self = {};
     const context = vm.createContext({
         self,
@@ -17,7 +17,6 @@ function loadPainterlyTextureFor(graphicsVariant) {
     });
     const source = readChunkWorkerSource();
     vm.runInContext(`${source}\nself.painterlyTextureFor = painterlyTextureFor;`, context);
-    vm.runInContext(`GRAPHICS_VARIANT = '${graphicsVariant}';`, context);
     return self.painterlyTextureFor;
 }
 
@@ -33,7 +32,7 @@ function collectVariants(selectTexture, blockType, fallback) {
 
 describe('painterly crafted wood variants', () => {
     it('varies workbenches, chests, and crafted planks within their atlas families', () => {
-        const selectTexture = loadPainterlyTextureFor('B');
+        const selectTexture = loadPainterlyTextureFor();
 
         expect([...collectVariants(selectTexture, 28, 29)]).toEqual(expect.arrayContaining([29, 159, 160, 161]));
         expect([...collectVariants(selectTexture, 75, 75)]).toEqual(expect.arrayContaining([75, 164, 165, 166]));
@@ -41,7 +40,7 @@ describe('painterly crafted wood variants', () => {
     });
 
     it('keeps each door bottom paired with its matching top', () => {
-        const selectTexture = loadPainterlyTextureFor('B');
+        const selectTexture = loadPainterlyTextureFor();
         const pairs = new Set();
 
         for (let x = -48; x <= 48; x += 3) {
@@ -54,14 +53,5 @@ describe('painterly crafted wood variants', () => {
 
         expect([...pairs]).toEqual(expect.arrayContaining(['39:40', '162:163']));
         expect([...pairs].every(pair => pair === '39:40' || pair === '162:163')).toBe(true);
-    });
-
-    it('keeps variant A on the original crafted wood tiles', () => {
-        const selectTexture = loadPainterlyTextureFor('A');
-
-        expect(selectTexture(28, null, 12, 33, -6, 29)).toBe(29);
-        expect(selectTexture(75, null, 12, 33, -6, 75)).toBe(75);
-        expect(selectTexture(33, null, 12, 32, -6, 39)).toBe(39);
-        expect(selectTexture(34, null, 12, 33, -6, 40)).toBe(40);
     });
 });

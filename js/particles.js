@@ -10,22 +10,17 @@
  */
 
 import * as THREE from 'three';
-import { isTouchDevice } from './touch.js?v=20260720q';
-import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
+import { isTouchDevice } from './touch.js?v=20260801a';
 
 const _dummy = new THREE.Object3D();
 const _color = new THREE.Color();
 const PRECIPITATION_PASSTHROUGH_IDS = new Set([0, 4, 8]);
 
-export function getPrecipitationVisualProfile(type, painterly = graphicsPrototype.usesPainterlyTextures) {
+export function getPrecipitationVisualProfile(type) {
     if (type === 'rain') {
-        return painterly
-            ? { width: 0.035, height: 0.42, opacity: 0.42, colors: [0x9aadb5, 0xb7c7c7, 0x8198a4], scaleMin: 0.72, scaleRange: 0.58 }
-            : { width: 0.05, height: 0.3, opacity: 0.5, colors: [0x8899cc], scaleMin: 1, scaleRange: 0 };
+        return { width: 0.035, height: 0.42, opacity: 0.42, colors: [0x9aadb5, 0xb7c7c7, 0x8198a4], scaleMin: 0.72, scaleRange: 0.58 };
     }
-    return painterly
-        ? { width: 0.1, height: 0.1, opacity: 0.82, colors: [0xfff4dc, 0xe9f1e8, 0xdde9ec], scaleMin: 0.68, scaleRange: 0.72 }
-        : { width: 0.08, height: 0.08, opacity: 0.75, colors: [0xffffff], scaleMin: 1, scaleRange: 0 };
+    return { width: 0.1, height: 0.1, opacity: 0.82, colors: [0xfff4dc, 0xe9f1e8, 0xdde9ec], scaleMin: 0.68, scaleRange: 0.72 };
 }
 
 function stableVariation(index, salt) {
@@ -59,8 +54,7 @@ export class ParticleSystem {
         this.scene = scene;
         this.type = type;
         this.world = world;
-        this.painterly = graphicsPrototype.usesPainterlyTextures;
-        this.visualProfile = getPrecipitationVisualProfile(type, this.painterly);
+        this.visualProfile = getPrecipitationVisualProfile(type);
         this.elapsed = 0;
         const mobile = isTouchDevice();
         this.count = mobile ? Math.floor(maxCount * 0.5) : maxCount;

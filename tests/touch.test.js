@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { applyTouchLookDelta, initTouchControls, isTouchDevice } from '../js/touch.js';
 import { Game } from '../js/Game.js';
+import { Input } from '../js/Input.js';
 
 const origMaxTouchPoints = navigator.maxTouchPoints;
 const origMatchMedia = window.matchMedia;
@@ -39,6 +40,8 @@ afterEach(() => {
     document.documentElement.classList.remove('touch-device');
     document.body.classList.remove('touch-device');
     Game.touchActive = false;
+    Input.moveF = Input.moveB = Input.moveL = Input.moveR = Input.moveUp = false;
+    Input.touchJumpHeld = Input.touchJumpQueued = false;
 });
 
 describe('isTouchDevice', () => {
@@ -83,9 +86,40 @@ describe('isTouchDevice', () => {
         expect(document.getElementById('touch-btn-place')).not.toBeNull();
         expect(document.getElementById('touch-btn-inv')).not.toBeNull();
         expect(document.getElementById('touch-btn-pause')).not.toBeNull();
+        expect(document.getElementById('touch-btn-camera')).not.toBeNull();
         expect(document.getElementById('touch-btn-dig')).toBeNull();
         expect(document.getElementById('touch-btn-slot-prev')).toBeNull();
         expect(document.getElementById('touch-btn-slot-next')).toBeNull();
+    });
+
+    it('wechselt die Kamera im Touch-HUD ohne externe Tastatur', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const player = { cameraMode: 'first' };
+        const toggleCameraMode = vi.fn(() => {
+            player.cameraMode = player.cameraMode === 'third' ? 'first' : 'third';
+            return player.cameraMode;
+        });
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            player,
+            toggleCameraMode,
+            isInventoryOpenedProvider: () => false
+        });
+
+        const cameraButton = document.getElementById('touch-btn-camera');
+        expect(cameraButton.textContent).toBe('3P');
+
+        dispatchTouchEvent(cameraButton, 'touchstart', {
+            identifier: 4,
+            clientX: 10,
+            clientY: 10
+        });
+
+        expect(toggleCameraMode).toHaveBeenCalledOnce();
+        expect(cameraButton.textContent).toBe('1P');
+        expect(cameraButton.getAttribute('aria-label')).toBe('Zu First Person wechseln');
     });
 
     it('Touch-Bauen feuert eine Rechtsklick-Interaktion', () => {
@@ -261,5 +295,82 @@ describe('isTouchDevice', () => {
 
         expect(camera.rotation.x).toBeLessThan(Math.PI / 2);
         expect(camera.rotation.z).toBe(0);
+    });
+
+    it('kombiniert Springen und Kameradrehung auf dem Sprungbutton', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const camera = { rotation: { x: 0, y: 0, z: 0, order: 'YXZ' } };
+        const attacks = [];
+        const onAttack = (event) => attacks.push(event.button);
+        document.addEventListener('mousedown', onAttack);
+
+        initTouchControls({
+            camera,
+            controls: { getObject: () => camera },
+            isInventoryOpenedProvider: () => false
+        });
+        Input.moveF = true;
+
+        const jump = document.getElementById('touch-btn-jump');
+        const start = { identifier: 20, clientX: 300, clientY: 300 };
+        dispatchTouches(jump, 'touchstart', [start], [start]);
+        expect(Input.touchJumpQueued).toBe(true);
+        expect(Input.touchJumpHeld).toBe(true);
+
+        dispatchTouches(jump, 'touchmove', [{ ...start, clientX: 325, clientY: 285 }]);
+        dispatchTouches(jump, 'touchend', [], [{ ...start, clientX: 325, clientY: 285 }]);
+        document.removeEventListener('mousedown', onAttack);
+
+        expect(camera.rotation.y).toBeLessThan(0);
+        expect(camera.rotation.x).toBeGreaterThan(0);
+        expect(Input.moveF).toBe(true);
+        expect(Input.touchJumpHeld).toBe(false);
+        expect(attacks).toEqual([]);
+    });
+
+    it('loest beim Ziehen vom Blickbereich in die Sprungzone genau einen Sprung aus', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const camera = { rotation: { x: 0, y: 0, z: 0, order: 'YXZ' } };
+        initTouchControls({
+            camera,
+            controls: { getObject: () => camera },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const jump = document.getElementById('touch-btn-jump');
+        jump.getBoundingClientRect = () => ({
+            left: 250, right: 310, top: 250, bottom: 310, width: 60, height: 60
+        });
+        const area = document.getElementById('touch-look-area');
+        const start = { identifier: 21, clientX: 200, clientY: 200 };
+        dispatchTouches(area, 'touchstart', [start], [start]);
+        dispatchTouches(area, 'touchmove', [{ ...start, clientX: 270, clientY: 270 }]);
+
+        expect(Input.touchJumpQueued).toBe(true);
+        expect(Input.touchJumpHeld).toBe(true);
+        Input.touchJumpQueued = false; // simuliert den vom nächsten Spielframe verbrauchten Sprung
+
+        dispatchTouches(area, 'touchmove', [{ ...start, clientX: 280, clientY: 280 }]);
+        expect(Input.touchJumpQueued).toBe(false);
+
+        dispatchTouches(area, 'touchend', [], [{ ...start, clientX: 280, clientY: 280 }]);
+        expect(Input.touchJumpHeld).toBe(false);
+    });
+
+    it('setzt eine abgebrochene Sprunggeste vollständig zurück', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        initTouchControls({
+            camera: { rotation: { x: 0, y: 0, z: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const jump = document.getElementById('touch-btn-jump');
+        const touch = { identifier: 22, clientX: 300, clientY: 300 };
+        dispatchTouches(jump, 'touchstart', [touch], [touch]);
+        dispatchTouches(jump, 'touchcancel', [], [touch]);
+
+        expect(Input.touchJumpHeld).toBe(false);
+        expect(Input.touchJumpQueued).toBe(false);
     });
 });

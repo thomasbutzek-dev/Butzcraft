@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../config.js?v=20260719a';
-import { SoundManager } from './sound.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260723e';
+import { SoundManager } from './sound.js?v=20260731a';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260801b';
 import { Physics } from './Physics.js?v=20260717a';
 import { Game } from './Game.js?v=20260716b';
-import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260719a';
+import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260801a';
 import { getAnimalLureItem, isAnimalPenEnclosed, isKeepableAnimal } from './animalHusbandry.js?v=20260720a';
 
-const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
-const { GRAVITY, MOB_JUMP_FORCE = 5.5 } = CONFIG.PHYSICS;
+const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, MOB_JUMP_FORCE = 5, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
+const { GRAVITY } = CONFIG.PHYSICS;
 const { HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
 Game.droppedItems = Game.droppedItems || [];
@@ -1191,6 +1191,19 @@ export class Mob {
                 }
                 
                 const checkMobC = (np) => Physics.checkAABBCollision(world, np, 0.3, 0.6, 1.8, true);
+                const canJumpObstacle = (x, z) => {
+                    const obstacleY = Math.floor(pos.y);
+                    return Physics.isSolid(world, x, obstacleY, z, true)
+                        && !Physics.isSolid(world, x, obstacleY + 1, z, true)
+                        && !Physics.isSolid(world, x, obstacleY + 2, z, true);
+                };
+                const groundY = Math.floor(pos.y - 0.05);
+                const groundBlock = world.getBlock(Math.floor(pos.x), groundY, Math.floor(pos.z));
+                const isGrounded = groundBlock !== 0
+                    && groundBlock !== 4
+                    && groundBlock !== 8
+                    && groundBlock !== 9
+                    && Math.abs(pos.y - (groundY + 1)) < 0.1;
 
                 const isHostileWalker = this.type === 'zombie' || this.type === 'skeleton' || this.type === 'spider' || this.type === 'polarBear' || this.type === 'scorpion';
                 const detectionRange = this.type === 'spider' ? SPIDER_DETECTION_RANGE : this.type === 'polarBear' ? 12 : this.type === 'scorpion' ? 9 : ZOMBIE_DETECTION_RANGE;
@@ -1226,7 +1239,7 @@ export class Mob {
                             }
                         }
                         const nX = pos.x + dir.x * 0.5, nZ = pos.z + dir.z * 0.5;
-                        if (world.getBlock(Math.floor(nX), Math.floor(pos.y), Math.floor(nZ)) !== 0 && frameTime - this.lastJump > 1200) {
+                        if (isGrounded && canJumpObstacle(nX, nZ) && frameTime - this.lastJump > 1200) {
                             this.velocity.y = MOB_JUMP_FORCE; this.lastJump = frameTime;
                         }
                     }
@@ -1286,7 +1299,7 @@ export class Mob {
                 } else if (this.legs) {
                     this.legs.forEach(leg => leg.rotation.x = 0);
                 }
-                
+
                 this.velocity.y -= GRAVITY * delta;
                 
                 // Kontinuierliche Wasser-Vermeidung
@@ -1310,11 +1323,13 @@ export class Mob {
                 
                 let hitWall = false;
                 let blockedByFence = false;
+                let jumpableObstacle = true;
                 if (!checkMobC({ x: mnx, y: pos.y, z: pos.z })) {
                     pos.x = mnx; 
                 } else { 
                     const block = world.getBlock(Math.floor(mnx), Math.floor(pos.y), Math.floor(pos.z));
                     blockedByFence ||= block === 102 || block === 103;
+                    jumpableObstacle &&= canJumpObstacle(mnx, pos.z);
                     this.velocity.x = 0; hitWall = true; 
                 }
                 
@@ -1323,12 +1338,13 @@ export class Mob {
                 } else { 
                     const block = world.getBlock(Math.floor(pos.x), Math.floor(pos.y), Math.floor(mnz));
                     blockedByFence ||= block === 102 || block === 103;
+                    jumpableObstacle &&= canJumpObstacle(pos.x, mnz);
                     this.velocity.z = 0; hitWall = true; 
                 }
 
                 if (hitWall) {
-                    if (!blockedByFence && this.velocity.y <= 0 && (frameTime - this.lastJump) > 1000) {
-                        // Bei Wandkontakt automatisch springen (Schwerkraft ist im y<=0 abgedeckt)
+                    if (!blockedByFence && jumpableObstacle && isGrounded && (frameTime - this.lastJump) > 1000) {
+                        // Nur vom Boden abspringen, damit Mobs nicht an Wänden hochspringen.
                         this.velocity.y = MOB_JUMP_FORCE;
                         this.lastJump = frameTime;
                     } else if (Math.random() < 0.1) {

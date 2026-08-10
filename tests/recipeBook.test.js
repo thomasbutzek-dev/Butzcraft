@@ -33,6 +33,7 @@ describe('recipe book initialization', () => {
         expect(document.querySelectorAll('.recipe-entry')).toHaveLength(1);
         expect(document.querySelector('.recipe-entry').tagName).toBe('BUTTON');
         expect(document.querySelector('.recipe-name').textContent).toBe('Holzbretter');
+        expect(document.querySelector('[data-category="Verfügbar"]').getAttribute('aria-selected')).toBe('true');
         expect(window.updateRecipeList).toBeUndefined();
     });
 
@@ -58,6 +59,7 @@ describe('recipe book initialization', () => {
         expect(document.querySelector('.recipe-lock-reason').textContent).toBe('Werkbank erforderlich.');
 
         const search = document.getElementById('recipe-search');
+        document.querySelector('[data-category="Alle"]').click();
         search.value = 'Spitzhacke';
         search.dispatchEvent(new Event('input'));
         const entries = [...document.querySelectorAll('.recipe-entry')];
@@ -114,10 +116,32 @@ describe('recipe book initialization', () => {
         );
 
         expect([...document.querySelectorAll('.recipe-category-tab')].map(tab => tab.textContent)).toEqual([
-            'Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Rüstung', 'Versorgung'
+            'Verfügbar', 'Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Rüstung', 'Versorgung'
         ]);
         document.querySelector('[data-category="Werkzeuge"]').click();
         expect([...document.querySelectorAll('.recipe-entry')].map(entry => entry.hidden)).toEqual([true, false]);
+    });
+
+    it('zeigt standardmäßig nur verfügbare Rezepte und erklärt einen leeren Einstieg', () => {
+        initRecipeBook(
+            'data:image/png;base64,atlas',
+            { 5: 1, 26: 2 },
+            [{ pattern: [5, 0, 0, 0], result: { type: 26, count: 4 } }],
+            { WOOD: 5, PLANKS: 26 },
+            { WOOD: 'Holz', PLANKS: 'Holzbretter' },
+            vi.fn(),
+            { getLockReason: () => 'Fehlt: 1× Holz.' }
+        );
+
+        const entry = document.querySelector('.recipe-entry');
+        const emptyState = document.getElementById('recipe-empty-state');
+        expect(entry.hidden).toBe(true);
+        expect(emptyState.hidden).toBe(false);
+        expect(emptyState.textContent).toBe('Noch nichts herstellbar – sammle zuerst Holz.');
+
+        document.querySelector('[data-category="Alle"]').click();
+        expect(entry.hidden).toBe(false);
+        expect(emptyState.hidden).toBe(true);
     });
 
     it('shows a custom title for a visible trust recipe', () => {

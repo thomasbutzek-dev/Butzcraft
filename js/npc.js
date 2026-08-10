@@ -2,7 +2,7 @@
  *
  * NPC-Klasse mit:
  *   - Voxel-Humanoid-Mesh (braune Kleidung, unterschiedliche Farben)
- *   - Einfache Wander-AI um Home-Position
+ *   - Tagesroutinen, Berufsaktionen und begrenzte A*-Wegfindung
  *   - Handels-Angebote pro NPC (deterministisch aus Position)
  *   - Rechtsklick → Trade-UI
  *
@@ -12,8 +12,9 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config.js?v=20260507b';
 import { Physics } from './Physics.js?v=20260717a';
-import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260719a';
+import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260801a';
 import { getArmorSetItems } from './equipmentRules.js?v=20260723e';
+import { findNpcPath, getNpcRoutine } from './npcBehavior.js?v=20260730a';
 
 const NPC_CFG = CONFIG.NPC;
 const NAME_TAG_VISIBLE_DISTANCE = 8;
@@ -22,8 +23,13 @@ const NPC_HALF_WIDTH = 0.28;
 const NPC_FEET_OFFSET = 0.05;
 const NPC_HEAD_OFFSET = 1.85;
 const WATER_BLOCKS = new Set([4]);
+const DOOR_BLOCKS = new Set([33, 34, 103]);
 const VILLAGER_SKIN_TILE = 11;
 const PROFESSION_TEXTURE_TILES = [12, 13, 14, 15];
+const SOCIAL_OFFSETS = [
+    [-1.4, 0], [1.4, 0], [0, -1.4], [0, 1.4],
+    [-1, -1], [1, -1], [-1, 1], [1, 1]
+];
 
 export function findNearestFootY(fromY, hasStandSpace, minY = 1, maxY = 63) {
     const centerY = Math.max(minY, Math.min(maxY, Math.round(fromY)));
@@ -115,6 +121,8 @@ export class NPC {
             door: schedule.door || null,
             porch: schedule.porch || null,
             work: schedule.work || null,
+            gathering: schedule.gathering || schedule.waypoints?.find(point => point.role === 'center') || null,
+            community: schedule.community || null,
             waypoints: Array.isArray(schedule.waypoints) ? schedule.waypoints : []
         };
 
@@ -122,20 +130,63 @@ export class NPC {
         this.health = 20;
         this.velocity = new THREE.Vector3();
 
-        // Wander-AI
+        // Tagesroutine und Navigation
         this.targetX = x;
         this.targetZ = z;
-        this.wanderTimer = 2 + Math.random() * 5;
+        this.activity = 'sleeping';
+        this.routinePhase = null;
+        this.path = [];
+        this.pathIndex = 0;
+        this.pathGoalKey = null;
+        this.repathTimer = 0;
+        this.stuckTimer = 0;
 
         // Mesh bauen
         this.group = new THREE.Group();
         this.group.position.set(x, y, z);
         this._buildMesh();
+        this._buildActivityProp();
         scene.add(this.group);
 
         // Walk-Animation
         this.walkTime = 0;
         this.isWalking = false;
+    }
+
+    _buildActivityProp() {
+        this.activityProp = new THREE.Group();
+        this.activityProp.visible = false;
+
+        if (this.professionIdx === 0) {
+            const handle = new THREE.Mesh(
+                new THREE.BoxGeometry(0.05, 0.36, 0.05),
+                new THREE.MeshPhongMaterial({ color: 0x6b4423 })
+            );
+            const head = new THREE.Mesh(
+                new THREE.BoxGeometry(0.22, 0.1, 0.1),
+                new THREE.MeshPhongMaterial({ color: 0x555b63 })
+            );
+            head.position.y = 0.18;
+            this.activityProp.add(handle, head);
+        } else if (this.professionIdx === 1) {
+            this.activityProp.add(new THREE.Mesh(
+                new THREE.BoxGeometry(0.2, 0.2, 0.2),
+                new THREE.MeshPhongMaterial({ color: 0xd4a820 })
+            ));
+        } else if (this.professionIdx === 2) {
+            this.activityProp.add(new THREE.Mesh(
+                new THREE.CylinderGeometry(0.09, 0.075, 0.18, 8),
+                new THREE.MeshPhongMaterial({ color: 0xc9a66b })
+            ));
+        } else {
+            this.activityProp.add(new THREE.Mesh(
+                new THREE.BoxGeometry(0.26, 0.06, 0.3),
+                new THREE.MeshPhongMaterial({ color: 0x6f2746 })
+            ));
+        }
+
+        this.activityProp.position.set(0, -0.28, 0.18);
+        this.rightArm.add(this.activityProp);
     }
 
     _buildMesh() {
@@ -265,21 +316,23 @@ export class NPC {
         return Physics.isSolid(world, x, y, z, false);
     }
 
-    _hasDryStandSpace(world, x, footY, z) {
+    _hasDryStandSpace(world, x, footY, z, allowClosedDoors = false) {
+        let hasFloorSupport = false;
         for (const [bx, bz] of this._getFootprintColumns(x, z)) {
             const floorY = footY - 1;
-            if (!this._isDrySolidFloor(world, bx, floorY, bz)) return false;
+            if (this._isDrySolidFloor(world, bx, floorY, bz)) hasFloorSupport = true;
 
             for (let y = Math.floor(footY + NPC_FEET_OFFSET); y <= Math.floor(footY + NPC_HEAD_OFFSET); y++) {
+                if (allowClosedDoors && DOOR_BLOCKS.has(world.getBlock(bx, y, bz))) continue;
                 if (Physics.isSolid(world, bx, y, bz, true)) return false;
                 if (WATER_BLOCKS.has(world.getBlock(bx, y, bz))) return false;
             }
         }
-        return true;
+        return hasFloorSupport;
     }
 
-    _findNearestFootY(world, x, z, fromY) {
-        return findNearestFootY(fromY, footY => this._hasDryStandSpace(world, x, footY, z), 1, 63);
+    _findNearestFootY(world, x, z, fromY, allowClosedDoors = false) {
+        return findNearestFootY(fromY, footY => this._hasDryStandSpace(world, x, footY, z, allowClosedDoors), 1, 63);
     }
 
     _findSafeHomeFootY(world) {
@@ -317,29 +370,91 @@ export class NPC {
         return false;
     }
 
-    _pickWanderTarget(dayRatio = 0.5) {
-        const isNight = dayRatio < 0.23 || dayRatio > 0.77;
-        if (isNight && this.schedule.home) {
-            this.targetX = this.schedule.home.x;
-            this.targetZ = this.schedule.home.z;
-            this.wanderTimer = 4 + Math.random() * 3;
+    _stableSlot() {
+        const source = this.id || `${this.homeX}:${this.homeZ}:${this.professionIdx}`;
+        let hash = 0;
+        for (let index = 0; index < source.length; index++) {
+            hash = ((hash * 31) + source.charCodeAt(index)) | 0;
+        }
+        return Math.abs(hash) % SOCIAL_OFFSETS.length;
+    }
+
+    _getRoutineTarget(routine) {
+        if (!routine.target) return { x: this.homeX, y: this.homeY, z: this.homeZ };
+        if (routine.phase !== 'midday' && routine.phase !== 'evening') return routine.target;
+        const [offsetX, offsetZ] = SOCIAL_OFFSETS[this._stableSlot()];
+        return {
+            x: routine.target.x + offsetX,
+            y: routine.target.y,
+            z: routine.target.z + offsetZ
+        };
+    }
+
+    _isNpcPositionFree(x, z, npcs) {
+        for (const npc of npcs || []) {
+            if (npc === this || npc.isDead || npc.isUnconscious) continue;
+            const dx = npc.group.position.x - x;
+            const dz = npc.group.position.z - z;
+            if (dx * dx + dz * dz >= 0.55 * 0.55) continue;
+            const currentDx = npc.group.position.x - this.group.position.x;
+            const currentDz = npc.group.position.z - this.group.position.z;
+            if (dx * dx + dz * dz <= currentDx * currentDx + currentDz * currentDz) return false;
+        }
+        return true;
+    }
+
+    _planPath(world, npcs, target) {
+        const occupied = new Set();
+        for (const npc of npcs || []) {
+            if (npc === this || npc.isDead || npc.isUnconscious) continue;
+            occupied.add(`${Math.round(npc.group.position.x)},${Math.round(npc.group.position.z)}`);
+        }
+
+        this.path = findNpcPath({
+            start: this.group.position,
+            target,
+            getFootY: (x, z, fromY) => this._findNearestFootY(world, x, z, fromY, true),
+            isBlocked: (x, z) => occupied.has(`${x},${z}`)
+        });
+        this.pathIndex = this.path.length > 1 ? 1 : 0;
+        this.repathTimer = this.path.length > 0 ? 2 : 0.75;
+    }
+
+    _updateActivityAnimation(delta) {
+        this.walkTime += delta * (this.isWalking ? 8 : 4);
+        this.leftArm.rotation.x = 0;
+        this.rightArm.rotation.x = 0;
+        this.leftLeg.rotation.x = 0;
+        this.rightLeg.rotation.x = 0;
+        this.activityProp.visible = false;
+
+        if (this.isWalking) {
+            const swing = Math.sin(this.walkTime) * 0.4;
+            this.leftArm.rotation.x = swing;
+            this.rightArm.rotation.x = -swing;
+            this.leftLeg.rotation.x = -swing;
+            this.rightLeg.rotation.x = swing;
             return;
         }
 
-        const scheduledTargets = [this.schedule.work, this.schedule.porch, ...this.schedule.waypoints].filter(Boolean);
-        if (scheduledTargets.length > 0) {
-            const target = scheduledTargets[Math.floor(Math.random() * scheduledTargets.length)];
-            this.targetX = target.x;
-            this.targetZ = target.z;
-            this.wanderTimer = NPC_CFG.WANDER_INTERVAL_MIN + Math.random() * (NPC_CFG.WANDER_INTERVAL_MAX - NPC_CFG.WANDER_INTERVAL_MIN);
-            return;
+        if (this.activity === 'forging') {
+            this.rightArm.rotation.x = -0.8 + Math.sin(this.walkTime * 1.8) * 0.65;
+            this.activityProp.visible = true;
+        } else if (this.activity === 'tending') {
+            const reach = -0.45 + Math.sin(this.walkTime) * 0.18;
+            this.leftArm.rotation.x = reach;
+            this.rightArm.rotation.x = reach;
+            this.activityProp.visible = true;
+        } else if (this.activity === 'serving') {
+            this.rightArm.rotation.x = -0.75 + Math.sin(this.walkTime * 0.7) * 0.12;
+            this.activityProp.visible = true;
+        } else if (this.activity === 'studying') {
+            this.leftArm.rotation.x = -0.65;
+            this.rightArm.rotation.x = -0.65;
+            this.activityProp.visible = true;
+        } else if (this.activity === 'trading' || this.activity === 'socializing') {
+            this.rightArm.rotation.x = Math.sin(this.walkTime) * 0.25;
         }
-
-        const angle = Math.random() * Math.PI * 2;
-        const dist = Math.random() * NPC_CFG.WANDER_RADIUS;
-        this.targetX = this.homeX + Math.cos(angle) * dist;
-        this.targetZ = this.homeZ + Math.sin(angle) * dist;
-        this.wanderTimer = NPC_CFG.WANDER_INTERVAL_MIN + Math.random() * (NPC_CFG.WANDER_INTERVAL_MAX - NPC_CFG.WANDER_INTERVAL_MIN);
     }
 
     /**
@@ -349,21 +464,21 @@ export class NPC {
      * @param {import('./world.js').World} world
      */
     _openDoorAt(world, x, y, z) {
-        const blockX = Math.floor(x);
-        const blockZ = Math.floor(z);
-        for (let blockY = Math.floor(y); blockY <= Math.floor(y) + 1; blockY++) {
-            const block = world.getBlock(blockX, blockY, blockZ);
-            if (block !== 33 && block !== 34 && block !== 103) continue;
-            const baseY = block === 34 ? blockY - 1 : blockY;
-            const nextMetadata = world.getBlockMeta(blockX, baseY, blockZ) | 4;
-            world.setBlockMeta(blockX, baseY, blockZ, nextMetadata);
-            if (block !== 103) world.setBlockMeta(blockX, baseY + 1, blockZ, nextMetadata);
-            return true;
+        for (const [blockX, blockZ] of this._getFootprintColumns(x, z)) {
+            for (let blockY = Math.floor(y); blockY <= Math.floor(y) + 1; blockY++) {
+                const block = world.getBlock(blockX, blockY, blockZ);
+                if (!DOOR_BLOCKS.has(block)) continue;
+                const baseY = block === 34 ? blockY - 1 : blockY;
+                const nextMetadata = world.getBlockMeta(blockX, baseY, blockZ) | 4;
+                world.setBlockMeta(blockX, baseY, blockZ, nextMetadata);
+                if (block !== 103) world.setBlockMeta(blockX, baseY + 1, blockZ, nextMetadata);
+                return true;
+            }
         }
         return false;
     }
 
-    update(delta, playerPos, world, dayRatio = 0.5) {
+    update(delta, playerPos, world, dayRatio = 0.5, npcs = []) {
         if (this.isDead) return;
         this._updateNameTag(playerPos);
         if (this.isUnconscious) {
@@ -378,49 +493,102 @@ export class NPC {
 
         const pos = this.group.position;
         this._resolveGround(world, true);
+        this.repathTimer -= delta;
 
-        // Wander-Timer
-        this.wanderTimer -= delta;
-        if (this.wanderTimer <= 0) {
-            this._pickWanderTarget(dayRatio);
+        const routine = getNpcRoutine(dayRatio, this.professionIdx, this.schedule);
+        const target = this._getRoutineTarget(routine);
+        this.targetX = target.x;
+        this.targetZ = target.z;
+        const goalKey = `${routine.phase}:${Math.round(target.x * 2)}:${Math.round(target.z * 2)}`;
+        if (goalKey !== this.pathGoalKey) {
+            this.pathGoalKey = goalKey;
+            this.routinePhase = routine.phase;
+            this.path = [];
+            this.pathIndex = 0;
+            this.repathTimer = 0;
+            this.stuckTimer = 0;
         }
 
-        // Bewegung zum Ziel
-        const dx = this.targetX - pos.x;
-        const dz = this.targetZ - pos.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
+        const targetDx = target.x - pos.x;
+        const targetDz = target.z - pos.z;
+        const targetDistance = Math.sqrt(targetDx * targetDx + targetDz * targetDz);
+        const pathEnd = this.path[this.path.length - 1];
+        const pathEndDistance = pathEnd
+            ? Math.hypot(pathEnd.x - pos.x, pathEnd.z - pos.z)
+            : Infinity;
+        const reachedGoal = targetDistance <= 1.05 || pathEndDistance <= 0.3;
         const checkNpcCollision = (np) => Physics.checkAABBCollision(world, np, NPC_HALF_WIDTH, NPC_FEET_OFFSET, NPC_HEAD_OFFSET, true);
-        const canStandAt = (x, z) => this._findNearestFootY(world, x, z, pos.y) !== null;
+        const getStandY = (x, z) => this._findNearestFootY(world, x, z, pos.y);
 
-        if (dist > 0.5) {
-            const speed = NPC_CFG.WANDER_SPEED * delta;
-            const nx = dx / dist, nz = dz / dist;
-            const nextX = pos.x + nx * speed;
-            const nextZ = pos.z + nz * speed;
+        if (!reachedGoal) {
+            if (this.repathTimer <= 0 || (this.path.length > 0 && this.pathIndex >= this.path.length)) {
+                this._planPath(world, npcs, target);
+            }
+
+            while (this.pathIndex < this.path.length) {
+                const point = this.path[this.pathIndex];
+                const pointDx = point.x - pos.x;
+                const pointDz = point.z - pos.z;
+                if (pointDx * pointDx + pointDz * pointDz >= 0.25 * 0.25) break;
+                this.pathIndex++;
+            }
+
+            const point = this.path[this.pathIndex];
             let moved = false;
+            if (point) {
+                const dx = point.x - pos.x;
+                const dz = point.z - pos.z;
+                const dist = Math.sqrt(dx * dx + dz * dz);
+                const nx = dx / Math.max(0.001, dist);
+                const nz = dz / Math.max(0.001, dist);
+                const speed = Math.min(NPC_CFG.WANDER_SPEED * delta, dist);
+                const turn = this._stableSlot() % 2 === 0 ? 1 : -1;
+                const directions = [
+                    [nx, nz],
+                    [nx + nz * 0.9 * turn, nz - nx * 0.9 * turn],
+                    [nz * turn, -nx * turn]
+                ];
 
-            this._openDoorAt(world, nextX, pos.y, nextZ);
+                for (const [rawX, rawZ] of directions) {
+                    const length = Math.sqrt(rawX * rawX + rawZ * rawZ);
+                    const moveX = rawX / length;
+                    const moveZ = rawZ / length;
+                    const nextX = pos.x + moveX * speed;
+                    const nextZ = pos.z + moveZ * speed;
+                    const nextY = getStandY(nextX, nextZ);
+                    this._openDoorAt(world, nextX, pos.y, nextZ);
 
-            if (canStandAt(nextX, pos.z) && !checkNpcCollision({ x: nextX, y: pos.y, z: pos.z })) {
-                pos.x = nextX;
-                moved = true;
+                    if (nextY !== null &&
+                        !checkNpcCollision({ x: nextX, y: nextY, z: nextZ }) &&
+                        this._isNpcPositionFree(nextX, nextZ, npcs)) {
+                        pos.x = nextX;
+                        pos.y = nextY;
+                        pos.z = nextZ;
+                        this.velocity.y = 0;
+                        moved = true;
+                        this.group.rotation.y = Math.atan2(moveX, moveZ);
+                        break;
+                    }
+                }
             }
-            if (canStandAt(pos.x, nextZ) && !checkNpcCollision({ x: pos.x, y: pos.y, z: nextZ })) {
-                pos.z = nextZ;
-                moved = true;
-            }
+
             this.isWalking = moved;
-
-            if (!moved) {
-                this.velocity.x = 0;
-                this.velocity.z = 0;
-                this._pickWanderTarget(dayRatio);
+            if (moved) {
+                this.stuckTimer = 0;
+                this.activity = 'walking';
+            } else {
+                this.activity = 'waiting';
+                this.stuckTimer += delta;
+                if (this.stuckTimer >= 0.7) {
+                    this.path = [];
+                    this.pathIndex = 0;
+                    this.repathTimer = 0;
+                    this.stuckTimer = 0;
+                }
             }
-
-            // Blickrichtung
-            this.group.rotation.y = Math.atan2(nx, nz);
         } else {
             this.isWalking = false;
+            this.activity = routine.action;
         }
 
         const groundY = this._findNearestFootY(world, pos.x, pos.z, pos.y);
@@ -429,21 +597,7 @@ export class NPC {
         }
         pos.y += this.velocity.y * delta;
         this._resolveGround(world);
-
-        // Walk-Animation
-        if (this.isWalking) {
-            this.walkTime += delta * 8;
-            const swing = Math.sin(this.walkTime) * 0.4;
-            if (this.leftArm) this.leftArm.rotation.x = swing;
-            if (this.rightArm) this.rightArm.rotation.x = -swing;
-            if (this.leftLeg) this.leftLeg.rotation.x = -swing;
-            if (this.rightLeg) this.rightLeg.rotation.x = swing;
-        } else {
-            if (this.leftArm) this.leftArm.rotation.x = 0;
-            if (this.rightArm) this.rightArm.rotation.x = 0;
-            if (this.leftLeg) this.leftLeg.rotation.x = 0;
-            if (this.rightLeg) this.rightLeg.rotation.x = 0;
-        }
+        this._updateActivityAnimation(delta);
 
         // Void-Schutz
         if (pos.y < 0) {

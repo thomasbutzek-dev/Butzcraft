@@ -1,4 +1,4 @@
-import { createBlockHTML, inventorySlots, updateInventoryUI } from './inventory.js?v=20260723e';
+import { createBlockHTML, inventorySlots, updateInventoryUI } from './inventory.js?v=20260801c';
 import {
     EQUIPMENT_SLOTS,
     equipArmorFromInventory,

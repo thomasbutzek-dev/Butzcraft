@@ -16,10 +16,12 @@
 
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { normalizeCharacterProfile } from './characterProfile.js?v=20260602a';
-import { createQuestState, normalizeQuestState } from './quests.js?v=20260723e';
+import { createQuestState, normalizeQuestState } from './quests.js?v=20260730a';
+import { STORY_EVENTS } from './storyProgress.js?v=20260730c';
+import { normalizeBloodMoonSurvival } from './bloodMoonCycle.js?v=20260730a';
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
-export const CURRENT_SAVE_VERSION = 15;
+export const CURRENT_SAVE_VERSION = 18;
 export const CURRENT_WORLD_GENERATION_VERSION = 2;
 
 export function getWorldGenerationLoadNotice(rawData, saveName) {
@@ -174,6 +176,41 @@ function migrateV14toV15(data) {
     return data;
 }
 
+function migrateV15toV16(data) {
+    const questState = normalizeQuestState(data.questState, data.storyObjectiveIndex);
+    const milestones = { ...questState.storyMilestones };
+    const mark = eventName => {
+        milestones[eventName] = true;
+    };
+    if (questState.homeVillageId) mark(STORY_EVENTS.VILLAGER_MET);
+    if (Object.values(questState.villages || {}).some(village => (Number(village?.trust) || 0) > 0)) {
+        mark(STORY_EVENTS.VILLAGE_TRUST_EARNED);
+    }
+    if (Number.isFinite(data.lastBloodMoonRewardDay) && data.lastBloodMoonRewardDay >= 0) {
+        mark(STORY_EVENTS.BLOOD_MOON_SURVIVED);
+    }
+    if ((Number(questState.questItems?.deepCrystal) || 0) > 0) mark(STORY_EVENTS.MINE_COMPLETED);
+    if ((Number(questState.questItems?.bloodSeal) || 0) > 0) mark(STORY_EVENTS.DUNGEON_COMPLETED);
+    const structureProgress = Object.values(data.structureProgress || {});
+    if (structureProgress.some(progress => progress?.keyFound)) mark(STORY_EVENTS.DUNGEON_KEY_FOUND);
+    if (structureProgress.some(progress => progress?.gateOpened)) mark(STORY_EVENTS.DUNGEON_GATE_OPENED);
+    if (structureProgress.some(progress => progress?.ritualActivated)) mark(STORY_EVENTS.RITUAL_ACTIVATED);
+    if (questState.storyFlags?.bossDefeated) mark(STORY_EVENTS.BOSS_DEFEATED);
+    questState.storyMilestones = milestones;
+    data.questState = questState;
+    return data;
+}
+
+function migrateV16toV17(data) {
+    data.bloodMoonSurvival = normalizeBloodMoonSurvival(data.bloodMoonSurvival);
+    return data;
+}
+
+function migrateV17toV18(data) {
+    if (!Array.isArray(data.penalizedVillageChests)) data.penalizedVillageChests = [];
+    return data;
+}
+
 // Map: Ziel-Version → Migration-Funktion (von Vorgänger-Version aus).
 const MIGRATIONS = {
     1: migrateV0toV1,
@@ -190,7 +227,10 @@ const MIGRATIONS = {
     12: migrateV11toV12,
     13: migrateV12toV13,
     14: migrateV13toV14,
-    15: migrateV14toV15
+    15: migrateV14toV15,
+    16: migrateV15toV16,
+    17: migrateV16toV17,
+    18: migrateV17toV18
 };
 
 function normalizeCharacterSettings(data) {
@@ -220,6 +260,7 @@ function normalizeWorldGeneration(data) {
     if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {
         data.structureProgress = {};
     }
+    if (!Array.isArray(data.penalizedVillageChests)) data.penalizedVillageChests = [];
     return data;
 }
 
@@ -286,6 +327,7 @@ export function stampSaveVersion(data) {
         if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {
             data.structureProgress = {};
         }
+        if (!Array.isArray(data.penalizedVillageChests)) data.penalizedVillageChests = [];
         data.questState = normalizeQuestState(data.questState || createQuestState(data.storyObjectiveIndex), data.storyObjectiveIndex);
     }
     return data;

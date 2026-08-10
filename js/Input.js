@@ -6,6 +6,8 @@ export const Input = {
     moveL: false,
     moveR: false,
     moveUp: false,
+    touchJumpHeld: false,
+    touchJumpQueued: false,
     sprint: false,   // Shift
     crouch: false,   // Ctrl
 
@@ -20,6 +22,7 @@ export const Input = {
 
         // Reset state, damit hängengebliebene Tasten nach Reload nicht weiter "gedrückt" sind
         this.moveF = this.moveB = this.moveL = this.moveR = this.moveUp = false;
+        this.touchJumpHeld = this.touchJumpQueued = false;
         this.sprint = this.crouch = false;
 
         this._onKeyDown = (e) => {
@@ -55,6 +58,7 @@ export const Input = {
         // wenn der User Alt+Tab macht während er sprintet.
         this._onBlur = () => {
             this.moveF = this.moveB = this.moveL = this.moveR = this.moveUp = false;
+            this.touchJumpHeld = this.touchJumpQueued = false;
             this.sprint = this.crouch = false;
         };
 

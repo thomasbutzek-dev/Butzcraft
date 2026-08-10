@@ -16,7 +16,6 @@ function loadWorkerVariants() {
     });
     const source = readChunkWorkerSource();
     vm.runInContext(`${source}\nself.__variants = { spawnTree, spawnPalm, BIOMES };`, context);
-    vm.runInContext("GRAPHICS_VARIANT = 'B';", context);
     return self.__variants;
 }
 

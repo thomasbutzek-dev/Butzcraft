@@ -5,7 +5,7 @@ const recipeBookStates = new WeakMap();
 
 export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_TYPES, TRANSLATIONS, onRecipeClick, options = {}) {
     const EMOJI_MAP = { 21: '🐟', 22: '🥩', 23: '🍗', 24: '🧟', 25: '🍖' };
-    const RECIPE_CATEGORIES = ['Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Rüstung', 'Versorgung'];
+    const RECIPE_CATEGORIES = ['Verfügbar', 'Alle', 'Bauen', 'Werkzeuge', 'Kampf', 'Rüstung', 'Versorgung'];
 
     const createMiniHTML = (type) => {
         if (type === 0) return '';
@@ -66,6 +66,7 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
                 <div id="recipe-book-title" style="color: #ffe066; font-size: 18px; font-weight: bold; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;">Rezeptbuch</div>
                 <div id="recipe-category-tabs" role="tablist" aria-label="Rezeptkategorien"></div>
                 <input id="recipe-search" type="search" aria-label="Rezepte suchen" placeholder="Rezepte suchen…" autocomplete="off">
+                <div id="recipe-empty-state" role="status" hidden></div>
                 <div id="recipe-list-container"></div>
             `;
 
@@ -101,7 +102,7 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
                 button.className = 'recipe-category-tab';
                 button.dataset.category = category;
                 button.setAttribute('role', 'tab');
-                button.setAttribute('aria-selected', category === 'Alle' ? 'true' : 'false');
+                button.setAttribute('aria-selected', category === 'Verfügbar' ? 'true' : 'false');
                 button.textContent = category;
                 button.addEventListener('click', () => {
                     container.dataset.recipeCategory = category;
@@ -113,7 +114,7 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
                 categoryTabs.appendChild(button);
             }
         }
-        if (!container.dataset.recipeCategory) container.dataset.recipeCategory = 'Alle';
+        if (!container.dataset.recipeCategory) container.dataset.recipeCategory = 'Verfügbar';
 
         const tooltip = ensureTooltip();
 
@@ -255,11 +256,15 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
         const searchInput = document.getElementById('recipe-search');
         state.applyRecipeFilter = () => {
             const query = searchInput?.value.trim().toLocaleLowerCase('de') || '';
-            const category = container.dataset.recipeCategory || 'Alle';
+            const category = container.dataset.recipeCategory || 'Verfügbar';
+            let visibleRecipes = 0;
             for (const entry of container.querySelectorAll('.recipe-entry')) {
-                const wrongCategory = category !== 'Alle' && entry.dataset.recipeCategory !== category;
+                const unavailable = category === 'Verfügbar' && entry.classList.contains('locked');
+                const wrongCategory = category !== 'Alle' && category !== 'Verfügbar'
+                    && entry.dataset.recipeCategory !== category;
                 const wrongQuery = Boolean(query) && !entry.dataset.recipeName.includes(query);
-                entry.hidden = wrongCategory || wrongQuery;
+                entry.hidden = unavailable || wrongCategory || wrongQuery;
+                if (!entry.hidden) visibleRecipes++;
             }
             for (const title of container.querySelectorAll('.recipe-section-title')) {
                 let sibling = title.nextElementSibling;
@@ -269,6 +274,13 @@ export function initRecipeBook(atlasDataURL, BLOCK_TEX, craftingRecipes, BLOCK_T
                     sibling = sibling.nextElementSibling;
                 }
                 title.hidden = !hasVisibleRecipe;
+            }
+            const emptyState = document.getElementById('recipe-empty-state');
+            if (emptyState) {
+                emptyState.hidden = visibleRecipes !== 0;
+                emptyState.textContent = category === 'Verfügbar' && !query
+                    ? 'Noch nichts herstellbar – sammle zuerst Holz.'
+                    : 'Keine passenden Rezepte gefunden.';
             }
         };
         if (searchInput) searchInput.oninput = state.applyRecipeFilter;

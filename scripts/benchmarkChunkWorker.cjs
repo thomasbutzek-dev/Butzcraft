@@ -5,9 +5,13 @@ const { spawnSync } = require('node:child_process');
 const { performance } = require('node:perf_hooks');
 
 const workerSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'chunkWorker.js'), 'utf8')
-    .replace(/^import .*undergroundStructures.*\r?\n/m, '');
+    .replace(/^import .*\r?\n/gm, '');
 const undergroundSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'undergroundStructures.js'), 'utf8')
     .replace('export function generateUndergroundStructures', 'function generateUndergroundStructures');
+const naturalSpawnSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'naturalSpawnRules.js'), 'utf8')
+    .replace(/^export /gm, '');
+const terrainHeightSource = fs.readFileSync(path.join(__dirname, '..', 'js', 'terrainHeightRules.js'), 'utf8')
+    .replace(/^export /gm, '');
 const config = {
     CHUNK_SIZE: 16,
     CHUNK_HEIGHT: 64,
@@ -22,8 +26,10 @@ function createWorkerRuntime(variant) {
             messages.push(message);
         }
     };
-    const context = vm.createContext({ self, console });
+    const context = vm.createContext({ self, console, performance });
     vm.runInContext(undergroundSource, context, { filename: 'undergroundStructures.js' });
+    vm.runInContext(naturalSpawnSource, context, { filename: 'naturalSpawnRules.js' });
+    vm.runInContext(terrainHeightSource, context, { filename: 'terrainHeightRules.js' });
     vm.runInContext(workerSource, context, { filename: 'chunkWorker.js' });
     self.onmessage({
         data: {

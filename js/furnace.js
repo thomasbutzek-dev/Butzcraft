@@ -1,6 +1,6 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260723e';
-import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260723e';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260801b';
+import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260801c';
 import { Game } from './Game.js?v=20260716b';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 

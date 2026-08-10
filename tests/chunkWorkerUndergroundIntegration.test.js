@@ -21,8 +21,6 @@ describe('chunk worker underground structure integration', () => {
                 config: { CHUNK_SIZE: 16, CHUNK_HEIGHT: 64, WATER_LEVEL: 32, CLOUD_HEIGHT: 58 },
                 blockColors: {},
                 blockTex: {},
-                graphicsVariant: 'A',
-                reducedGraphicsDetail: false,
                 worldGenerationVersion: 2
             }
         });
@@ -40,6 +38,7 @@ describe('chunk worker underground structure integration', () => {
                     }
                 });
                 const terrain = messages.pop();
+                expect(terrain.timings.workerGenerationMs).toBeGreaterThanOrEqual(0);
                 structures.push(...(terrain.structureInfos || []));
             }
         }

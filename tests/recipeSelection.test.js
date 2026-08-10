@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 
-const recipeBookState = vi.hoisted(() => ({ onRecipeClick: null, options: null }));
+const recipeBookState = vi.hoisted(() => ({ onRecipeClick: null, options: null, calls: 0 }));
 
 vi.mock('../js/blocks.js', () => ({
     BLOCK_TYPES: { WOOD: 5, PLANKS: 26 },
@@ -10,6 +10,7 @@ vi.mock('../js/blocks.js', () => ({
 }));
 vi.mock('../js/recipe_book.js', () => ({
     initRecipeBook: (...args) => {
+        recipeBookState.calls++;
         recipeBookState.onRecipeClick = args[5];
         recipeBookState.options = args[6];
     }
@@ -62,6 +63,7 @@ beforeEach(() => {
     }
     recipeBookState.onRecipeClick = null;
     recipeBookState.options = null;
+    recipeBookState.calls = 0;
     controls.lock.mockClear();
     controls.unlock.mockClear();
     window.getHighestVillageTrust = () => 0;
@@ -92,6 +94,19 @@ describe('recipe selection', () => {
         expect(inventorySlots[0]).toEqual({ type: 5, count: 1 });
         expect(craftingGridData[0]).toEqual({ type: 5, count: 1 });
         expect(document.getElementById('crafting-status').textContent).toBe('Rezept eingesetzt.');
+    });
+
+    it('refreshes recipe availability after ingredients move and after crafting', () => {
+        inventorySlots[0] = { type: 5, count: 2 };
+        toggleInventory(true, false, controls);
+        const callsAfterOpen = recipeBookState.calls;
+
+        recipeBookState.onRecipeClick(planksRecipe);
+        const callsAfterSelection = recipeBookState.calls;
+        craftCurrentRecipe();
+
+        expect(callsAfterSelection).toBeGreaterThan(callsAfterOpen);
+        expect(recipeBookState.calls).toBeGreaterThan(callsAfterSelection);
     });
 
     it('keeps existing crafting ingredients when the selected recipe is unavailable', () => {

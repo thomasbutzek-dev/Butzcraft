@@ -91,22 +91,10 @@ describe('dropped item collection', () => {
             mesh: { rotation: { x: 0, y: 0, z: 0 } }
         };
 
-        updateDroppedItemVisual(drop, 0.25, true);
+        updateDroppedItemVisual(drop, 0.25);
 
         expect(drop.mesh.rotation.y).toBeGreaterThan(0);
         expect(Math.abs(drop.mesh.rotation.z)).toBeLessThanOrEqual(0.09);
         expect(drop.visualPhase).toBeTypeOf('number');
-    });
-
-    it('does not alter drop motion in the original graphics variant', () => {
-        const drop = {
-            blockType: 22,
-            age: 1,
-            mesh: { rotation: { x: 0, y: 0, z: 0 } }
-        };
-
-        updateDroppedItemVisual(drop, 0.25, false);
-
-        expect(drop.mesh.rotation).toEqual({ x: 0, y: 0, z: 0 });
     });
 });
