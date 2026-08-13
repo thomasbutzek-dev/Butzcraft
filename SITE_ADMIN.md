@@ -2,6 +2,8 @@
 
 Die Landingpage kann unter `/admin` direkt bearbeitet werden. Der Zugang ist serverseitig geschützt und bleibt deaktiviert, solange kein Passwort konfiguriert ist.
 
+Nach der Anmeldung öffnet die Schaltfläche **Statistik** die aggregierten Spielaufrufe der letzten 24 Stunden und 30 Tage. Gezählt werden nur Produktionsaufrufe von `play.butzcraft.de`; IP-Adressen, Header und einzelne Zugriffszeitpunkte werden nicht gespeichert. Die Daten liegen im Verzeichnis aus `STATISTICS_DIR` (produktiv: `/app/statistics`).
+
 ## Lokal starten
 
 ```powershell
@@ -35,3 +37,13 @@ SMTP_PASSWORD=<Passwort oder App-Passwort>
 ```
 
 Diese Werte entsprechen Hostinger Email mit SSL. In `compose.hostinger.yaml` sind alle nicht geheimen Werte bereits voreingestellt. Auf dem Server muss nur `SMTP_PASSWORD` als geheime Umgebungsvariable gesetzt werden. Zugangsdaten niemals in das Repository eintragen.
+
+## Versionierung
+
+Butzcraft verwendet Versionen im Format `0.MINOR.PATCH`:
+
+- `PATCH` für kleine Fehlerkorrekturen, Texte und geringfügige Anpassungen, zum Beispiel `0.2.1`.
+- `MINOR` für neue Spielinhalte oder größere Funktionen, zum Beispiel `0.3.0`.
+- `1.0.0` wird erst für die bewusst freigegebene stabile Vollversion verwendet.
+
+Die aktuelle Version steht in `package.json` und `js/version.js`. Beide Werte müssen bei einer neuen Version gemeinsam geändert werden. Ab `v0.2.0` veröffentlicht ein Git-Tag zusätzlich die Container-Tags der jeweiligen Version und `stable`. Normale Pushes auf `stabilization/game-optimization` aktualisieren weiterhin nur den Container-Tag `stabilization`.

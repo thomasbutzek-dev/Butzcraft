@@ -1,10 +1,13 @@
 import * as THREE from 'three';
 import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
 import { Physics } from './Physics.js?v=20260717a';
-import { createCharacterModel } from './characterModel.js?v=20260718a';
+import { createCharacterModel, updateCharacterEquipment } from './characterModel.js?v=20260801a';
 import { CharacterAnimator } from './characterAnimator.js';
 import { clampThirdPersonDistance, clampThirdPersonPitch, orbitDirection } from './characterCamera.js';
 import { createTorchModel, TORCH_LIGHT_COLOR } from './torchLights.js?v=20260719a';
+import { getToolInfo } from './miningRules.js?v=20260718b';
+import { getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
+import { applySwordAppearance, applyToolAppearance, createHeldBowModel, createHeldSwordModel, createHeldToolModel } from './heldItemModels.js?v=20260801a';
 
 const CAMERA_EXTRA_BLOCKING_BLOCKS = new Set([5, 6, 13, 14, 15, 16]);
 const THIRD_PERSON_CAMERA_CLEARANCE = 0.28;
@@ -49,6 +52,10 @@ export class Player {
         this.camera.add(this.swordGroup);
         this.bowGroup = this.createBow();
         this.camera.add(this.bowGroup);
+        this.toolGroup = this.createTool();
+        this.camera.add(this.toolGroup);
+        this.heldItemType = 0;
+        this.equipmentSlots = null;
         this.heldTorchGroup = createTorchModel();
         this.heldTorchGroup.scale.setScalar(0.55);
         this.heldTorchGroup.position.set(0.42, -0.43, -0.68);
@@ -114,6 +121,7 @@ export class Player {
 
     setCharacterProfile(characterProfile) {
         if (this.characterGroup) {
+            this._attachHeldItemModels(this.camera);
             this.scene.remove(this.characterGroup);
             disposeObject(this.characterGroup);
         }
@@ -124,8 +132,16 @@ export class Player {
             this.characterGroup.visible = this.cameraMode === 'third' && !this.characterOccludedByCamera;
             this.scene.add(this.characterGroup);
             this._attachThirdPersonTorch();
+            if (this.equipmentSlots) updateCharacterEquipment(this.characterGroup, this.equipmentSlots);
             this.updateCharacterModel();
         }
+        this._attachHeldItemModels();
+        this.updateSword(0);
+    }
+
+    setEquipment(inventorySlots) {
+        this.equipmentSlots = inventorySlots;
+        if (this.characterGroup) updateCharacterEquipment(this.characterGroup, inventorySlots);
     }
 
     _attachThirdPersonTorch() {
@@ -136,6 +152,13 @@ export class Player {
         this.heldTorchThirdPerson.rotation.set(0.12, 0, -0.08);
         this.heldTorchThirdPerson.visible = false;
         hand.add(this.heldTorchThirdPerson);
+    }
+
+    _attachHeldItemModels(parent = null) {
+        const target = parent
+            || (this.cameraMode === 'third' && this.characterGroup?.rig?.rightArmPivot)
+            || this.camera;
+        target.add(this.swordGroup, this.bowGroup, this.toolGroup);
     }
 
     updateHeldTorch(selected) {
@@ -173,6 +196,7 @@ export class Player {
         this.isSwinging = false;
         this.swordGroup.visible = false;
         this.bowGroup.visible = false;
+        this.toolGroup.visible = false;
         this.updateHeldTorch(this.heldTorchSelected);
         return this.ghostMode;
     }
@@ -192,13 +216,16 @@ export class Player {
     setCameraMode(mode) {
         this.cameraMode = mode === 'third' ? 'third' : 'first';
         if (this.characterGroup) this.characterGroup.visible = this.cameraMode === 'third' && !this.characterOccludedByCamera;
+        this._attachHeldItemModels();
         if (this.cameraMode === 'third') {
             this._syncOrbitFromCamera();
             this._cameraOffsetReady = false;
             this.swordGroup.visible = false;
             this.bowGroup.visible = false;
+            this.toolGroup.visible = false;
         }
         this.updateHeldTorch(this.heldTorchSelected);
+        this.updateSword(0);
     }
 
     setThirdPersonCameraDistance(distance) {
@@ -399,71 +426,26 @@ export class Player {
     }
 
     createSword() {
-        const swordGroup = new THREE.Group();
-        
-        // Klinge (Hellgrau)
-        const blade = new THREE.Mesh(
-            new THREE.BoxGeometry(0.12, 0.6, 0.05),
-            new THREE.MeshPhongMaterial({ color: 0xbdc3c7 })
-        );
-        this.swordBlade = blade;
-        blade.position.y = 0.45;
-        swordGroup.add(blade);
-
-        // Parierstange (Dunkelgrau)
-        const guard = new THREE.Mesh(
-            new THREE.BoxGeometry(0.35, 0.08, 0.08),
-            new THREE.MeshPhongMaterial({ color: 0x2c3e50 })
-        );
-        guard.position.y = 0.15;
-        swordGroup.add(guard);
-
-        // Griff (Braun)
-        const handle = new THREE.Mesh(
-            new THREE.BoxGeometry(0.08, 0.25, 0.08),
-            new THREE.MeshPhongMaterial({ color: 0x7e5233 })
-        );
-        handle.position.y = 0.0;
-        swordGroup.add(handle);
-
-        // Knauf (Dunkelgrau)
-        const pommel = new THREE.Mesh(
-            new THREE.BoxGeometry(0.12, 0.1, 0.12),
-            new THREE.MeshPhongMaterial({ color: 0x2c3e50 })
-        );
-        pommel.position.y = -0.15;
-        swordGroup.add(pommel);
-
-        // Positionierung in der Hand (unten rechts im HUD)
-        swordGroup.position.set(0.4, -0.35, -0.5);
-        swordGroup.rotation.set(-0.2, 0, 0);
-        swordGroup.visible = false;
+        const swordGroup = createHeldSwordModel();
+        this.swordBlade = swordGroup.userData.blade;
         return swordGroup;
     }
 
     createBow() {
-        const bowGroup = new THREE.Group();
-        const wood = new THREE.MeshPhongMaterial({ color: 0x8B5A2B });
-        const upper = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.42, 0.07), wood);
-        const lower = upper.clone();
-        upper.position.set(0.08, 0.2, 0); upper.rotation.z = -0.28;
-        lower.position.set(0.08, -0.2, 0); lower.rotation.z = 0.28;
-        bowGroup.add(upper, lower);
+        return createHeldBowModel();
+    }
 
-        const stringPoints = [
-            new THREE.Vector3(0.19, 0.4, 0),
-            new THREE.Vector3(-0.06, 0, 0),
-            new THREE.Vector3(0.19, -0.4, 0)
-        ];
-        const string = new THREE.Line(
-            new THREE.BufferGeometry().setFromPoints(stringPoints),
-            new THREE.LineBasicMaterial({ color: 0xEEEEEE })
-        );
-        bowGroup.add(string);
-        bowGroup.position.set(0.42, -0.25, -0.55);
-        bowGroup.rotation.set(-0.15, -0.35, -0.15);
-        bowGroup.visible = false;
-        return bowGroup;
+    createTool() {
+        return createHeldToolModel();
+    }
+
+    updateHeldItem(type) {
+        this.heldItemType = Number(type) || 0;
+        const tool = getToolInfo(this.heldItemType);
+        if (tool) applyToolAppearance(this.toolGroup, tool);
+        const sword = getSwordInfo(this.heldItemType);
+        if (sword) applySwordAppearance(this.swordGroup, sword);
+        this.updateSword(0);
     }
 
     swingSword() {
@@ -475,12 +457,11 @@ export class Player {
         this.swingProgress = 0;
         this.showSwordDuringSwing = Boolean(swordInfo);
         this.showBowDuringSwing = false;
+        this.showToolDuringSwing = Boolean(getToolInfo(this.heldItemType));
         this.swordSwingSpeed = swordInfo
             ? Math.max(10, Math.PI / Math.max(0.25, swordInfo.cooldown * 0.75))
             : 12;
-        if (swordInfo && this.swordBlade?.material?.color) {
-            this.swordBlade.material.color.setHex(swordInfo.color);
-        }
+        if (swordInfo) applySwordAppearance(this.swordGroup, swordInfo);
         const duration = Math.PI / this.swordSwingSpeed;
         this.characterAnimator?.triggerAction('melee', duration);
         this.setActionCamera(duration * 1000 + 220);
@@ -491,6 +472,7 @@ export class Player {
         this.swingProgress = 0;
         this.showSwordDuringSwing = false;
         this.showBowDuringSwing = true;
+        this.showToolDuringSwing = false;
         this.swordSwingSpeed = Math.max(8, Math.PI / Math.max(0.3, bowInfo.cooldown * 0.85));
         const duration = Math.PI / this.swordSwingSpeed;
         this.characterAnimator?.triggerAction('bow', duration);
@@ -498,15 +480,22 @@ export class Player {
     }
 
     updateSword(delta) {
+        const firstPerson = this.cameraMode === 'first' && !this.ghostMode;
+        const thirdPerson = this.cameraMode === 'third' && !this.ghostMode && Boolean(this.characterGroup);
+        const selectedSword = getSwordInfo(this.heldItemType);
+        const selectedBow = getBowInfo(this.heldItemType);
+        const selectedTool = getToolInfo(this.heldItemType);
         if (this.isSwinging) {
-            this.swordGroup.visible = this.cameraMode === 'first' && this.showSwordDuringSwing;
-            this.bowGroup.visible = this.cameraMode === 'first' && this.showBowDuringSwing;
+            this.swordGroup.visible = firstPerson && this.showSwordDuringSwing;
+            this.bowGroup.visible = firstPerson && this.showBowDuringSwing;
+            this.toolGroup.visible = firstPerson && this.showToolDuringSwing;
             this.swingProgress += delta * this.swordSwingSpeed;
             if (this.swingProgress > Math.PI) { 
                 this.swingProgress = 0; 
                 this.isSwinging = false; 
                 this.swordGroup.visible = false; 
                 this.bowGroup.visible = false;
+                this.toolGroup.visible = false;
             }
             const v = Math.sin(this.swingProgress); 
             this.swordGroup.rotation.x = -0.2 - v * 1.5; 
@@ -515,9 +504,30 @@ export class Player {
             this.swordGroup.rotation.y = -0.35 - v * 0.15;
             this.bowGroup.position.z = -0.55 + v * 0.12;
             this.bowGroup.rotation.y = -0.35 - v * 0.12;
+            this.toolGroup.rotation.x = -0.25 - v * 1.25;
+            this.toolGroup.rotation.z = -0.18 + v * 0.42;
+            this.toolGroup.position.z = -0.55 + v * 0.18;
         } else {
-            this.swordGroup.visible = false;
-            this.bowGroup.visible = false;
+            this.swordGroup.visible = firstPerson && Boolean(selectedSword);
+            this.bowGroup.visible = firstPerson && Boolean(selectedBow);
+            this.toolGroup.visible = firstPerson && Boolean(selectedTool);
+            this.swordGroup.position.set(0.4, -0.35, -0.5);
+            this.swordGroup.rotation.set(-0.2, 0, 0);
+            this.bowGroup.position.set(0.42, -0.25, -0.55);
+            this.bowGroup.rotation.set(-0.15, -0.35, -0.15);
+            this.toolGroup.position.set(0.42, -0.38, -0.55);
+            this.toolGroup.rotation.set(-0.25, -0.2, -0.18);
+        }
+        if (thirdPerson) {
+            this.swordGroup.visible = Boolean(selectedSword);
+            this.bowGroup.visible = Boolean(selectedBow);
+            this.toolGroup.visible = Boolean(selectedTool);
+            this.swordGroup.position.set(0, -0.82, 0.22);
+            this.swordGroup.rotation.set(-0.15, 0, Math.PI);
+            this.bowGroup.position.set(0, -0.82, 0.22);
+            this.bowGroup.rotation.set(0, 0, 0);
+            this.toolGroup.position.set(0, -0.84, 0.2);
+            this.toolGroup.rotation.set(0, 0, Math.PI);
         }
     }
 
@@ -666,7 +676,8 @@ export class Player {
             this.velocity.z -= this.velocity.z * drag * delta;
             this.velocity.y -= 9.8 * 1.5 * delta;
 
-            if (Input.moveUp) this.velocity.y += (PLAYER_JUMP_FORCE * 2.5) * delta;
+            if (Input.moveUp || Input.touchJumpHeld) this.velocity.y += (PLAYER_JUMP_FORCE * 2.5) * delta;
+            if (Input.touchJumpQueued) Input.touchJumpQueued = false;
             if (Input.moveF || Input.moveB) { this.velocity.z -= this.direction.z * (WALK_SPEED / 2) * delta; this.hunger -= (HUNGER_LOSS_MOVE / 2) * delta; }
             if (Input.moveL || Input.moveR) { this.velocity.x -= this.direction.x * (WALK_SPEED / 2) * delta; this.hunger -= (HUNGER_LOSS_MOVE / 2) * delta; }
 
@@ -686,7 +697,9 @@ export class Player {
                 this.velocity.y = 0; this.canJ = true;
             }
 
-            if (Input.moveUp && this.canJ) {
+            const jumpRequested = Input.moveUp || Input.touchJumpQueued;
+            if (Input.touchJumpQueued) Input.touchJumpQueued = false;
+            if (jumpRequested && this.canJ) {
                 this.velocity.y = PLAYER_JUMP_FORCE;
                 this.canJ = false;
             }
@@ -727,7 +740,8 @@ export class Player {
         this._ghostMove.set(0, 0, 0);
         this._ghostMove.addScaledVector(this._fwd, Number(Boolean(Input.moveF)) - Number(Boolean(Input.moveB)));
         this._ghostMove.addScaledVector(this._rgt, Number(Boolean(Input.moveR)) - Number(Boolean(Input.moveL)));
-        this._ghostMove.y += Number(Boolean(Input.moveUp)) - Number(Boolean(Input.crouch));
+        this._ghostMove.y += Number(Boolean(Input.moveUp || Input.touchJumpHeld || Input.touchJumpQueued)) - Number(Boolean(Input.crouch));
+        if (Input.touchJumpQueued) Input.touchJumpQueued = false;
 
         if (this._ghostMove.lengthSq() > 0) {
             const speed = GHOST_FLY_SPEED * (Input.sprint ? GHOST_FAST_MULTIPLIER : 1);

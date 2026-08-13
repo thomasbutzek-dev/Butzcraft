@@ -135,6 +135,18 @@ describe('matchRecipe – Smoke-Test mit echten Spiel-Rezepten', () => {
         expect(result).toEqual({ type: 38, count: 1 });
     });
 
+    it('Eisbärenfell ersetzt Wolle beim Bett-Rezept', () => {
+        const result = matchRecipe([105, 105, 26, 26], 2, craftingRecipes);
+        expect(result).toEqual({ type: 38, count: 1 });
+    });
+
+    it('craftet eine Truhe aus acht Brettern an der Werkbank', () => {
+        const pattern = [26,26,26, 26,0,26, 26,26,26];
+
+        expect(matchRecipe(pattern, 3, craftingRecipes)).toEqual({ type: 75, count: 1 });
+        expect(matchRecipe([26,26,26,26], 2, craftingRecipes)).toEqual({ type: 28, count: 1 });
+    });
+
     it('leeres Grid liefert null (kein Phantom-Recipe)', () => {
         expect(matchRecipe([0, 0, 0, 0], 2, craftingRecipes)).toBeNull();
     });
@@ -161,5 +173,11 @@ describe('matchRecipe – Smoke-Test mit echten Spiel-Rezepten', () => {
     it('craftet Zaun und Gatter aus vier Stöcken und zwei Brettern', () => {
         expect(matchRecipe([27,26,27, 27,26,27, 0,0,0], 3, craftingRecipes)).toEqual({ type: 102, count: 4 });
         expect(matchRecipe([27,27,27, 26,26,27, 0,0,0], 3, craftingRecipes)).toEqual({ type: 103, count: 1 });
+    });
+
+    it('craftet leichte und sehr teure verstärkte Rüstung, aber keine Blutmondrüstung', () => {
+        expect(matchRecipe([27,6,6, 27,0,6, 0,0,0], 3, craftingRecipes)).toEqual({ type: 106, count: 1 });
+        expect(matchRecipe([62,61,61, 62,0,61, 0,0,0], 3, craftingRecipes)).toEqual({ type: 126, count: 1 });
+        expect(craftingRecipes.some(recipe => recipe.result?.type >= 131 && recipe.result?.type <= 135)).toBe(false);
     });
 });

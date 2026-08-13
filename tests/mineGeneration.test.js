@@ -90,6 +90,19 @@ describe('modular mine generation', () => {
         expect(styleFor([[0, -1], [1, 0], [0, 1], [-1, 0]])).toEqual({ kind: 'crossing', rotation: 0 });
     });
 
+    it('keeps the visual rail direction across one-block slopes', () => {
+        const { getMineRailStyle } = loadMineGenerator();
+        const rails = new Set(['0,21,-1', '1,20,0']);
+        const style = getMineRailStyle(
+            0,
+            20,
+            0,
+            (x, y, z) => rails.has(`${x},${y},${z}`) ? 80 : 0
+        );
+
+        expect(style).toEqual({ kind: 'curve', rotation: 0 });
+    });
+
     it('stamps the complete planned railway across chunk boundaries', () => {
         const { createMinePlan, spawnMine, mulberry32, BIOMES } = loadMineGenerator();
         const mineX = 15;

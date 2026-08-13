@@ -1,6 +1,6 @@
 {
   "name": "butzcraft",
-  "version": "1.0.0",
+  "version": "0.3.1",
   "description": "",
   "main": "config.js",
   "scripts": {
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "jsdom": "^29.1.0",
-    "vite": "^5.4.21",
+    "vite": "^8.1.5",
     "vitest": "^3.2.4"
   }
 }

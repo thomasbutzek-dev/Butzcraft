@@ -3,7 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
     STORY_EVENTS,
     advanceStoryProgress,
-    getStoryProgress
+    getStoryProgress,
+    reconcileStoryProgress,
+    recordStoryMilestone
 } from '../js/storyProgress.js';
 
 describe('long-term story progress', () => {
@@ -43,10 +45,27 @@ describe('long-term story progress', () => {
         expect(progress.objective.touchHint).toContain('Tippe');
     });
 
+    it('explains how village trust advances the journey', () => {
+        const progress = getStoryProgress(2);
+
+        expect(progress.objective.hint).toContain('Dorfquest');
+        expect(progress.objective.hint).toContain('Vertrauensbelohnung');
+        expect(progress.objective.touchHint).toContain('Dorfquest');
+    });
+
+    it('states that the first blood moon night must be survived', () => {
+        const progress = getStoryProgress(3);
+
+        expect(progress.objective.text).toBe('Überlebe die erste Blutmondnacht');
+        expect(progress.objective.hint).toContain('bis zum Morgen');
+        expect(progress.objective.hint).toContain('nicht schlafen');
+    });
+
     it('only accepts the event belonging to the current objective', () => {
         expect(advanceStoryProgress(1, STORY_EVENTS.QUEST_COMPLETED)).toBe(1);
         expect(advanceStoryProgress(1, STORY_EVENTS.VILLAGER_MET)).toBe(2);
-        expect(advanceStoryProgress(2, STORY_EVENTS.QUEST_COMPLETED)).toBe(3);
+        expect(advanceStoryProgress(2, STORY_EVENTS.QUEST_COMPLETED)).toBe(2);
+        expect(advanceStoryProgress(2, STORY_EVENTS.VILLAGE_TRUST_EARNED)).toBe(3);
         expect(advanceStoryProgress(3, STORY_EVENTS.BLOOD_MOON_SURVIVED)).toBe(4);
         expect(advanceStoryProgress(4, STORY_EVENTS.MINE_COMPLETED)).toBe(5);
         expect(advanceStoryProgress(5, STORY_EVENTS.DUNGEON_KEY_FOUND)).toBe(6);
@@ -54,6 +73,16 @@ describe('long-term story progress', () => {
         expect(advanceStoryProgress(7, STORY_EVENTS.DUNGEON_COMPLETED)).toBe(8);
         expect(advanceStoryProgress(8, STORY_EVENTS.RITUAL_ACTIVATED)).toBe(9);
         expect(advanceStoryProgress(9, STORY_EVENTS.BOSS_DEFEATED)).toBe(10);
+    });
+
+    it('remembers early milestones and applies them later in story order', () => {
+        let milestones = recordStoryMilestone({}, STORY_EVENTS.DUNGEON_KEY_FOUND);
+
+        expect(reconcileStoryProgress(4, milestones)).toBe(4);
+
+        milestones = recordStoryMilestone(milestones, STORY_EVENTS.MINE_COMPLETED);
+
+        expect(reconcileStoryProgress(4, milestones)).toBe(6);
     });
 
     it('never regresses restored progress and opens the endgame after the boss', () => {

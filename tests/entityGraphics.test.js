@@ -27,7 +27,8 @@ describe('painterly entity graphics', () => {
         expect(npcSource).toContain('getPainterlyEntityTexture');
     });
 
-    it('softens player textures only for the painterly graphics styles', () => {
-        expect(characterSource).toContain('graphicsPrototype.usesPainterlyTextures ? THREE.LinearFilter : THREE.NearestFilter');
+    it('softens player textures for the painterly production style', () => {
+        expect(characterSource).toContain('texture.magFilter = THREE.LinearFilter');
+        expect(characterSource).toContain('texture.minFilter = THREE.LinearFilter');
     });
 });

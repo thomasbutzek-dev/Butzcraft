@@ -1,11 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from '../js/structures.js';
+import { applyVillageChestPenalty, classifyChestLoot, getLootDiscoveryMessage, rollLoot } from '../js/structures.js';
 
 function blockReader(blocks) {
     return (x, y, z) => blocks.get(`${x},${y},${z}`) || 0;
 }
 
 describe('structure-specific gameplay', () => {
+    it('subtracts three trust from the owning village without going below zero', () => {
+        const state = {
+            villages: {
+                'village:1,2': { trust: 7 },
+                'village:3,4': { trust: 2 }
+            }
+        };
+
+        expect(applyVillageChestPenalty(state, 'village:1,2')).toEqual({ penalty: 3, trust: 4 });
+        expect(applyVillageChestPenalty(state, 'village:3,4')).toEqual({ penalty: 3, trust: 0 });
+        expect(applyVillageChestPenalty(state, 'village:missing')).toBeNull();
+    });
+
     it('recognizes village stores from generated house positions', () => {
         const villages = [{
             layout: 'courtyard',

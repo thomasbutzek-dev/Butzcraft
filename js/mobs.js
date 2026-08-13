@@ -1,15 +1,15 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONFIG } from '../config.js?v=20260719a';
-import { SoundManager } from './sound.js?v=20260507b';
-import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260717z';
+import { SoundManager } from './sound.js?v=20260731a';
+import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260801b';
 import { Physics } from './Physics.js?v=20260717a';
 import { Game } from './Game.js?v=20260716b';
-import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260719a';
+import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260801a';
 import { getAnimalLureItem, isAnimalPenEnclosed, isKeepableAnimal } from './animalHusbandry.js?v=20260720a';
 
-const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
-const { GRAVITY, MOB_JUMP_FORCE = 5.5 } = CONFIG.PHYSICS;
+const { ZOMBIE_DETECTION_RANGE, ZOMBIE_SPEED, ZOMBIE_DAMAGE, WANDER_SPEED, CHICKEN_EGG_TIME_MIN, CHICKEN_EGG_TIME_MAX, SHEEP_WOOL_TIME_MIN, SHEEP_WOOL_TIME_MAX, WATER_AVOIDANCE_RADIUS, SPAWN_DIST_MAX, MOB_JUMP_FORCE = 5, SKELETON_SPEED = 1.5, SPIDER_DETECTION_RANGE = 12, SPIDER_SPEED = 1.2, SPIDER_DAMAGE = 2 } = CONFIG.MOBS;
+const { GRAVITY } = CONFIG.PHYSICS;
 const { HUNGER_GAIN_PIG } = CONFIG.GAMEPLAY;
 
 Game.droppedItems = Game.droppedItems || [];
@@ -30,7 +30,13 @@ const MOB_TEXTURE_TILES = {
     fish: 7,
     octopus: 8,
     turtle: 9,
-    parrot: 10
+    parrot: 10,
+    penguin: 4,
+    seal: 5,
+    polarBear: 5,
+    camel: 11,
+    fennec: 11,
+    scorpion: 12
 };
 
 // Material-Cache pro Farb-, Atlas- und Variantenkombination. Vorher wurde pro Body-Part eines Mobs
@@ -53,6 +59,12 @@ const MOB_LOD_PROFILES = {
     fish: { size: [0.5, 0.4, 1], y: 0.2, color: 0x4d91a8 },
     octopus: { size: [0.9, 0.8, 0.9], y: 0.3, color: 0x80526f },
     turtle: { size: [1.2, 0.5, 1.4], y: 0.25, color: 0x668351 },
+    penguin: { size: [0.65, 1.05, 0.55], y: 0.52, color: 0x20262b },
+    seal: { size: [0.85, 0.55, 1.45], y: 0.3, color: 0xb8c1c7 },
+    polarBear: { size: [1.15, 1.2, 1.8], y: 0.62, color: 0xe9edf0 },
+    camel: { size: [1.0, 1.7, 1.9], y: 0.85, color: 0xb98752 },
+    fennec: { size: [0.5, 0.55, 0.85], y: 0.3, color: 0xd9a766 },
+    scorpion: { size: [0.85, 0.3, 1.15], y: 0.2, color: 0x5e3a24 },
     geist: { size: [0.8, 1.8, 0.6], y: 0.8, color: 0x9fb7ba },
     parrot: { size: [0.6, 0.7, 0.7], y: 0.4, color: 0xc45b46 }
 };
@@ -112,7 +124,7 @@ export class Mob {
     constructor(scene, type, x, y, z) {
         this.scene = scene;
         this.type = type;
-        this.health = (type === 'zombie' || type === 'skeleton') ? 20 : (type === 'spider') ? 8 : (type === 'turtle') ? 15 : (type === 'pig' || type === 'sheep' || type === 'cow') ? 12 : (type === 'geist') ? Infinity : 5;
+        this.health = (type === 'polarBear') ? 60 : (type === 'camel') ? 30 : (type === 'zombie' || type === 'skeleton') ? 20 : (type === 'scorpion') ? 10 : (type === 'spider' || type === 'penguin') ? 8 : (type === 'fennec') ? 6 : (type === 'turtle') ? 15 : (type === 'seal') ? 18 : (type === 'pig' || type === 'sheep' || type === 'cow') ? 12 : (type === 'geist') ? Infinity : 5;
         this.lastMilkTime = 0; // Für Kühe
         this.lastShotTime = 0; // Für Skelette
         this.isDead = false;
@@ -146,6 +158,18 @@ export class Mob {
             this._buildOctopus();
         } else if (type === 'turtle') {
             this._buildTurtle();
+        } else if (type === 'penguin') {
+            this._buildPenguin();
+        } else if (type === 'seal') {
+            this._buildSeal();
+        } else if (type === 'polarBear') {
+            this._buildPolarBear();
+        } else if (type === 'camel') {
+            this._buildCamel();
+        } else if (type === 'fennec') {
+            this._buildFennec();
+        } else if (type === 'scorpion') {
+            this._buildScorpion();
         } else if (type === 'geist') {
             this._buildGeist();
         } else if (type === 'parrot') {
@@ -411,6 +435,165 @@ export class Mob {
         
         const leg = (ox, oz) => { const l = box(0.24, 0.5, 0.24, 0xffffff, 24); l.position.set(ox, 0.25, oz); this.group.add(l); this.legs.push(l); };
         leg(-0.28, -0.35); leg(0.28, -0.35); leg(-0.28, 0.35); leg(0.28, 0.35);
+    }
+
+    _buildPenguin() {
+        this.isAmphibious = true;
+        this.legs = [];
+        const box = (w, h, d, color, textured = true) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(color, undefined, textured));
+        const body = box(0.55, 0.85, 0.45, 0x20262b); body.position.y = 0.58; this.group.add(body);
+        const belly = box(0.36, 0.58, 0.04, 0xf2f3ec); belly.position.set(0, 0.5, 0.24); this.group.add(belly);
+        const head = box(0.48, 0.42, 0.42, 0x171b1f); head.position.set(0, 1.05, 0.02); this.group.add(head);
+        const beak = box(0.22, 0.12, 0.2, 0xe7a62c, false); beak.position.set(0, 1.0, 0.3); this.group.add(beak);
+        const eyeL = box(0.06, 0.06, 0.03, 0xf5f5f5, false); eyeL.position.set(-0.13, 1.12, 0.23); this.group.add(eyeL);
+        const eyeR = box(0.06, 0.06, 0.03, 0xf5f5f5, false); eyeR.position.set(0.13, 1.12, 0.23); this.group.add(eyeR);
+        const wingL = box(0.12, 0.55, 0.3, 0x15191d); wingL.position.set(-0.34, 0.62, 0); wingL.rotation.z = 0.15; this.group.add(wingL);
+        const wingR = box(0.12, 0.55, 0.3, 0x15191d); wingR.position.set(0.34, 0.62, 0); wingR.rotation.z = -0.15; this.group.add(wingR);
+        this.flippers = [wingL, wingR];
+        const foot = x => { const mesh = box(0.22, 0.08, 0.32, 0xe7a62c, false); mesh.position.set(x, 0.04, 0.08); this.group.add(mesh); this.legs.push(mesh); };
+        foot(-0.16); foot(0.16);
+    }
+
+    _buildSeal() {
+        this.isAmphibious = true;
+        const box = (w, h, d, color, textured = true) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(color, undefined, textured));
+        const body = box(0.72, 0.48, 1.25, 0xb8c1c7); body.position.y = 0.34; this.group.add(body);
+        const neck = box(0.62, 0.5, 0.55, 0xc4ccd1); neck.position.set(0, 0.48, 0.62); this.group.add(neck);
+        const snout = box(0.36, 0.2, 0.28, 0xd7dde0); snout.position.set(0, 0.48, 0.97); this.group.add(snout);
+        const nose = box(0.15, 0.1, 0.08, 0x30363a, false); nose.position.set(0, 0.52, 1.14); this.group.add(nose);
+        const eyeL = box(0.07, 0.07, 0.04, 0x111111, false); eyeL.position.set(-0.16, 0.64, 0.94); this.group.add(eyeL);
+        const eyeR = box(0.07, 0.07, 0.04, 0x111111, false); eyeR.position.set(0.16, 0.64, 0.94); this.group.add(eyeR);
+        const flipperL = box(0.45, 0.1, 0.28, 0x9faab0); flipperL.position.set(-0.48, 0.2, 0.15); flipperL.rotation.y = -0.35; this.group.add(flipperL);
+        const flipperR = box(0.45, 0.1, 0.28, 0x9faab0); flipperR.position.set(0.48, 0.2, 0.15); flipperR.rotation.y = 0.35; this.group.add(flipperR);
+        const tailL = box(0.32, 0.1, 0.4, 0x9faab0); tailL.position.set(-0.18, 0.24, -0.8); tailL.rotation.y = -0.35; this.group.add(tailL);
+        const tailR = box(0.32, 0.1, 0.4, 0x9faab0); tailR.position.set(0.18, 0.24, -0.8); tailR.rotation.y = 0.35; this.group.add(tailR);
+        this.flippers = [flipperL, flipperR, tailL, tailR];
+    }
+
+    _buildPolarBear() {
+        this.legs = [];
+        this.group.scale.setScalar(1.65);
+        const box = (w, h, d, color, textured = true) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(color, undefined, textured));
+        const body = box(1.05, 0.9, 1.55, 0xe9edf0); body.position.y = 0.8; this.group.add(body);
+        const shoulder = box(1.1, 0.95, 0.65, 0xf1f3f4); shoulder.position.set(0, 0.86, 0.58); this.group.add(shoulder);
+        const head = box(0.72, 0.68, 0.68, 0xf1f3f4); head.position.set(0, 1.26, 1.02); this.group.add(head);
+        const snout = box(0.42, 0.28, 0.38, 0xdde2e5); snout.position.set(0, 1.12, 1.48); this.group.add(snout);
+        const nose = box(0.18, 0.13, 0.08, 0x22272a, false); nose.position.set(0, 1.18, 1.7); this.group.add(nose);
+        const earL = box(0.2, 0.22, 0.16, 0xdde2e5); earL.position.set(-0.25, 1.63, 0.92); this.group.add(earL);
+        const earR = box(0.2, 0.22, 0.16, 0xdde2e5); earR.position.set(0.25, 1.63, 0.92); this.group.add(earR);
+        const eyeL = box(0.08, 0.08, 0.04, 0x111111, false); eyeL.position.set(-0.2, 1.4, 1.36); this.group.add(eyeL);
+        const eyeR = box(0.08, 0.08, 0.04, 0x111111, false); eyeR.position.set(0.2, 1.4, 1.36); this.group.add(eyeR);
+        const leg = (x, z) => { const mesh = box(0.32, 0.65, 0.38, 0xe2e6e8); mesh.position.set(x, 0.32, z); this.group.add(mesh); this.legs.push(mesh); };
+        leg(-0.35, -0.48); leg(0.35, -0.48); leg(-0.35, 0.48); leg(0.35, 0.48);
+    }
+
+    _buildCamel() {
+        this.legs = [];
+        const box = (w, h, d, color, textured = true) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(color, undefined, textured));
+        const body = box(0.9, 0.75, 1.55, 0xb98752); body.position.y = 1.05; this.group.add(body);
+        const humpA = box(0.6, 0.65, 0.55, 0xa87645); humpA.position.set(0, 1.65, -0.35); this.group.add(humpA);
+        const humpB = box(0.58, 0.58, 0.5, 0xa87645); humpB.position.set(0, 1.6, 0.28); this.group.add(humpB);
+        const neck = box(0.42, 1.25, 0.45, 0xb98752); neck.position.set(0, 1.55, 0.78); neck.rotation.x = -0.18; this.group.add(neck);
+        const head = box(0.58, 0.48, 0.7, 0xc7965d); head.position.set(0, 2.22, 1.04); this.group.add(head);
+        const muzzle = box(0.5, 0.25, 0.34, 0xd1aa78); muzzle.position.set(0, 2.1, 1.48); this.group.add(muzzle);
+        const earL = box(0.13, 0.32, 0.12, 0x9c6a3f); earL.position.set(-0.22, 2.58, 0.95); earL.rotation.z = -0.2; this.group.add(earL);
+        const earR = box(0.13, 0.32, 0.12, 0x9c6a3f); earR.position.set(0.22, 2.58, 0.95); earR.rotation.z = 0.2; this.group.add(earR);
+        const eyeL = box(0.09, 0.09, 0.04, 0x111111, false); eyeL.position.set(-0.17, 2.3, 1.41); this.group.add(eyeL);
+        const eyeR = box(0.09, 0.09, 0.04, 0x111111, false); eyeR.position.set(0.17, 2.3, 1.41); this.group.add(eyeR);
+        const leg = (x, z) => { const mesh = box(0.2, 1.05, 0.22, 0xa87645); mesh.position.set(x, 0.52, z); this.group.add(mesh); this.legs.push(mesh); };
+        leg(-0.3, -0.52); leg(0.3, -0.52); leg(-0.3, 0.52); leg(0.3, 0.52);
+    }
+
+    _buildFennec() {
+        this.legs = [];
+        const box = (w, h, d, color, textured = true) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(color, undefined, textured));
+        const body = box(0.46, 0.4, 0.78, 0xd9a766); body.position.y = 0.42; this.group.add(body);
+        const chest = box(0.4, 0.45, 0.36, 0xefd09a); chest.position.set(0, 0.52, 0.4); this.group.add(chest);
+        const head = box(0.45, 0.42, 0.44, 0xe2b673); head.position.set(0, 0.83, 0.55); this.group.add(head);
+        const muzzle = box(0.28, 0.18, 0.25, 0xf1d4a1); muzzle.position.set(0, 0.74, 0.85); this.group.add(muzzle);
+        const earL = box(0.18, 0.52, 0.12, 0xe2b673); earL.position.set(-0.16, 1.24, 0.5); earL.rotation.z = -0.12; this.group.add(earL);
+        const earR = box(0.18, 0.52, 0.12, 0xe2b673); earR.position.set(0.16, 1.24, 0.5); earR.rotation.z = 0.12; this.group.add(earR);
+        const eyeL = box(0.07, 0.08, 0.035, 0x111111, false); eyeL.position.set(-0.13, 0.88, 0.79); this.group.add(eyeL);
+        const eyeR = box(0.07, 0.08, 0.035, 0x111111, false); eyeR.position.set(0.13, 0.88, 0.79); this.group.add(eyeR);
+        const nose = box(0.1, 0.08, 0.06, 0x2b2522, false); nose.position.set(0, 0.78, 1.0); this.group.add(nose);
+        const tail = box(0.22, 0.24, 0.72, 0xd9a766); tail.position.set(0, 0.55, -0.7); tail.rotation.x = -0.35; this.group.add(tail);
+        const leg = (x, z) => { const mesh = box(0.12, 0.34, 0.13, 0xc99055); mesh.position.set(x, 0.17, z); this.group.add(mesh); this.legs.push(mesh); };
+        leg(-0.15, -0.24); leg(0.15, -0.24); leg(-0.15, 0.24); leg(0.15, 0.24);
+    }
+
+    _buildScorpion() {
+        this.legs = [];
+        const box = (w, h, d, color, textured = true) => new THREE.Mesh(new THREE.BoxGeometry(w, h, d), this._getTexMat(color, undefined, textured));
+        const body = box(0.65, 0.28, 0.8, 0x5e3a24); body.position.y = 0.25; this.group.add(body);
+        const head = box(0.55, 0.25, 0.38, 0x70472b); head.position.set(0, 0.26, 0.55); this.group.add(head);
+        const eyeL = box(0.08, 0.07, 0.04, 0x111111, false); eyeL.position.set(-0.14, 0.31, 0.76); this.group.add(eyeL);
+        const eyeR = box(0.08, 0.07, 0.04, 0x111111, false); eyeR.position.set(0.14, 0.31, 0.76); this.group.add(eyeR);
+        const claw = x => { const arm = box(0.38, 0.12, 0.16, 0x70472b); arm.position.set(x, 0.27, 0.75); arm.rotation.y = x < 0 ? -0.35 : 0.35; this.group.add(arm); const pincer = box(0.24, 0.18, 0.22, 0x815233); pincer.position.set(x * 1.45, 0.28, 0.92); this.group.add(pincer); };
+        claw(-0.42); claw(0.42);
+        for (let i = 0; i < 4; i++) {
+            const z = 0.35 - i * 0.25;
+            const left = box(0.5, 0.08, 0.1, 0x4d301e); left.position.set(-0.5, 0.16, z); left.rotation.y = -0.25; this.group.add(left); this.legs.push(left);
+            const right = box(0.5, 0.08, 0.1, 0x4d301e); right.position.set(0.5, 0.16, z); right.rotation.y = 0.25; this.group.add(right); this.legs.push(right);
+        }
+        this.tail = [];
+        for (let i = 0; i < 4; i++) {
+            const segment = box(0.22, 0.22, 0.28, 0x70472b);
+            segment.position.set(0, 0.36 + i * 0.18, -0.52 - i * 0.18);
+            segment.rotation.x = -0.55;
+            this.group.add(segment);
+            this.tail.push(segment);
+        }
+        const stinger = box(0.18, 0.25, 0.18, 0x2f2017, false); stinger.position.set(0, 1.18, -1.15); this.group.add(stinger);
+    }
+
+    updateAmphibious(delta, playerPos, world, time = performance.now()) {
+        const pos = this.group.position;
+        if (pos.distanceTo(playerPos) > 50) { this.isDead = true; return; }
+
+        const block = world.getBlock(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z));
+        const inWater = block === 4 || block === 12;
+        const speed = inWater ? (this.type === 'penguin' ? 1.6 : 1.35) : (this.type === 'penguin' ? 0.8 : 0.55);
+        if (Math.random() < 0.01 || Math.hypot(this.velocity.x, this.velocity.z) < 0.05) {
+            const angle = Math.random() * Math.PI * 2;
+            this.velocity.x = Math.cos(angle) * speed;
+            this.velocity.z = Math.sin(angle) * speed;
+            this.group.rotation.y = angle;
+        }
+
+        if (inWater) {
+            this.velocity.y = Math.sin(time * 0.002 + this.visualVariant) * 0.2;
+            pos.x += this.velocity.x * delta;
+            pos.y += this.velocity.y * delta;
+            pos.z += this.velocity.z * delta;
+            if (this.flippers) {
+                const paddle = Math.sin(time * 0.008) * 0.45;
+                this.flippers.forEach((flipper, index) => { flipper.rotation.x = paddle * (index % 2 ? -1 : 1); });
+            }
+            return;
+        }
+
+        const nextX = pos.x + this.velocity.x * delta;
+        const nextZ = pos.z + this.velocity.z * delta;
+        const obstacle = world.getBlock(Math.floor(nextX), Math.floor(pos.y), Math.floor(nextZ));
+        if (obstacle === 0 || obstacle === 4 || obstacle === 12) {
+            pos.x = nextX;
+            pos.z = nextZ;
+        } else {
+            this.velocity.x *= -1;
+            this.velocity.z *= -1;
+        }
+        this.velocity.y -= GRAVITY * delta;
+        pos.y += this.velocity.y * delta;
+        const belowY = Math.floor(pos.y - 0.05);
+        const below = world.getBlock(Math.floor(pos.x), belowY, Math.floor(pos.z));
+        if (below !== 0 && below !== 4 && below !== 8 && below !== 9 && this.velocity.y <= 0) {
+            pos.y = belowY + 1;
+            this.velocity.y = 0;
+        }
+        if (this.legs) {
+            const walk = Math.sin(time * 0.01) * 0.5;
+            this.legs.forEach((leg, index) => { leg.rotation.x = index % 2 ? -walk : walk; });
+        }
     }
 
 
@@ -971,6 +1154,7 @@ export class Mob {
             this._farUpdateAccumulator = 0;
         }
         if (this.isAquatic) { this.updateAquatic(delta, playerPos, world, onDamage, frameTime); return; }
+        if (this.isAmphibious) { this.updateAmphibious(delta, playerPos, world, frameTime); return; }
         if (this.type === 'geist') { this.updateGeist(delta, playerPos, world, dayRatio, frameTime); return; }
         if (this.type === 'parrot') { this.updateParrot(delta, playerPos, world, frameTime); return; }
                 const pos = this.group.position;
@@ -1007,9 +1191,22 @@ export class Mob {
                 }
                 
                 const checkMobC = (np) => Physics.checkAABBCollision(world, np, 0.3, 0.6, 1.8, true);
+                const canJumpObstacle = (x, z) => {
+                    const obstacleY = Math.floor(pos.y);
+                    return Physics.isSolid(world, x, obstacleY, z, true)
+                        && !Physics.isSolid(world, x, obstacleY + 1, z, true)
+                        && !Physics.isSolid(world, x, obstacleY + 2, z, true);
+                };
+                const groundY = Math.floor(pos.y - 0.05);
+                const groundBlock = world.getBlock(Math.floor(pos.x), groundY, Math.floor(pos.z));
+                const isGrounded = groundBlock !== 0
+                    && groundBlock !== 4
+                    && groundBlock !== 8
+                    && groundBlock !== 9
+                    && Math.abs(pos.y - (groundY + 1)) < 0.1;
 
-                const isHostileWalker = this.type === 'zombie' || this.type === 'skeleton' || this.type === 'spider';
-                const detectionRange = this.type === 'spider' ? SPIDER_DETECTION_RANGE : ZOMBIE_DETECTION_RANGE;
+                const isHostileWalker = this.type === 'zombie' || this.type === 'skeleton' || this.type === 'spider' || this.type === 'polarBear' || this.type === 'scorpion';
+                const detectionRange = this.type === 'spider' ? SPIDER_DETECTION_RANGE : this.type === 'polarBear' ? 12 : this.type === 'scorpion' ? 9 : ZOMBIE_DETECTION_RANGE;
                 if (isHostileWalker && dist < detectionRange) {
                     const dir = _tempDir.subVectors(playerPos, pos);
                     dir.y = 0; dir.normalize();
@@ -1026,7 +1223,7 @@ export class Mob {
                         // Zombie stoppt vor Wasser, aber versucht seitlich auszuweichen
                         this.velocity.x = 0; this.velocity.z = 0;
                     } else {
-                         const speed = this.type === 'skeleton' ? SKELETON_SPEED : (this.type === 'spider' ? SPIDER_SPEED : ZOMBIE_SPEED);
+                         const speed = this.type === 'skeleton' ? SKELETON_SPEED : this.type === 'spider' ? SPIDER_SPEED : this.type === 'polarBear' ? 2.0 : this.type === 'scorpion' ? 1.5 : ZOMBIE_SPEED;
                         if ((this.type === 'skeleton' && dist < 10) || (this.type === 'zombie' && dist < 2.0)) {
                             this.velocity.x = 0; this.velocity.z = 0;
                         } else {
@@ -1042,7 +1239,7 @@ export class Mob {
                             }
                         }
                         const nX = pos.x + dir.x * 0.5, nZ = pos.z + dir.z * 0.5;
-                        if (world.getBlock(Math.floor(nX), Math.floor(pos.y), Math.floor(nZ)) !== 0 && frameTime - this.lastJump > 1200) {
+                        if (isGrounded && canJumpObstacle(nX, nZ) && frameTime - this.lastJump > 1200) {
                             this.velocity.y = MOB_JUMP_FORCE; this.lastJump = frameTime;
                         }
                     }
@@ -1069,8 +1266,9 @@ export class Mob {
                         }
 
                         if (!waterAhead) {
-                            this.velocity.x = dirX * (isHostileWalker ? (this.type === 'spider' ? SPIDER_SPEED : ZOMBIE_SPEED) : WANDER_SPEED);
-                            this.velocity.z = dirZ * (isHostileWalker ? (this.type === 'spider' ? SPIDER_SPEED : ZOMBIE_SPEED) : WANDER_SPEED);
+                            const wanderSpeed = isHostileWalker ? (this.type === 'spider' ? SPIDER_SPEED : this.type === 'polarBear' ? 1.1 : this.type === 'scorpion' ? 0.9 : ZOMBIE_SPEED) : WANDER_SPEED;
+                            this.velocity.x = dirX * wanderSpeed;
+                            this.velocity.z = dirZ * wanderSpeed;
                             this.group.rotation.y = angle;
                         } else {
                             this.velocity.x = 0; this.velocity.z = 0;
@@ -1101,7 +1299,7 @@ export class Mob {
                 } else if (this.legs) {
                     this.legs.forEach(leg => leg.rotation.x = 0);
                 }
-                
+
                 this.velocity.y -= GRAVITY * delta;
                 
                 // Kontinuierliche Wasser-Vermeidung
@@ -1125,11 +1323,13 @@ export class Mob {
                 
                 let hitWall = false;
                 let blockedByFence = false;
+                let jumpableObstacle = true;
                 if (!checkMobC({ x: mnx, y: pos.y, z: pos.z })) {
                     pos.x = mnx; 
                 } else { 
                     const block = world.getBlock(Math.floor(mnx), Math.floor(pos.y), Math.floor(pos.z));
                     blockedByFence ||= block === 102 || block === 103;
+                    jumpableObstacle &&= canJumpObstacle(mnx, pos.z);
                     this.velocity.x = 0; hitWall = true; 
                 }
                 
@@ -1138,12 +1338,13 @@ export class Mob {
                 } else { 
                     const block = world.getBlock(Math.floor(pos.x), Math.floor(pos.y), Math.floor(mnz));
                     blockedByFence ||= block === 102 || block === 103;
+                    jumpableObstacle &&= canJumpObstacle(pos.x, mnz);
                     this.velocity.z = 0; hitWall = true; 
                 }
 
                 if (hitWall) {
-                    if (!blockedByFence && this.velocity.y <= 0 && (frameTime - this.lastJump) > 1000) {
-                        // Bei Wandkontakt automatisch springen (Schwerkraft ist im y<=0 abgedeckt)
+                    if (!blockedByFence && jumpableObstacle && isGrounded && (frameTime - this.lastJump) > 1000) {
+                        // Nur vom Boden abspringen, damit Mobs nicht an Wänden hochspringen.
                         this.velocity.y = MOB_JUMP_FORCE;
                         this.lastJump = frameTime;
                     } else if (Math.random() < 0.1) {
@@ -1190,6 +1391,18 @@ export class Mob {
                         onDamage(SPIDER_DAMAGE * delta);
                     }
                 }
+                if (this.type === 'polarBear') {
+                    const horizontalDist = Math.hypot(pos.x - playerPos.x, pos.z - playerPos.z);
+                    if (horizontalDist < 1.8 && Math.abs(pos.y - playerPos.y) < 2.2) {
+                        onDamage(12 * delta);
+                    }
+                }
+                if (this.type === 'scorpion') {
+                    const horizontalDist = Math.hypot(pos.x - playerPos.x, pos.z - playerPos.z);
+                    if (horizontalDist < 1.5 && Math.abs(pos.y - playerPos.y) < 1.5) {
+                        onDamage(4 * delta);
+                    }
+                }
             }
             serialize() {
                 return {
@@ -1217,19 +1430,29 @@ export class Mob {
                     else if (this.type === 'zombie') { blockType = 24; dropColor = 0x3a5f0b; }
                     else if (this.type === 'skeleton') { blockType = 31; dropColor = 0xebebeb; }
                     else if (this.type === 'spider') { blockType = BLOCK_TYPES.STRING; dropColor = 0xF2F2F2; }
+                    else if (this.type === 'scorpion') { blockType = BLOCK_TYPES.ARROW; dropColor = 0xA0A0A0; }
                     else if (this.type === 'sheep') { blockType = 25; dropColor = 0xFFB6C1; }
                     else if (this.type === 'turtle') { blockType = 55; dropColor = 0x4A7A3D; }
 
-                    if (blockType) {
+                    const drops = this.type === 'polarBear'
+                        ? [
+                            { blockType: BLOCK_TYPES.RAW_MEAT, color: 0xFF9999 },
+                            { blockType: BLOCK_TYPES.RAW_MEAT, color: 0xFF9999 },
+                            { blockType: BLOCK_TYPES.RAW_MEAT, color: 0xFF9999 },
+                            { blockType: BLOCK_TYPES.POLAR_BEAR_FUR, color: 0xE9EDF0 }
+                        ]
+                        : blockType ? [{ blockType, color: dropColor }] : [];
+
+                    for (const drop of drops) {
                         const dropMesh = new THREE.Mesh(
                             new THREE.BoxGeometry(0.2, 0.2, 0.2),
-                            new THREE.MeshPhongMaterial({ color: dropColor })
+                            new THREE.MeshPhongMaterial({ color: drop.color })
                         );
                         dropMesh.position.copy(this.group.position);
                         dropMesh.position.y += 0.3;
                         this.scene.add(dropMesh);
                         if (!Game.droppedItems) Game.droppedItems = [];
-                        Game.droppedItems.push({ mesh: dropMesh, velocityY: 2.0, blockType: blockType });
+                        Game.droppedItems.push({ mesh: dropMesh, velocityY: 2.0, blockType: drop.blockType });
                     }
                     if (typeof onKill === 'function') onKill(this);
                 }

@@ -163,6 +163,12 @@ body {
             white-space: nowrap;
         }
 
+        #performance-summary {
+            margin-top: 3px;
+            font-size: 10px;
+            color: #ffd166;
+        }
+
         #stats.debug-visible {
             display: block;
         }
@@ -953,6 +959,10 @@ body {
             gap: 20px;
             width: 100%;
             max-width: 600px;
+            max-height: calc(100svh - 24px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            box-sizing: border-box;
             padding: 40px;
             background: rgba(0,0,0,0.4);
             backdrop-filter: blur(10px);
@@ -1002,6 +1012,19 @@ body {
             font-weight: 800;
             letter-spacing: 0.04em;
             text-transform: uppercase;
+        }
+
+        #mobile-experimental-notice {
+            display: none;
+            max-width: 420px;
+            padding: 10px 12px;
+            border: 1px solid rgba(255, 216, 77, 0.45);
+            border-radius: 8px;
+            background: rgba(82, 61, 15, 0.42);
+            color: #ffe6a1;
+            font-size: 13px;
+            line-height: 1.4;
+            text-align: center;
         }
 
         .menu-btn {
@@ -1264,6 +1287,13 @@ body { user-select: none; -webkit-user-select: none; }
     color: rgba(255, 255, 255, 0.55);
 }
 
+#recipe-empty-state {
+    padding: 18px 12px;
+    color: #ddd;
+    line-height: 1.4;
+    text-align: center;
+}
+
 #recipe-category-tabs {
     display: flex;
     flex-wrap: wrap;
@@ -1420,6 +1450,111 @@ body { user-select: none; -webkit-user-select: none; }
 
 #inventory-overlay.quest-view #inventory-main-content {
     width: min(760px, calc(100vw - 40px));
+}
+
+#inventory-overlay.equipment-view #recipe-book,
+#inventory-overlay.equipment-view #inventory-objective,
+#inventory-overlay.equipment-view #crafting-label,
+#inventory-overlay.equipment-view #crafting-area,
+#inventory-overlay.equipment-view #crafting-status,
+#inventory-overlay.equipment-view #inventory-grid,
+#inventory-overlay.equipment-view #inventory-main-content > p {
+    display: none !important;
+}
+
+#inventory-overlay.equipment-view #inventory-main-content {
+    width: min(760px, calc(100vw - 40px));
+}
+
+#equipment-panel {
+    overflow-y: auto;
+    padding: 6px 2px 18px;
+}
+
+#equipment-panel[hidden] { display: none; }
+.equipment-panel-heading { display: flex; justify-content: space-between; gap: 16px; align-items: end; margin: 10px 0 14px; }
+.equipment-panel-heading > div { display: grid; gap: 3px; }
+.equipment-kicker { color: #aaa; font-size: 11px; text-transform: uppercase; letter-spacing: 0.12em; }
+#equipment-protection { color: #ffe066; font-size: 20px; }
+#equipment-status { color: #ffb36a; font-size: 12px; }
+
+#equipment-paperdoll {
+    position: relative;
+    min-height: 310px;
+    border: 1px solid rgba(255, 224, 102, 0.25);
+    background: radial-gradient(circle at center, rgba(255, 224, 102, 0.08), rgba(0, 0, 0, 0.25) 68%);
+}
+
+.equipment-silhouette { position: absolute; left: 50%; top: 22px; width: 110px; height: 264px; transform: translateX(-50%); opacity: 0.28; }
+.equipment-silhouette span { position: absolute; display: block; background: #d5cdb8; border: 2px solid #f0e5ca; }
+.equipment-silhouette-head { left: 35px; top: 0; width: 40px; height: 48px; border-radius: 42% 42% 30% 30%; }
+.equipment-silhouette-body { left: 25px; top: 55px; width: 60px; height: 92px; border-radius: 16px 16px 8px 8px; }
+.equipment-silhouette-arm { top: 62px; width: 20px; height: 108px; border-radius: 10px; }
+.equipment-silhouette-arm.left { left: 0; transform: rotate(5deg); }
+.equipment-silhouette-arm.right { right: 0; transform: rotate(-5deg); }
+.equipment-silhouette-leg { top: 151px; width: 25px; height: 110px; border-radius: 8px; }
+.equipment-silhouette-leg.left { left: 27px; }
+.equipment-silhouette-leg.right { right: 27px; }
+
+#equipment-slots { position: absolute; inset: 0; }
+.equipment-slot {
+    position: absolute;
+    display: grid;
+    grid-template-columns: 50px 1fr;
+    grid-template-rows: auto auto;
+    width: 154px;
+    min-height: 62px;
+    padding: 7px;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 5px;
+    background: rgba(20, 18, 15, 0.88);
+    color: #eee;
+    text-align: left;
+    cursor: pointer;
+}
+.equipment-slot:disabled { cursor: default; opacity: 0.68; }
+.equipment-slot-head { left: 18px; top: 20px; }
+.equipment-slot-body { right: 18px; top: 56px; }
+.equipment-slot-arms { left: 18px; top: 116px; }
+.equipment-slot-legs { right: 18px; top: 172px; }
+.equipment-slot-feet { left: 18px; top: 230px; }
+.equipment-slot-label { color: #ffe066; font-size: 11px; text-transform: uppercase; }
+.equipment-slot-icon { grid-row: 1 / 3; width: 42px; height: 42px; display: grid; place-items: center; }
+.equipment-slot-detail { color: #aaa; font-size: 11px; }
+
+#equipment-panel h2 { margin: 16px 0 8px; color: #ffe066; font-size: 14px; }
+#equipment-items { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+.equipment-item { display: grid; grid-template-columns: 44px 1fr auto; gap: 9px; align-items: center; padding: 8px; border: 1px solid rgba(255,255,255,0.16); background: rgba(0,0,0,0.25); color: #eee; text-align: left; cursor: pointer; }
+.equipment-item:hover { border-color: rgba(255, 224, 102, 0.7); }
+.equipment-item strong, .equipment-item small { display: block; }
+.equipment-item small { color: #aaa; margin-top: 3px; }
+.equipment-item-icon { width: 40px; height: 40px; display: grid; place-items: center; }
+.equipment-item-action { color: #ffe066; font-size: 11px; text-transform: uppercase; }
+.equipment-empty { grid-column: 1 / -1; color: #aaa; }
+
+.armor-item-icon {
+    position: relative;
+    display: inline-block;
+    width: 38px;
+    height: 38px;
+    filter: drop-shadow(0 2px 1px rgba(0,0,0,0.5));
+}
+.armor-item-icon::before,
+.armor-item-icon::after { content: ""; position: absolute; box-sizing: border-box; }
+.armor-item-icon::before { inset: 5px 7px 4px; background: var(--armor-color); border: 3px solid var(--armor-accent); border-radius: 8px 8px 12px 12px; }
+.armor-item-icon::after { left: 12px; right: 12px; top: 10px; height: 4px; background: var(--armor-accent); box-shadow: 0 9px var(--armor-accent); }
+.armor-item-icon[data-armor-slot="head"]::before { inset: 6px 6px 10px; border-radius: 13px 13px 5px 5px; }
+.armor-item-icon[data-armor-slot="arms"]::before { inset: 5px 12px; transform: rotate(12deg); }
+.armor-item-icon[data-armor-slot="legs"]::before { clip-path: polygon(0 0,100% 0,100% 100%,58% 100%,50% 45%,42% 100%,0 100%); }
+.armor-item-icon[data-armor-slot="feet"]::before { inset: 16px 4px 5px; border-radius: 4px 4px 10px 10px; }
+.armor-icon-mini { width: 22px; height: 22px; }
+.armor-icon-mini::before { border-width: 2px; inset: 3px 4px 2px; }
+.armor-icon-mini::after { left: 7px; right: 7px; top: 6px; height: 2px; box-shadow: 0 5px var(--armor-accent); }
+
+@media (max-width: 680px) {
+    #equipment-items { grid-template-columns: 1fr; }
+    .equipment-slot { width: 120px; grid-template-columns: 38px 1fr; }
+    .equipment-slot-icon { width: 34px; height: 34px; }
 }
 
 #quest-journal {
@@ -1683,6 +1818,7 @@ body { user-select: none; -webkit-user-select: none; }
     align-items: center;
     gap: 8px;
     flex: 1;
+    min-width: 0;
 }
 
 .trade-icon {
@@ -1699,6 +1835,11 @@ body { user-select: none; -webkit-user-select: none; }
     font-size: 12px;
     color: #ccc;
     white-space: nowrap;
+}
+
+.quest-row .trade-label {
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 
 .trade-arrow {
@@ -1763,7 +1904,19 @@ html.touch-device body {
     touch-action: none;
 }
 
+html.touch-device #fps-summary {
+    display: none;
+}
+
+#inventory-overlay[aria-hidden="false"] ~ #touch-overlay {
+    visibility: hidden;
+}
+
 @media (pointer: coarse), (max-width: 760px) {
+    #mobile-experimental-notice {
+        display: block;
+    }
+
     #ui {
         padding:
             max(8px, env(safe-area-inset-top))
@@ -2237,6 +2390,192 @@ html.touch-device body {
 }
 
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 460px) {
+    #start-menu-content {
+        width: min(96vw, 720px);
+        max-height: calc(100svh - 12px);
+        padding: 8px 16px;
+        gap: 7px;
+    }
+
+    #start-menu-content .logo-img {
+        width: auto;
+        max-height: 58px;
+    }
+
+    #start-promise,
+    #start-goals {
+        display: none;
+    }
+
+    #mobile-experimental-notice {
+        max-width: 560px;
+        padding: 6px 10px;
+        font-size: 11px;
+        line-height: 1.25;
+    }
+
+    #start-menu-content .menu-btn {
+        min-height: 38px;
+        padding: 7px 16px;
+        margin-top: 0;
+        font-size: 14px;
+    }
+
+    #inventory-overlay {
+        padding:
+            max(6px, env(safe-area-inset-top))
+            max(6px, env(safe-area-inset-right))
+            max(6px, env(safe-area-inset-bottom))
+            max(6px, env(safe-area-inset-left)) !important;
+        flex-direction: row !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+        overflow: hidden !important;
+    }
+
+    #inventory-main-content {
+        order: 2;
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto !important;
+        max-width: none !important;
+        height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #recipe-book {
+        order: 1;
+        flex: 0 0 min(30vw, 220px);
+        width: min(30vw, 220px) !important;
+        height: 100% !important;
+        max-height: none;
+        contain: none;
+        padding: 8px;
+        overflow-x: hidden !important;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #recipe-book-title {
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+
+    #recipe-category-tabs,
+    #recipe-search {
+        margin-bottom: 6px;
+    }
+
+    #inventory-header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        flex: 0 0 auto;
+        gap: 6px;
+        margin-bottom: 5px;
+        padding-bottom: 4px;
+        background: rgba(49, 55, 39, 0.98);
+    }
+
+    #inventory-title {
+        display: none;
+    }
+
+    #inventory-view-tabs {
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 4px;
+    }
+
+    #inventory-view-tabs button {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 6px 5px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    #inventory-close-btn {
+        min-width: 70px;
+        height: 32px;
+        padding: 0 8px;
+        font-size: 11px;
+    }
+
+    #inventory-objective {
+        width: 100%;
+        margin-bottom: 5px;
+        padding: 5px 8px;
+    }
+
+    #inventory-objective .inventory-objective-kicker,
+    #inventory-objective-hint {
+        display: none;
+    }
+
+    #inventory-objective strong {
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    #crafting-label {
+        margin: 0 0 4px;
+    }
+
+    #crafting-area {
+        width: auto;
+        margin-bottom: 5px !important;
+    }
+
+    #crafting-status {
+        min-height: 12px;
+        margin: 0 0 4px;
+        font-size: 9px;
+    }
+
+    #inventory-grid {
+        grid-template-columns: repeat(8, 40px) !important;
+        gap: 4px !important;
+        margin-top: 4px;
+    }
+
+    #inventory-grid .inv-slot {
+        width: 40px !important;
+        height: 40px !important;
+    }
+
+    #inventory-grid .inv-section-title,
+    #inventory-grid #inventory-divider {
+        grid-column: span 8 !important;
+    }
+
+    #inventory-overlay.quest-view #inventory-main-content,
+    #inventory-overlay.equipment-view #inventory-main-content {
+        width: auto !important;
+        max-width: none !important;
+        align-items: stretch !important;
+        overflow: hidden !important;
+    }
+
+    #quest-journal,
+    #equipment-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0 4px 8px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #quest-journal h2 {
+        margin: 7px 0 5px;
+        font-size: 12px;
+    }
+
     #top-ui {
         padding: 6px 112px 6px 6px;
     }
@@ -2278,6 +2617,31 @@ html.touch-device body {
         font-size: 12px;
     }
 
+    #first-objective,
+    #first-objective.visible {
+        top: max(6px, env(safe-area-inset-top));
+        left: max(6px, env(safe-area-inset-left));
+        width: min(38vw, 240px);
+        padding: 7px 9px 8px;
+        transform: none;
+    }
+
+    #first-objective .first-objective-kicker,
+    #first-objective-progress {
+        display: none;
+    }
+
+    #first-objective strong {
+        font-size: 13px;
+        line-height: 1.2;
+    }
+
+    #first-objective-hint {
+        margin-top: 2px;
+        font-size: 10px;
+        line-height: 1.25;
+    }
+
     #instructions {
         width: min(82vw, 560px);
         padding: 12px;
@@ -2290,6 +2654,43 @@ html.touch-device body {
     #instructions h1 {
         font-size: 22px;
     }
+}
+
+.village-chest-warning {
+    margin-bottom: 16px;
+    padding: 12px;
+    border: 1px solid #d99b3d;
+    border-radius: 6px;
+    background: rgba(103, 55, 18, 0.9);
+    color: #fff3d0;
+    text-align: center;
+}
+
+.village-chest-warning[hidden] {
+    display: none;
+}
+
+.village-chest-warning p {
+    margin: 8px 0 12px;
+}
+
+.village-chest-warning-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.village-chest-warning-actions button {
+    padding: 8px 12px;
+    border: 1px solid #d9b06f;
+    border-radius: 4px;
+    background: #4d4033;
+    color: white;
+    cursor: pointer;
+}
+
+#village-chest-confirm {
+    background: #8a321f;
 }
 
 @media (min-width: 901px) and (max-height: 820px) {
@@ -2326,8 +2727,8 @@ html.touch-device body {
     }
 }
 
-/* ===== PAINTERLY INTERFACE (GRAPHICS VARIANTS B/C) ===== */
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) {
+/* ===== PAINTERLY PRODUCTION INTERFACE ===== */
+html {
     --painter-ui-ink: #221c15;
     --painter-ui-deep: rgba(37, 42, 31, 0.96);
     --painter-ui-panel: rgba(54, 60, 43, 0.96);
@@ -2340,13 +2741,13 @@ html.touch-device body {
     --painter-ui-shadow: rgba(20, 17, 12, 0.62);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #top-ui {
+html #top-ui {
     color: var(--painter-ui-parchment);
     text-shadow: 0 2px 3px rgba(27, 22, 15, 0.85);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #time-info,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #stats {
+html #time-info,
+html #stats {
     border: 1px solid var(--painter-ui-edge);
     border-radius: 9px 7px 10px 6px;
     background:
@@ -2358,23 +2759,23 @@ html.touch-device body {
     color: var(--painter-ui-parchment);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crosshair {
+html #crosshair {
     border-color: rgba(255, 240, 197, 0.9);
     box-shadow: 0 0 0 1px rgba(52, 39, 25, 0.5), 0 0 8px rgba(255, 232, 170, 0.28);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crosshair::before,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crosshair::after {
+html #crosshair::before,
+html #crosshair::after {
     background: rgba(255, 240, 197, 0.92);
     box-shadow: 0 1px 2px rgba(33, 25, 17, 0.8);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #mining-progress {
+html #mining-progress {
     background: conic-gradient(var(--painter-ui-gold) calc(var(--mining-progress) * 1turn), rgba(238, 220, 177, 0.16) 0);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #controls-hint {
+html #first-objective,
+html #controls-hint {
     border-color: var(--painter-ui-edge);
     border-radius: 12px 9px 13px 8px;
     background:
@@ -2387,72 +2788,72 @@ html.touch-device body {
     color: var(--painter-ui-parchment);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective {
+html #first-objective {
     border-left-color: var(--painter-ui-gold);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective span,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .controls-hint-title {
+html #first-objective span,
+html .controls-hint-title {
     color: var(--painter-ui-gold);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective-hint,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #controls-hint-text {
+html #first-objective-hint,
+html #controls-hint-text {
     color: var(--painter-ui-muted);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective-progress i {
+html #first-objective-progress i {
     background: rgba(241, 222, 179, 0.16);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective-progress i.active {
+html #first-objective-progress i.active {
     background: linear-gradient(90deg, #c89538, #efd071);
     box-shadow: 0 0 5px rgba(230, 188, 79, 0.35);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective.complete {
+html #first-objective.complete {
     border-color: rgba(129, 191, 117, 0.62);
     border-left-color: #82bd70;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective.complete span {
+html #first-objective.complete span {
     color: #a9d294;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #first-objective.complete #first-objective-progress i.active {
+html #first-objective.complete #first-objective-progress i.active {
     background: linear-gradient(90deg, #6b9d5d, #a9d294);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #bottom-ui {
+html #bottom-ui {
     color: var(--painter-ui-parchment);
     text-shadow: 0 1px 2px rgba(27, 20, 13, 0.9);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .bar-label {
+html .bar-label {
     color: var(--painter-ui-parchment);
     font-weight: 700;
     letter-spacing: 0.08em;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .bar,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .attack-cooldown-track {
+html .bar,
+html .attack-cooldown-track {
     border-color: rgba(204, 164, 101, 0.72);
     background: #2c251b;
     box-shadow: inset 0 2px 5px rgba(12, 10, 7, 0.72), 0 1px rgba(255, 236, 190, 0.12);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #health-fill {
+html #health-fill {
     background: linear-gradient(90deg, #a83f38, #dc6a57 62%, #ec8d6e);
     box-shadow: inset 0 2px rgba(255, 218, 181, 0.22);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #hunger-fill,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #attack-cooldown-fill {
+html #hunger-fill,
+html #attack-cooldown-fill {
     background: linear-gradient(90deg, #bd7b2f, #e2b84f 62%, #f1d57a);
     box-shadow: inset 0 2px rgba(255, 239, 190, 0.25);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory {
+html #inventory {
     border-color: var(--painter-ui-edge);
     border-radius: 13px 10px 14px 9px;
     background:
@@ -2464,9 +2865,9 @@ html.touch-device body {
         0 7px 22px var(--painter-ui-shadow);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .slot,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .inv-slot,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .mini-slot {
+html .slot,
+html .inv-slot,
+html .mini-slot {
     border-color: rgba(190, 155, 102, 0.5);
     border-radius: 8px 6px 9px 5px;
     background:
@@ -2475,8 +2876,8 @@ html.touch-device body {
     box-shadow: inset 1px 1px rgba(255, 236, 190, 0.09), inset -2px -3px rgba(24, 21, 15, 0.26);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .slot:hover,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .inv-slot:hover {
+html .slot:hover,
+html .inv-slot:hover {
     border-color: rgba(239, 211, 150, 0.88);
     background:
         radial-gradient(circle at 28% 20%, rgba(247, 224, 172, 0.16), transparent 43%),
@@ -2484,7 +2885,7 @@ html.touch-device body {
     box-shadow: inset 1px 1px rgba(255, 239, 199, 0.12), 0 6px 14px rgba(24, 19, 13, 0.38);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .slot.active {
+html .slot.active {
     border-color: var(--painter-ui-gold);
     background:
         radial-gradient(circle at 28% 20%, rgba(255, 230, 161, 0.22), transparent 43%),
@@ -2492,7 +2893,7 @@ html.touch-device body {
     box-shadow: inset 0 0 0 1px rgba(255, 229, 151, 0.24), 0 7px 18px rgba(93, 68, 23, 0.48);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory .slot-name {
+html #inventory .slot-name {
     position: absolute;
     right: 2px;
     bottom: 3px;
@@ -2510,7 +2911,7 @@ html.touch-device body {
     white-space: nowrap;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory .slot-count {
+html #inventory .slot-count {
     position: absolute;
     top: 19px;
     right: 2px;
@@ -2522,20 +2923,20 @@ html.touch-device body {
     text-align: center;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory .slot-count.low {
+html #inventory .slot-count.low {
     color: #ff9b85;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .key-hint {
+html .key-hint {
     color: rgba(240, 218, 170, 0.74);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-overlay,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .furnace-panel,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .chest-panel,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-panel,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #instructions,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #start-menu-content {
+html #inventory-overlay,
+html .furnace-panel,
+html .chest-panel,
+html .trade-panel,
+html #instructions,
+html #start-menu-content {
     border-color: var(--painter-ui-edge) !important;
     border-radius: 17px 12px 18px 11px !important;
     background:
@@ -2548,91 +2949,91 @@ html.touch-device body {
     color: var(--painter-ui-parchment) !important;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-overlay,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #chest-overlay,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #trade-overlay {
+html #furnace-overlay,
+html #chest-overlay,
+html #trade-overlay {
     background: rgba(25, 23, 17, 0.7) !important;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-title,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-title,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #instructions h1 {
+html #inventory-title,
+html .panel-title,
+html #instructions h1 {
     color: var(--painter-ui-gold) !important;
     font-family: Georgia, 'Times New Roman', serif;
     letter-spacing: 0.08em;
     text-shadow: 0 2px 2px rgba(37, 28, 17, 0.8);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-label,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .inv-section-title,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .recipe-section-title,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-slot-label {
+html #crafting-label,
+html .inv-section-title,
+html .recipe-section-title,
+html .panel-slot-label {
     color: var(--painter-ui-muted) !important;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-divider {
+html #inventory-divider {
     background: linear-gradient(90deg, transparent, var(--painter-ui-edge), transparent);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #recipe-book,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-inventory-grid {
+html #recipe-book,
+html #furnace-inventory-grid {
     border-color: rgba(195, 158, 102, 0.38);
     background: rgba(29, 29, 22, 0.3);
     box-shadow: inset 0 3px 10px rgba(18, 16, 11, 0.26);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .recipe-entry,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-row {
+html .recipe-entry,
+html .trade-row {
     border-color: rgba(196, 160, 103, 0.3);
     background: rgba(239, 214, 164, 0.045);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .recipe-entry:hover,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-row:hover {
+html .recipe-entry:hover,
+html .trade-row:hover {
     border-color: rgba(226, 190, 111, 0.56);
     background: rgba(226, 187, 100, 0.09);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .recipe-name,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-label,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-status,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .furnace-selection-help,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .furnace-return-help,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-fuel-reserve {
+html .recipe-name,
+html .trade-label,
+html #crafting-status,
+html .furnace-selection-help,
+html .furnace-return-help,
+html #furnace-fuel-reserve {
     color: var(--painter-ui-muted);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-status.success {
+html #crafting-status.success {
     color: #a9d294;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-status.error {
+html #crafting-status.error {
     color: #ffb09d;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-flow-arrow,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-arrow {
+html .panel-flow-arrow,
+html .trade-arrow {
     color: var(--painter-ui-gold) !important;
     text-shadow: 0 2px 4px rgba(39, 29, 16, 0.7);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-progress {
+html #furnace-progress {
     border: 1px solid rgba(194, 151, 88, 0.58);
     background: #2b241a !important;
     box-shadow: inset 0 2px 5px rgba(15, 12, 8, 0.65);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #furnace-progress-bar {
+html #furnace-progress-bar {
     background: linear-gradient(90deg, #a94f2f, #dd8c3f 62%, #f0c45f) !important;
     box-shadow: inset 0 2px rgba(255, 228, 175, 0.23);
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-create-btn,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-close-btn,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-close-button,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-btn,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .save-btn,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .menu-btn {
+html #crafting-create-btn,
+html #inventory-close-btn,
+html .panel-close-button,
+html .trade-btn,
+html .save-btn,
+html .menu-btn {
     border: 1px solid rgba(218, 182, 111, 0.62) !important;
     border-radius: 8px 6px 9px 5px !important;
     background: linear-gradient(145deg, #6f704b, #4b513b) !important;
@@ -2640,18 +3041,18 @@ html.touch-device body {
     color: #f6e5bd !important;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-create-btn:hover,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #inventory-close-btn:hover,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .panel-close-button:hover,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-btn:hover,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .save-btn:hover,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .menu-btn:hover {
+html #crafting-create-btn:hover,
+html #inventory-close-btn:hover,
+html .panel-close-button:hover,
+html .trade-btn:hover,
+html .save-btn:hover,
+html .menu-btn:hover {
     border-color: rgba(244, 215, 151, 0.9) !important;
     background: linear-gradient(145deg, #838159, #596047) !important;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #crafting-create-btn:disabled,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .trade-btn:disabled {
+html #crafting-create-btn:disabled,
+html .trade-btn:disabled {
     border-color: rgba(152, 140, 110, 0.34) !important;
     background: linear-gradient(145deg, #555749, #41433a) !important;
     box-shadow: none;
@@ -2659,14 +3060,14 @@ html.touch-device body {
     opacity: 0.62;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .danger-button,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) .danger-button:hover {
+html .danger-button,
+html .danger-button:hover {
     border-color: rgba(221, 139, 111, 0.68) !important;
     background: linear-gradient(145deg, #8c4f3f, #643b32) !important;
     color: #ffe2d2 !important;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) :is(button, .slot, .inv-slot, .recipe-entry):focus-visible {
+html :is(button, .slot, .inv-slot, .recipe-entry):focus-visible {
     outline: 2px solid #f2d77f;
     outline-offset: 2px;
 }
@@ -2676,14 +3077,14 @@ html.touch-device body {
     outline-offset: 3px;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #save-input,
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #instructions select {
+html #save-input,
+html #instructions select {
     border: 1px solid rgba(211, 174, 111, 0.54) !important;
     background: rgba(36, 38, 29, 0.9) !important;
     color: var(--painter-ui-parchment) !important;
 }
 
-:is(html[data-graphics-variant="B"], html[data-graphics-variant="C"]) #damage-flash {
+html #damage-flash {
     background: radial-gradient(ellipse at center, transparent 38%, rgba(145, 52, 40, 0.46) 78%, rgba(94, 35, 29, 0.64) 100%) !important;
     mix-blend-mode: soft-light;
 }

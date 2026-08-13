@@ -1,6 +1,6 @@
 /* js/furnace.js – Ofen-System: Zustand, Schmelz-Logik, UI */
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717z';
-import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260721c';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260801b';
+import { createBlockHTML, getItemName, inventorySlots } from './inventory.js?v=20260801c';
 import { Game } from './Game.js?v=20260716b';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
@@ -12,6 +12,8 @@ const SMELT_RECIPES = {
     [BLOCK_TYPES.STONE]:     { type: BLOCK_TYPES.STONE_BRICK, count: 1 },
     [BLOCK_TYPES.SAND]:      { type: BLOCK_TYPES.SANDSTONE,   count: 1 },
     [BLOCK_TYPES.WOOD]:      { type: BLOCK_TYPES.COAL,        count: 1 }, // Holzkohle
+    [BLOCK_TYPES.JUNGLE_WOOD]: { type: BLOCK_TYPES.COAL,      count: 1 },
+    [BLOCK_TYPES.PALM_WOOD]: { type: BLOCK_TYPES.COAL,        count: 1 },
     [BLOCK_TYPES.FISH]:      { type: BLOCK_TYPES.COOKED_FISH, count: 1 },
     [BLOCK_TYPES.RAW_MEAT]:  { type: BLOCK_TYPES.COOKED_MEAT, count: 1 },
     [BLOCK_TYPES.RAW_CHICKEN]: { type: BLOCK_TYPES.COOKED_CHICKEN, count: 1 },
@@ -27,6 +29,8 @@ const SMELT_TIME = 6000;
 const FUEL_VALUES = new Map([
     [BLOCK_TYPES.COAL, 8],
     [BLOCK_TYPES.WOOD, 3],
+    [BLOCK_TYPES.JUNGLE_WOOD, 3],
+    [BLOCK_TYPES.PALM_WOOD, 3],
     [BLOCK_TYPES.PLANKS, 2],
     [BLOCK_TYPES.STICK, 1],
 ]);

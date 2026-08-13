@@ -91,6 +91,67 @@ function lineBetween(from, to) {
     return cells;
 }
 
+function trackKey(cell) {
+    return `${cell.x},${cell.y},${cell.z}`;
+}
+
+function createTrackMap(track) {
+    return new Map(track.map(cell => [trackKey(cell), cell]));
+}
+
+function getTrackNeighbors(trackMap, cell) {
+    const neighbors = [];
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        for (const dy of [-1, 0, 1]) {
+            const neighbor = trackMap.get(trackKey({ x: cell.x + dx, y: cell.y + dy, z: cell.z + dz }));
+            if (!neighbor) continue;
+            neighbors.push(neighbor);
+            break;
+        }
+    }
+    return neighbors;
+}
+
+function getStraightTrackAxis(trackMap, cell) {
+    const directions = getTrackNeighbors(trackMap, cell).map(neighbor => ({
+        x: neighbor.x - cell.x,
+        z: neighbor.z - cell.z
+    }));
+    if (directions.length !== 2) return null;
+    if (directions.every(direction => direction.z === 0)) return 'x';
+    if (directions.every(direction => direction.x === 0)) return 'z';
+    return null;
+}
+
+function selectMinecartSpawns(track) {
+    const trackMap = createTrackMap(track);
+    const candidates = track
+        .map(cell => ({
+            cell,
+            neighbors: getTrackNeighbors(trackMap, cell)
+                .filter(neighbor => cell.mainline && neighbor.mainline)
+        }))
+        .filter(candidate => candidate.neighbors.length > 0);
+    const usedCells = new Set();
+
+    return [0.25, 0.7].flatMap(fraction => {
+        const preferredIndex = Math.min(candidates.length - 1, Math.floor(candidates.length * fraction));
+        for (let offset = 0; offset < candidates.length; offset++) {
+            const candidate = candidates[(preferredIndex + offset) % candidates.length];
+            const key = trackKey(candidate.cell);
+            if (usedCells.has(key)) continue;
+            usedCells.add(key);
+            const next = candidate.neighbors[0];
+            return [{
+                cell: candidate.cell,
+                next,
+                direction: { x: next.x - candidate.cell.x, z: next.z - candidate.cell.z }
+            }];
+        }
+        return [];
+    });
+}
+
 function createMinePlan(random, theme, surfaceY) {
     const levels = 2 + Math.floor(random() * 2);
     const moduleCount = MINE_MODULE_MIN
@@ -410,6 +471,7 @@ function decorateRoom(candidate, module, chunk, world, palette) {
 
 function stampMine(candidate, chunk, world) {
     const palette = paletteForTheme(candidate.plan.theme);
+    const trackMap = createTrackMap(candidate.plan.track);
     for (const module of candidate.plan.modules) stampRoom(candidate, module, chunk, world, palette);
 
     for (const cell of candidate.plan.track) {
@@ -425,29 +487,53 @@ function stampMine(candidate, chunk, world) {
             }
         }
     }
-    for (const cell of candidate.plan.track) {
-        const x = candidate.x + cell.x;
-        const y = candidate.plan.baseY + cell.y;
-        const z = candidate.z + cell.z;
-        setBlock(chunk.data, chunk, world, x, y, z, BLOCK.RAIL);
-    }
+    for (const module of candidate.plan.modules) decorateRoom(candidate, module, chunk, world, palette);
 
-    for (let index = 0; index < candidate.plan.track.length; index += 5) {
-        const cell = candidate.plan.track[index];
+    const straightTrack = candidate.plan.track.filter(cell => getStraightTrackAxis(trackMap, cell));
+    for (let index = 0; index < straightTrack.length; index += 5) {
+        const cell = straightTrack[index];
+        const axis = getStraightTrackAxis(trackMap, cell);
         const x = candidate.x + cell.x;
         const y = candidate.plan.baseY + cell.y;
         const z = candidate.z + cell.z;
+        const sideOffsetX = axis === 'z' ? 2 : 0;
+        const sideOffsetZ = axis === 'x' ? 2 : 0;
+        const left = { x: cell.x - sideOffsetX, y: cell.y, z: cell.z - sideOffsetZ };
+        const right = { x: cell.x + sideOffsetX, y: cell.y, z: cell.z + sideOffsetZ };
+        if (trackMap.has(trackKey(left)) || trackMap.has(trackKey(right))) continue;
         for (let dy = 0; dy <= 2; dy++) {
-            setBlock(chunk.data, chunk, world, x - 2, y + dy, z, palette.support);
-            setBlock(chunk.data, chunk, world, x + 2, y + dy, z, palette.support);
+            setBlock(chunk.data, chunk, world, x - sideOffsetX, y + dy, z - sideOffsetZ, palette.support);
+            setBlock(chunk.data, chunk, world, x + sideOffsetX, y + dy, z + sideOffsetZ, palette.support);
+        }
+        for (let offset = -2; offset <= 2; offset++) {
+            setBlock(
+                chunk.data,
+                chunk,
+                world,
+                x + (axis === 'x' ? 0 : offset),
+                y + 3,
+                z + (axis === 'x' ? offset : 0),
+                palette.support
+            );
         }
     }
 
-    for (const module of candidate.plan.modules) decorateRoom(candidate, module, chunk, world, palette);
     setBlock(chunk.data, chunk, world, candidate.x - 2, candidate.surfaceY, candidate.z - 7, palette.support);
     setBlock(chunk.data, chunk, world, candidate.x + 2, candidate.surfaceY, candidate.z - 7, palette.support);
     setBlock(chunk.data, chunk, world, candidate.x - 2, candidate.surfaceY + 1, candidate.z - 7, BLOCK.TORCH);
     setBlock(chunk.data, chunk, world, candidate.x + 2, candidate.surfaceY + 1, candidate.z - 7, BLOCK.TORCH);
+
+    // Gleise zuletzt wiederherstellen, damit Stützen, Gefahren und überlappende
+    // Steigungs-Aushübe weder Fahrweg noch Unterbau oder Kopffreiheit zerstören.
+    for (const cell of candidate.plan.track) {
+        const x = candidate.x + cell.x;
+        const y = candidate.plan.baseY + cell.y;
+        const z = candidate.z + cell.z;
+        setBlock(chunk.data, chunk, world, x, y - 1, z, palette.floor);
+        setBlock(chunk.data, chunk, world, x, y, z, BLOCK.RAIL);
+        setBlock(chunk.data, chunk, world, x, y + 1, z, BLOCK.AIR);
+        setBlock(chunk.data, chunk, world, x, y + 2, z, BLOCK.AIR);
+    }
 }
 
 function stampDungeonRoom(candidate, room, chunk, world, palette) {
@@ -653,13 +739,8 @@ export function generateUndergroundStructures({ chunk, world, terrain }) {
             if (candidate.originCx !== chunk.cx || candidate.originCz !== chunk.cz) continue;
 
             result.structures.push(publicMineStructure(candidate));
-            for (const [cartIndex, fraction] of [0.25, 0.7].entries()) {
-                const trackIndex = Math.min(
-                    candidate.plan.track.length - 2,
-                    Math.floor(candidate.plan.track.length * fraction)
-                );
-                const cell = candidate.plan.track[trackIndex];
-                const next = candidate.plan.track[trackIndex + 1];
+            for (const [cartIndex, spawn] of selectMinecartSpawns(candidate.plan.track).entries()) {
+                const { cell, next, direction } = spawn;
                 result.entities.push({
                     id: `minecart:${candidate.id}:${cartIndex}`,
                     kind: 'minecart',
@@ -667,10 +748,12 @@ export function generateUndergroundStructures({ chunk, world, terrain }) {
                     x: candidate.x + cell.x,
                     y: candidate.plan.baseY + cell.y,
                     z: candidate.z + cell.z,
-                    direction: {
-                        x: Math.sign(next.x - cell.x),
-                        z: Math.sign(next.z - cell.z)
-                    }
+                    nextCell: {
+                        x: candidate.x + next.x,
+                        y: candidate.plan.baseY + next.y,
+                        z: candidate.z + next.z
+                    },
+                    direction
                 });
             }
             const reward = candidate.plan.modules.find(module => module.role === 'reward');

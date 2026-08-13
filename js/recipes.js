@@ -14,6 +14,34 @@
  *   Legacy (vor Sprint 3): { pattern: [...], result: {...} } wird als shaped/2×2 interpretiert.
  */
 
+import { getArmorSetItems } from './equipmentRules.js?v=20260723e';
+
+const ARMOR_PATTERNS = [
+    [1,1,1, 1,0,1, 0,0,0],
+    [1,0,1, 1,1,1, 1,1,1],
+    [1,0,1, 1,0,1, 0,0,0],
+    [1,1,1, 1,0,1, 1,0,1],
+    [0,0,0, 1,0,1, 1,0,1]
+];
+
+function armorPattern(primary, secondary = primary) {
+    return ARMOR_PATTERNS.map((shape, pieceIndex) => shape.map((cell, cellIndex) => (
+        cell === 0 ? 0 : ((cellIndex + pieceIndex) % 3 === 0 ? secondary : primary)
+    )));
+}
+
+function armorSetRecipes(name, tierId, primary, secondary = primary) {
+    const armorTypes = getArmorSetItems(tierId).map(item => item.type);
+    return armorPattern(primary, secondary).map((pattern, offset) => ({
+        name: `${name} – ${['Helm', 'Harnisch', 'Armschutz', 'Beinschutz', 'Stiefel'][offset]}`,
+        category: 'Rüstung',
+        kind: 'shaped',
+        gridSize: 3,
+        pattern,
+        result: { type: armorTypes[offset], count: 1 }
+    }));
+}
+
 export const craftingRecipes = [
     // Bestehende Rezepte (Legacy-Form, weiterhin gültig):
     { category: 'Versorgung', pattern: [5, 0, 0, 0], result: { type: 26, count: 4 } },       // WOOD -> 4x PLANKS (Pattern-Shifting!)
@@ -26,9 +54,11 @@ export const craftingRecipes = [
     { category: 'Bauen', pattern: [26, 12, 12, 26], result: { type: 32, count: 1 } },   // PLANKS+ICE -> WINDOW
     { category: 'Bauen', pattern: [27, 26, 27, 26], result: { type: 33, count: 1 } },   // STICK+PLANKS -> DOOR
     { category: 'Versorgung', pattern: [19, 19, 26, 26], result: { type: 38, count: 1 } },   // WOOL+PLANKS -> BED
+    { category: 'Versorgung', pattern: [105, 105, 26, 26], result: { type: 38, count: 1 } }, // POLAR_BEAR_FUR+PLANKS -> BED
     { category: 'Versorgung', kind: 'shapeless', ingredients: [60, 27], result: { type: 101, count: 4 } }, // KOHLE+STOCK -> 4x FACKEL
     { category: 'Bauen', kind: 'shaped', gridSize: 3, pattern: [27,26,27, 27,26,27, 0,0,0], result: { type: 102, count: 4 } }, // Fence
     { category: 'Bauen', kind: 'shaped', gridSize: 3, pattern: [27,27,27, 26,26,27, 0,0,0], result: { type: 103, count: 1 } }, // Gate
+    { category: 'Versorgung', kind: 'shaped', gridSize: 3, pattern: [26,26,26, 26,0,26, 26,26,26], result: { type: 75, count: 1 } }, // Truhe
 
     // Neue 3×3-Rezepte: Werkzeuge
     // Schema: pattern[0..8] = Zeile0-2, Spalte0-2
@@ -61,6 +91,15 @@ export const craftingRecipes = [
     { name: 'Verstärkter Dorfzaun', requiredTrust: 3, category: 'Bauen', kind: 'shaped', gridSize: 3, pattern: [26,27,26, 26,27,26, 0,0,0], result: { type: 102, count: 8 } },
     { name: 'Jägerpfeile', requiredTrust: 7, category: 'Kampf', kind: 'shapeless', ingredients: [3,27,31], result: { type: 95, count: 8 } },
     { name: 'Meisterklinge', requiredTrust: 12, category: 'Kampf', kind: 'shaped', gridSize: 3, pattern: [0,61,0, 0,61,0, 62,27,62], result: { type: 91, count: 2 } }
+    ,
+    ...armorSetRecipes('Leichte Rüstung', 'brush', 6, 27),
+    ...armorSetRecipes('Fellrüstung', 'fur', 19),
+    ...armorSetRecipes('Fellrüstung aus Eisbärenfell', 'fur', 105),
+    ...armorSetRecipes('Holzrüstung', 'wood', 26, 19),
+    ...armorSetRecipes('Holzrüstung mit Eisbärenfell', 'wood', 26, 105),
+    ...armorSetRecipes('Eisenrüstung', 'iron', 61, 19),
+    // Nahezu jedes Feld besteht aus Metall; Goldbeschläge machen das Set bewusst sehr teuer.
+    ...armorSetRecipes('Verstärkte Eisenrüstung', 'reinforcedIron', 61, 62)
 ];
 
 export function getRecipeTrustLockReason(recipe, trust = 0) {

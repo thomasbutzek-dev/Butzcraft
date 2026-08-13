@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 
 describe('painterly interface skin', () => {
-    it('scopes the warmer interface to graphics variants B and C', () => {
+    it('uses the warmer interface as the production style', () => {
         const styles = readFileSync('style.css', 'utf8');
 
-        expect(styles).toContain(':is(html[data-graphics-variant="B"], html[data-graphics-variant="C"])');
+        expect(styles).not.toContain('data-graphics-variant');
         expect(styles).toContain('--painter-ui-parchment');
         expect(styles).toContain('#bottom-ui');
         expect(styles).toContain('#inventory-overlay');
@@ -26,7 +26,7 @@ describe('painterly interface skin', () => {
     it('refreshes the stylesheet URL so browsers receive the new skin', () => {
         const html = readFileSync('index.html', 'utf8');
 
-        expect(html).toContain('style.css?v=20260721c');
+        expect(html).toContain('style.css?v=20260813c');
     });
 
     it('keeps filtered recipe entries visually hidden', () => {

@@ -7,18 +7,29 @@ const path = require('path');
 const crypto = require('crypto');
 const sanitizeHtml = require('sanitize-html');
 const nodemailer = require('nodemailer');
+const http = require('http');
+const { createStatisticsStore } = require('./serverStatistics');
 
+function createApp({ env = process.env } = {}) {
 const app = express();
-const PORT = process.env.PORT || 3000;
-const isProduction = process.env.NODE_ENV === 'production';
-const remoteSavesEnabled = process.env.ENABLE_REMOTE_SAVES === 'true' || !isProduction;
+const PORT = env.PORT || 3000;
+const HOST = env.HOST || '127.0.0.1';
+const isProduction = env.NODE_ENV === 'production';
+const remoteSavesEnabled = env.ENABLE_REMOTE_SAVES === 'true' || !isProduction;
 const websiteHosts = new Set(
-    (process.env.WEBSITE_HOSTS || '')
+    (env.WEBSITE_HOSTS || '')
         .split(',')
         .map(host => host.trim().toLowerCase())
         .filter(Boolean)
 );
-const gameOrigin = process.env.GAME_ORIGIN || '';
+const gameOrigin = env.GAME_ORIGIN || '';
+const gameHost = (() => {
+    try {
+        return new URL(gameOrigin).hostname.toLowerCase();
+    } catch {
+        return '';
+    }
+})();
 function isWebsiteRequest(req) {
     const hostname = req.hostname.toLowerCase();
     return websiteHosts.has(hostname) || (!isProduction && ['localhost', '127.0.0.1', '::1'].includes(hostname));
@@ -33,7 +44,7 @@ app.get('/health', (req, res) => {
 // Nicht global auf statische Assets anwenden: Vite setzt im Production-Build `crossorigin`
 // auf Script/CSS-Tags, und der Browser schickt dann einen Origin-Header. Ein globaler
 // CORS-Reject wuerde JS/CSS auf Render als 500 blockieren.
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || `http://localhost:${PORT},http://127.0.0.1:${PORT}`).split(',').map(s => s.trim());
+const allowedOrigins = (env.ALLOWED_ORIGINS || `http://localhost:${PORT},http://127.0.0.1:${PORT}`).split(',').map(s => s.trim());
 const corsOptions = {
     origin: (origin, cb) => {
         // Same-origin requests haben kein Origin-Header → erlauben
@@ -47,11 +58,13 @@ app.use('/api', cors(corsOptions));
 // Vorher 50MB → DoS-Vektor (RAM-Exhaustion durch parallele große Requests).
 app.use(bodyParser.json({ limit: '5mb' }));
 
-const siteContentDir = path.resolve(process.env.SITE_CONTENT_DIR || path.join(__dirname, 'site-content'));
+const siteContentDir = path.resolve(env.SITE_CONTENT_DIR || path.join(__dirname, 'site-content'));
+const statisticsDir = path.resolve(env.STATISTICS_DIR || path.join(__dirname, 'statistics'));
+const statisticsStore = createStatisticsStore({ directory: statisticsDir });
 const siteMediaDir = path.join(siteContentDir, 'uploads');
 const siteContentFile = path.join(siteContentDir, 'content.json');
-const adminUsername = process.env.SITE_ADMIN_USER || 'admin';
-const adminPassword = process.env.SITE_ADMIN_PASSWORD || '';
+const adminUsername = env.SITE_ADMIN_USER || 'admin';
+const adminPassword = env.SITE_ADMIN_PASSWORD || '';
 const adminSessions = new Map();
 const loginAttempts = new Map();
 const contactAttempts = new Map();
@@ -61,17 +74,17 @@ const CONTENT_KEY = /^[a-z0-9.-]{1,80}$/;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 const CONTACT_LIMIT = 5;
 const CONTACT_SUBJECTS = new Set(['Frage zum Spiel', 'Fehler melden', 'Idee und Feedback', 'Sonstiges']);
-const contactToEmail = process.env.CONTACT_TO_EMAIL || '';
-const contactFromEmail = process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER || '';
-const smtpHost = process.env.SMTP_HOST || '';
-const smtpPort = Number(process.env.SMTP_PORT || 587);
-const smtpUser = process.env.SMTP_USER || '';
-const smtpPassword = process.env.SMTP_PASSWORD || '';
+const contactToEmail = env.CONTACT_TO_EMAIL || '';
+const contactFromEmail = env.CONTACT_FROM_EMAIL || env.SMTP_USER || '';
+const smtpHost = env.SMTP_HOST || '';
+const smtpPort = Number(env.SMTP_PORT || 587);
+const smtpUser = env.SMTP_USER || '';
+const smtpPassword = env.SMTP_PASSWORD || '';
 const contactTransport = smtpHost && smtpUser && smtpPassword && contactToEmail && contactFromEmail
     ? nodemailer.createTransport({
         host: smtpHost,
         port: smtpPort,
-        secure: process.env.SMTP_SECURE === 'true' || smtpPort === 465,
+        secure: env.SMTP_SECURE === 'true' || smtpPort === 465,
         auth: { user: smtpUser, pass: smtpPassword }
     })
     : null;
@@ -85,6 +98,21 @@ function setExpiringEntry(map, key, value, ttl = ATTEMPT_WINDOW_MS) {
 }
 
 fs.mkdirSync(siteMediaDir, { recursive: true });
+
+app.use((req, res, next) => {
+    const tracked = isProduction
+        && gameHost
+        && req.hostname.toLowerCase() === gameHost
+        && (req.method === 'GET' || req.method === 'HEAD');
+    if (tracked) {
+        const gamePage = req.path === '/' || req.path === '/index.html';
+        res.once('finish', () => statisticsStore.recordResponse({
+            statusCode: res.statusCode,
+            gamePage: gamePage && res.statusCode >= 200 && res.statusCode < 300
+        }));
+    }
+    next();
+});
 
 function emptySiteContent() {
     return { texts: {}, images: {}, updatedAt: null };
@@ -188,6 +216,11 @@ app.get('/api/admin/session', (req, res) => {
     res.json({ authenticated: Boolean(getAdminSession(req)) });
 });
 
+app.get('/api/admin/statistics', requireSiteAdmin, (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json(statisticsStore.snapshot());
+});
+
 app.post('/api/admin/login', (req, res) => {
     if (!adminPassword) return res.status(503).json({ error: 'Der Adminmodus ist auf dem Server noch nicht aktiviert.' });
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
@@ -285,7 +318,7 @@ app.get('/admin', (req, res) => {
     res.redirect(302, '/?edit=1');
 });
 
-const savesDir = path.join(__dirname, 'saves');
+const savesDir = path.resolve(env.SAVES_DIR || path.join(__dirname, 'saves'));
 const savesDirResolved = path.resolve(savesDir);
 if (!fs.existsSync(savesDir)) {
     fs.mkdirSync(savesDir);
@@ -498,35 +531,90 @@ app.get('/', (req, res) => {
 // schlägt der erste Verbindungsversuch fehl → für den User "Seite nicht erreichbar".
 // Lösung: Im Default-Modus ZWEI Listener — IPv4 (127.0.0.1) + IPv6 (::1). Beide Stacks
 // werden bedient, LAN bleibt ausgeschlossen (keine Wildcard-Bindung).
-const http = require('http');
-const HOST = process.env.HOST || '127.0.0.1';
-
-if (HOST === '127.0.0.1') {
-    // Dual-Stack-Localhost
-    http.createServer(app).listen(PORT, '127.0.0.1', () => {
-        console.log(`=======================================`);
-        console.log(` Butzcraft Server (Node.js) läuft!`);
-        console.log(` Bind: 127.0.0.1:${PORT} (IPv4 localhost)`);
-    });
-    // IPv6 ist auf manchen Systemen deaktiviert → try/catch verhindert harten Crash.
+function flushStatistics() {
     try {
-        http.createServer(app).listen(PORT, '::1', () => {
+        statisticsStore.close();
+    } catch (error) {
+        console.error(`Statistics could not be written: ${error.message}`);
+    }
+}
+
+return { app, port: PORT, host: HOST, close: flushStatistics };
+}
+
+function startServer(runtime = createApp()) {
+const { app, port: PORT, host: HOST, close: flushStatistics } = runtime;
+process.once('SIGTERM', () => {
+    flushStatistics();
+    process.exit(0);
+});
+process.once('SIGINT', () => {
+    flushStatistics();
+    process.exit(0);
+});
+
+const bindings = HOST === '127.0.0.1' ? ['127.0.0.1', '::1'] : [HOST];
+const servers = [];
+let pendingBindings = bindings.length;
+let successfulBindings = 0;
+
+function completeBinding(success) {
+    pendingBindings--;
+    if (success) successfulBindings++;
+    if (pendingBindings === 0 && successfulBindings === 0) {
+        console.error(` Butzcraft Server konnte an keine Adresse auf Port ${PORT} gebunden werden.`);
+        flushStatistics();
+        process.exitCode = 1;
+    }
+}
+
+for (const address of bindings) {
+    const server = http.createServer(app);
+    let bindingSettled = false;
+    const settleBinding = success => {
+        if (bindingSettled) return;
+        bindingSettled = true;
+        completeBinding(success);
+    };
+    servers.push(server);
+    server.once('listening', () => {
+        if (address === '127.0.0.1') {
+            console.log(`=======================================`);
+            console.log(` Butzcraft Server (Node.js) läuft!`);
+            console.log(` Bind: 127.0.0.1:${PORT} (IPv4 localhost)`);
+        } else if (address === '::1') {
             console.log(` Bind: [::1]:${PORT} (IPv6 localhost)`);
             console.log(` Aufrufen unter: http://localhost:${PORT}`);
             console.log(`=======================================`);
-        });
-    } catch (e) {
-        console.warn(` (IPv6-Bind fehlgeschlagen — IPv4-only. Falls localhost nicht geht: http://127.0.0.1:${PORT})`);
-        console.log(`=======================================`);
-    }
-} else {
-    // Explizit konfigurierter Host (z.B. 0.0.0.0 für LAN-Test). Single-Listener.
-    app.listen(PORT, HOST, () => {
-        console.log(`=======================================`);
-        console.log(` Butzcraft Server (Node.js) läuft!`);
-        console.log(` Bind: ${HOST}:${PORT}`);
-        console.log(` Aufrufen unter: http://localhost:${PORT}`);
-        console.log(` ⚠ Server ist netzwerk-erreichbar (HOST=${HOST}). Nur in vertrauten Netzen!`);
-        console.log(`=======================================`);
+        } else {
+            console.log(`=======================================`);
+            console.log(` Butzcraft Server (Node.js) läuft!`);
+            console.log(` Bind: ${address}:${PORT}`);
+            console.log(` Aufrufen unter: http://localhost:${PORT}`);
+            console.log(` ⚠ Server ist netzwerk-erreichbar (HOST=${address}). Nur in vertrauten Netzen!`);
+            console.log(`=======================================`);
+        }
+        settleBinding(true);
     });
+    server.on('error', error => {
+        if (bindingSettled) {
+            console.error(` Serverfehler auf ${address}:${PORT} (${error.code || error.message}).`);
+            return;
+        }
+        console.warn(` Bind ${address}:${PORT} fehlgeschlagen (${error.code || error.message}).`);
+        if (address === '::1') {
+            console.warn(` IPv4 bleibt verfügbar. Falls localhost nicht geht: http://127.0.0.1:${PORT}`);
+        }
+        settleBinding(false);
+    });
+    server.listen(PORT, address);
 }
+
+runtime.servers = servers;
+
+return runtime;
+}
+
+if (require.main === module) startServer();
+
+module.exports = { createApp, startServer };

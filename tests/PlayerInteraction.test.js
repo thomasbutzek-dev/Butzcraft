@@ -82,6 +82,7 @@ describe('PlayerInteraction through the Game seam', () => {
         delete window.butzcraftCanInteract;
         delete window.trySleepInBed;
         delete window.tryActivateBloodMoonRitual;
+        delete window.tryActivateStructureBoss;
     });
 
     it('starts an empty-hand animation without showing or sounding like a free sword', async () => {
@@ -265,6 +266,96 @@ describe('PlayerInteraction through the Game seam', () => {
         for (const call of expectedCalls) expect(world.setBlockMeta).toHaveBeenCalledWith(...call);
     });
 
+    it.each([
+        [0, 0, new THREE.Vector3(0.075, 0.5, 1.25), new THREE.Vector3(1, 0, 0)],
+        [0, 0, new THREE.Vector3(-0.075, 0.5, 1.25), new THREE.Vector3(-1, 0, 0)],
+        [0, 1, new THREE.Vector3(0.075, 1.5, 1.25), new THREE.Vector3(1, 0, 0)],
+        [0, 1, new THREE.Vector3(-0.075, 1.5, 1.25), new THREE.Vector3(-1, 0, 0)],
+        [1, 0, new THREE.Vector3(1.25, 0.5, 0.075), new THREE.Vector3(0, 0, 1)],
+        [1, 0, new THREE.Vector3(1.25, 0.5, -0.075), new THREE.Vector3(0, 0, -1)],
+        [1, 1, new THREE.Vector3(1.25, 1.5, 0.075), new THREE.Vector3(0, 0, 1)],
+        [1, 1, new THREE.Vector3(1.25, 1.5, -0.075), new THREE.Vector3(0, 0, -1)]
+    ])('closes an open door for rotation %i through half %i from either side', async (rotation, half, openPoint, openNormal) => {
+        const { interaction, world } = await createInteraction({
+            getBlockAt: (x, y, z) => x === 0 && z === 0 && y === 0 ? 33 : (x === 0 && z === 0 && y === 1 ? 34 : 0)
+        });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        world.chunks.set('0,0', { mesh, waterMesh: null });
+        world.setBlockMeta(0, 0, 0, rotation);
+        world.setBlockMeta(0, 1, 0, rotation);
+        let interactionCount = 0;
+        interaction.raycaster.intersectObjects = vi.fn(objects => {
+            if (!objects.includes(mesh)) return [];
+            interactionCount++;
+            const closedAlongX = rotation === 0;
+            return [{
+                distance: 2,
+                object: mesh,
+                point: interactionCount === 1
+                    ? new THREE.Vector3(closedAlongX ? 0.5 : 0.575, half + 0.5, closedAlongX ? 0.575 : 0.5)
+                    : openPoint,
+                face: { normal: interactionCount === 1
+                    ? new THREE.Vector3(closedAlongX ? 0 : 1, 0, closedAlongX ? 1 : 0)
+                    : openNormal }
+            }];
+        });
+
+        await interaction.handleInteraction({ button: 2 });
+        expect(world.getBlockMeta(0, 0, 0)).toBe(rotation | 4);
+        await interaction.handleInteraction({ button: 2 });
+
+        expect(world.getBlockMeta(0, 0, 0)).toBe(rotation);
+        expect(world.getBlockMeta(0, 1, 0)).toBe(rotation);
+    });
+
+    it('closes an open gate when the visible rail extends into the neighboring cell', async () => {
+        const { interaction, world } = await createInteraction({
+            getBlockAt: (x, y, z) => x === 0 && y === 0 && z === 0 ? 103 : 0
+        });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        world.chunks.set('0,0', { mesh, waterMesh: null });
+        let interactionCount = 0;
+        interaction.raycaster.intersectObjects = vi.fn(objects => objects.includes(mesh) ? [{
+            distance: 2,
+            object: mesh,
+            point: ++interactionCount === 1
+                ? new THREE.Vector3(0.5, 0.36, 0.57)
+                : new THREE.Vector3(0.23, 0.36, 1.1),
+            face: { normal: interactionCount === 1
+                ? new THREE.Vector3(0, 0, 1)
+                : new THREE.Vector3(1, 0, 0) }
+        }] : []);
+
+        await interaction.handleInteraction({ button: 2 });
+        expect(world.getBlockMeta(0, 0, 0)).toBe(4);
+        await interaction.handleInteraction({ button: 2 });
+
+        expect(world.getBlockMeta(0, 0, 0)).toBe(0);
+    });
+
+    it('opens a generated village chest instead of allowing its warning to be bypassed by mining', async () => {
+        const { interaction, world } = await createInteraction({ blockType: 75 });
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1));
+        world.chunks.set('0,0', { mesh, waterMesh: null });
+        world.structureChests = new Map([['chest,0,0,0', {
+            role: 'village_supply',
+            villageId: 'village:0,0'
+        }]]);
+        interaction.raycaster.intersectObjects = vi.fn(objects => objects.includes(mesh) ? [{
+            distance: 2,
+            object: mesh,
+            point: new THREE.Vector3(0.5, 0.5, 0.5),
+            face: { normal: new THREE.Vector3(0, 0, 1) }
+        }] : []);
+        interaction._openChest = vi.fn();
+        interaction._startMining = vi.fn();
+
+        await interaction.handleInteraction({ button: 0 });
+
+        expect(interaction._openChest).toHaveBeenCalledWith(0, 0, 0);
+        expect(interaction._startMining).not.toHaveBeenCalled();
+    });
+
     it('applies pressure-plate damage to the central player state', async () => {
         const { interaction, sound, world } = await createInteraction({ blockType: 79 });
 
@@ -423,11 +514,37 @@ describe('PlayerInteraction through the Game seam', () => {
         expect(world.structureProgress[structureId]).toEqual({ keyFound: true, gateOpened: true });
     }, 15000);
 
+    it.each([
+        { role: 'mine_reward', structureKind: 'mine', structureId: 'mine:0,0:v2' },
+        { role: 'dungeon_reward', structureKind: 'dungeon', structureId: 'dungeon:0,0:v2' }
+    ])('keeps a $structureKind reward chest sealed until its boss is defeated', async ({ role, structureKind, structureId }) => {
+        const { interaction, world } = await createInteraction();
+        world.structureChests = new Map([['chest,8,18,10', {
+            structureId,
+            role
+        }]]);
+        window.tryActivateStructureBoss = vi.fn(() => ({
+            blocked: true,
+            message: 'Der Tiefenwächter erwacht!'
+        }));
+
+        interaction._openChest(8, 18, 10);
+
+        expect(window.tryActivateStructureBoss).toHaveBeenCalledWith({
+            structureId,
+            structureKind,
+            position: { x: 6, y: 19, z: 8 }
+        });
+        expect(world.lootedChests).not.toContain('chest,8,18,10');
+        expect(interaction.showMessage).toHaveBeenCalledWith('Der Tiefenwächter erwacht!', '#ff647c', 18);
+    }, 15000);
+
     it('activates the blood moon ritual through the generated dungeon altar', async () => {
         const { interaction, world } = await createInteraction({ blockType: 58 });
         const structureId = 'dungeon:0,0:v2';
         world.structureAltars = new Map([['4,18,6', {
             structureId,
+            interaction: { x: 4, y: 18, z: 6 },
             spawn: { x: 4, y: 18, z: 9 }
         }]]);
         world.structureProgress = {};
@@ -436,7 +553,8 @@ describe('PlayerInteraction through the Game seam', () => {
         expect(interaction._tryActivateRitualAltar(4, 18, 6)).toBe(true);
         expect(window.tryActivateBloodMoonRitual).toHaveBeenCalledWith({
             structureId,
-            position: { x: 4, y: 18, z: 9 }
+            position: { x: 4, y: 18, z: 9 },
+            ritualPosition: { x: 4, y: 18, z: 6 }
         });
         expect(world.structureProgress[structureId]).toEqual({ ritualActivated: true });
         expect(interaction.showMessage).toHaveBeenCalledWith('Das Ritual beginnt.', '#ff647c', 18);
@@ -484,15 +602,12 @@ describe('PlayerInteraction through the Game seam', () => {
 });
 
 describe('painterly block fragments', () => {
-    it('uses fewer, softer and longer-lived fragments on painterly devices', async () => {
+    it('reduces painterly fragments on reduced-detail devices', async () => {
         const { getBlockBreakParticleProfile } = await import('../js/PlayerInteraction.js');
-        const original = getBlockBreakParticleProfile(false, false);
-        const painterly = getBlockBreakParticleProfile(true, false);
-        const reduced = getBlockBreakParticleProfile(true, true);
+        const standard = getBlockBreakParticleProfile(false);
+        const reduced = getBlockBreakParticleProfile(true);
 
-        expect(painterly.count).toBeLessThanOrEqual(original.count);
-        expect(painterly.opacity).toBeLessThan(original.opacity);
-        expect(painterly.lifetimeMs).toBeGreaterThan(original.lifetimeMs);
-        expect(reduced.count).toBeLessThan(painterly.count);
+        expect(standard).toMatchObject({ count: 9, size: 0.08, opacity: 0.78, lifetimeMs: 480, gravity: 4.8 });
+        expect(reduced.count).toBeLessThan(standard.count);
     });
 });

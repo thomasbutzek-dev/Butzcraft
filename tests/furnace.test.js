@@ -10,6 +10,8 @@ vi.mock('../js/blocks.js', () => ({
         STONE: 3,
         WOOD: 5,
         SAND: 7,
+        JUNGLE_WOOD: 13,
+        PALM_WOOD: 15,
         STONE_BRICK: 29,
         SANDSTONE: 30,
         COAL_ORE: 56,
@@ -176,10 +178,20 @@ describe('furnace inventory transfer', () => {
 
         expect(furnace.getFuelValue(60)).toBe(8);
         expect(furnace.getFuelValue(5)).toBe(3);
+        expect(furnace.getFuelValue(13)).toBe(3);
+        expect(furnace.getFuelValue(15)).toBe(3);
         expect(furnace.getFuelValue(26)).toBe(2);
         expect(furnace.getFuelValue(27)).toBe(1);
         expect(furnace.getFuelValue(57)).toBe(0);
         expect(furnace.getSmeltTime()).toBe(6000);
+    });
+
+    it('turns every wood type into charcoal', async () => {
+        const furnace = await loadFurnace();
+
+        expect(furnace.getSmeltRecipe(5)).toEqual({ type: 60, count: 1 });
+        expect(furnace.getSmeltRecipe(13)).toEqual({ type: 60, count: 1 });
+        expect(furnace.getSmeltRecipe(15)).toEqual({ type: 60, count: 1 });
     });
 
     it('smelts eight items with one piece of coal', async () => {

@@ -132,6 +132,32 @@
             </div>
         </section>
 
+        <section class="section diary-section" id="tagebuch" aria-labelledby="diary-title">
+            <div class="section-inner">
+                <div class="section-heading split-heading diary-heading" data-reveal>
+                    <div>
+                        <p class="eyebrow">Entwicklertagebuch</p>
+                        <h2 id="diary-title">Aus Blöcken. In Seiten.</h2>
+                    </div>
+                    <p>Seit Version 0.2.0 hält dieses Buch fest, was in Butzcraft neu ist. Jede neue Version fügt automatisch ein weiteres Kapitel hinzu.</p>
+                </div>
+
+                <div class="diary-stage" data-developer-diary data-reveal>
+                    <nav class="diary-chapters" data-diary-chapters aria-label="Version auswählen"></nav>
+                    <div class="diary-book" data-diary-book tabindex="0" aria-describedby="diary-instructions">
+                        <div class="diary-spine" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                        <div class="diary-spread" data-diary-spread aria-live="polite" aria-atomic="true"></div>
+                    </div>
+                    <div class="diary-controls">
+                        <button type="button" data-diary-previous aria-label="Zur älteren Version blättern"><span aria-hidden="true">←</span> Ältere Seite</button>
+                        <p><strong data-diary-position></strong><span id="diary-instructions">Mit den Pfeiltasten blättern</span></p>
+                        <button type="button" data-diary-next aria-label="Zur neueren Version blättern">Neuere Seite <span aria-hidden="true">→</span></button>
+                    </div>
+                    <noscript><p class="diary-noscript">Aktiviere JavaScript, um im Entwicklertagebuch zu blättern.</p></noscript>
+                </div>
+            </div>
+        </section>
+
         <section class="section character-section" id="charakter" aria-labelledby="character-title">
             <div class="section-inner">
                 <div class="section-heading split-heading" data-reveal>
@@ -209,7 +235,7 @@
     <footer class="site-footer">
         <a href="#start"><img src="logo.png" alt="Butzcraft"></a>
         <nav aria-label="Fußnavigation"><a href="/guide">Guide</a><a href="/faq">FAQ</a><a href="#kontakt">Kontakt</a><a href="/impressum">Impressum</a><a href="/datenschutz">Datenschutz</a></nav>
-        <p>Baue. Entdecke. Überlebe.</p>
+        <p>Baue. Entdecke. Überlebe. · Version <span data-app-version>0.3.1</span></p>
     </footer>
 
     <script type="module" src="js/butzcraftSite.js"></script>

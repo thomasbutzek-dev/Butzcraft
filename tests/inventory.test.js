@@ -10,12 +10,15 @@
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+const blocksMock = vi.hoisted(() => ({ atlasDataURL: '' }));
+const actualQuerySelectorAll = document.querySelectorAll.bind(document);
+
 // blocks.js importiert three (nur via CDN-importmap im Browser verfügbar) → mocken.
 // Wir geben die fürs Inventory nötigen Konstanten zurück, ohne Three.js zu laden.
 vi.mock('../js/blocks.js', () => ({
     BLOCK_TYPES: { GRASS: 1, DIRT: 2, STONE: 3, WATER: 4, WOOD: 5 },
     BLOCK_TEX: {},
-    atlasDataURL: ''
+    get atlasDataURL() { return blocksMock.atlasDataURL; }
 }));
 // recipe_book.js + sound.js sind UI/Audio-only — für Inventory-Logic-Tests irrelevant.
 vi.mock('../js/recipe_book.js', () => ({ initRecipeBook: () => {} }));
@@ -34,15 +37,19 @@ const {
 
 // updateInventoryUI hängt am DOM; wir machen sie zum No-Op via document.querySelectorAll-stub.
 beforeEach(() => {
+    blocksMock.atlasDataURL = '';
+    document.body.innerHTML = '';
     // Reset Slots
     for (let i = 0; i < inventorySlots.length; i++) {
         inventorySlots[i].type = 0;
         inventorySlots[i].count = 0;
         delete inventorySlots[i].durability;
+        delete inventorySlots[i].spoilAt;
     }
     cursorItem.type = 0;
     cursorItem.count = 0;
     delete cursorItem.durability;
+    delete cursorItem.spoilAt;
     // Stub für DOM-Lookups in updateInventoryUI
     document.querySelectorAll = () => [];
 });
@@ -106,6 +113,26 @@ describe('addItemToInventory – Basis', () => {
         expect(cursorItem).toEqual({ type: 0, count: 0 });
     });
 
+    it('preserves the earliest spoilage deadline when splitting and merging food stacks', () => {
+        inventorySlots[0] = { type: 17, count: 10, spoilAt: 100 };
+        inventorySlots[2] = { type: 17, count: 2, spoilAt: 80 };
+        const source = createSlotElement(0, 'inventory');
+        const emptyTarget = createSlotElement(1, 'inventory');
+        const olderTarget = createSlotElement(2, 'inventory');
+
+        source.dispatchEvent(new MouseEvent('mousedown', { button: 2 }));
+        expect(cursorItem).toEqual({ type: 17, count: 5, spoilAt: 100 });
+        expect(inventorySlots[0]).toEqual({ type: 17, count: 5, spoilAt: 100 });
+
+        emptyTarget.dispatchEvent(new MouseEvent('mousedown', { button: 2 }));
+        expect(inventorySlots[1]).toEqual({ type: 17, count: 1, spoilAt: 100 });
+        expect(cursorItem).toEqual({ type: 17, count: 4, spoilAt: 100 });
+
+        olderTarget.dispatchEvent(new MouseEvent('mousedown', { button: 0 }));
+        expect(inventorySlots[2]).toEqual({ type: 17, count: 6, spoilAt: 80 });
+        expect(cursorItem).toEqual({ type: 0, count: 0 });
+    });
+
     it('restores an item icon when an emptied slot receives the same item type again', () => {
         const slot = createSlotElement(0, 'inventory');
         document.querySelectorAll = (selector) => selector === '.inv-slot' ? [slot] : [];
@@ -121,6 +148,20 @@ describe('addItemToInventory – Basis', () => {
         updateInventoryUI();
 
         expect(icon.innerHTML).not.toBe('');
+    });
+
+    it('repaints existing item icons when the async texture atlas becomes ready', () => {
+        document.querySelectorAll = actualQuerySelectorAll;
+        const slot = createSlotElement(0, 'inventory');
+        document.body.appendChild(slot);
+        inventorySlots[0] = { type: 3, count: 1 };
+        updateInventoryUI();
+
+        blocksMock.atlasDataURL = 'blob:inventory-atlas';
+        window.dispatchEvent(new CustomEvent('butzcraft:atlas-ready'));
+
+        const face = slot.querySelector('.mc-face');
+        expect(face.style.backgroundImage).toContain('blob:inventory-atlas');
     });
 });
 
@@ -170,6 +211,22 @@ describe('addItemToInventory full inventory', () => {
 
         expect(result).toEqual({ added: false, reason: 'inventory-full' });
         expect(inventorySlots).toEqual(before);
+    });
+});
+
+describe('equipment bundle transactions', () => {
+    it('atomically exchanges payment for five durable armor pieces', async () => {
+        const { tryExchangeInventory } = await import('../js/inventory.js');
+        inventorySlots[0] = { type: 62, count: 30 };
+
+        const result = tryExchangeInventory(
+            { type: 62, count: 30 },
+            { items: [131, 132, 133, 134, 135].map(type => ({ type, count: 1 })) }
+        );
+
+        expect(result.exchanged).toBe(true);
+        expect(inventorySlots.filter(slot => slot.type >= 131 && slot.type <= 135)).toHaveLength(5);
+        expect(inventorySlots.find(slot => slot.type === 131)?.durability).toBe(1200);
     });
 });
 

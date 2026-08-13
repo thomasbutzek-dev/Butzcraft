@@ -35,4 +35,25 @@ describe('accessible gameplay dialogs', () => {
         expect(header.contains(document.getElementById('inventory-close-btn'))).toBe(true);
         expect(header.nextElementSibling.id).toBe('inventory-objective');
     });
+
+    it('includes the recipe empty state in the shipped inventory shell', () => {
+        const html = readFileSync('index.html', 'utf8');
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        const emptyState = document.getElementById('recipe-empty-state');
+
+        expect(emptyState).not.toBeNull();
+        expect(emptyState.getAttribute('role')).toBe('status');
+        expect(emptyState.hidden).toBe(true);
+    });
+
+    it('offers an explicit cancel action before taking village supplies', () => {
+        const html = readFileSync('index.html', 'utf8');
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        const warning = document.getElementById('village-chest-warning');
+
+        expect(warning.getAttribute('role')).toBe('alert');
+        expect(warning.textContent).toContain('Das Vertrauen sinkt um 3');
+        expect(document.getElementById('village-chest-cancel').textContent).toBe('Abbrechen');
+        expect(document.getElementById('village-chest-confirm').textContent).toBe('Trotzdem nehmen');
+    });
 });

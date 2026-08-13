@@ -1,0 +1,90 @@
+{
+  "schemaVersion": 1,
+  "reason": "duration",
+  "targetDurationMs": 30000,
+  "activeDurationMs": 30002.6,
+  "frameCount": 2056,
+  "excludedFrameGaps": 0,
+  "averageFps": 68.53,
+  "frameTimeMs": {
+    "p50": 12.9,
+    "p95": 25.2,
+    "p99": 39.68,
+    "worst": 86.7
+  },
+  "frameBudget": {
+    "over16_7ms": {
+      "count": 559,
+      "percent": 27.19
+    },
+    "over33_3ms": {
+      "count": 49,
+      "percent": 2.38
+    },
+    "over50ms": {
+      "count": 6,
+      "percent": 0.29
+    }
+  },
+  "diagnostics": {
+    "loadedChunks": {
+      "first": 81,
+      "last": 81,
+      "min": 81,
+      "max": 81
+    },
+    "queuedChunks": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0
+    },
+    "pendingMeshes": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0
+    },
+    "pendingMeshResults": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0
+    },
+    "mobs": {
+      "first": 1,
+      "last": 6,
+      "min": 1,
+      "max": 6
+    },
+    "npcs": {
+      "first": 0,
+      "last": 0,
+      "min": 0,
+      "max": 0
+    },
+    "renderTriangles": {
+      "first": 50738,
+      "last": 51086,
+      "min": 50738,
+      "max": 51086
+    },
+    "usedJsHeapMiB": {
+      "first": 33.44,
+      "last": 31.83,
+      "min": 30.36,
+      "max": 43.5
+    }
+  },
+  "metadata": {
+    "capturedAt": "2026-07-31T12:37:04.226Z",
+    "scenario": "desktop-steady-new-game",
+    "appVersion": "0.2.2",
+    "graphicsVariant": "B",
+    "viewport": "1933x1165",
+    "devicePixelRatio": 2,
+    "hardwareConcurrency": 24,
+    "deviceMemoryGiB": 32,
+    "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+  }
+}

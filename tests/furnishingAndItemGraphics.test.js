@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { describe, expect, it } from 'vitest';
 
-function loadPainterlyTextureFor(graphicsVariant) {
+function loadPainterlyTextureFor() {
     const self = {};
     const context = vm.createContext({
         self,
@@ -18,11 +18,10 @@ function loadPainterlyTextureFor(graphicsVariant) {
     });
     const source = readChunkWorkerSource();
     vm.runInContext(`${source}\nself.painterlyTextureFor = painterlyTextureFor;`, context);
-    vm.runInContext(`GRAPHICS_VARIANT = '${graphicsVariant}';`, context);
     return self.painterlyTextureFor;
 }
 
-function loadFurnitureHelpers(graphicsVariant) {
+function loadFurnitureHelpers() {
     const self = {};
     const context = vm.createContext({
         self,
@@ -37,7 +36,6 @@ function loadFurnitureHelpers(graphicsVariant) {
     });
     const source = readChunkWorkerSource();
     vm.runInContext(`${source}\nself.furnitureTopUVs = furnitureTopUVs; self.furnitureTextureFor = furnitureTextureFor;`, context);
-    vm.runInContext(`GRAPHICS_VARIANT = '${graphicsVariant}';`, context);
     return self;
 }
 
@@ -53,7 +51,7 @@ function collectVariants(selectTexture, blockType, fallback) {
 
 describe('painterly furnishing and item graphics', () => {
     it('varies furnace, workbench side, window, and both bed halves in style B', () => {
-        const selectTexture = loadPainterlyTextureFor('B');
+        const selectTexture = loadPainterlyTextureFor();
 
         expect([...collectVariants(selectTexture, 59, 59)]).toEqual(expect.arrayContaining([59, 240, 241, 242]));
         expect([...collectVariants(selectTexture, 36, 36)]).toEqual(expect.arrayContaining([36, 243, 244, 245]));
@@ -62,18 +60,8 @@ describe('painterly furnishing and item graphics', () => {
         expect([...collectVariants(selectTexture, 39, 42)]).toEqual(expect.arrayContaining([42, 250]));
     });
 
-    it('keeps style A on the original furnishing tiles', () => {
-        const selectTexture = loadPainterlyTextureFor('A');
-
-        expect(selectTexture(59, null, 12, 34, -6, 59)).toBe(59);
-        expect(selectTexture(36, null, 12, 34, -6, 36)).toBe(36);
-        expect(selectTexture(32, null, 12, 34, -6, 38)).toBe(38);
-        expect(selectTexture(38, null, 12, 34, -6, 41)).toBe(41);
-        expect(selectTexture(39, null, 12, 34, -6, 42)).toBe(42);
-    });
-
     it('rotates both furniture halves together and keeps their texture variants paired', () => {
-        const { furnitureTopUVs, furnitureTextureFor } = loadFurnitureHelpers('B');
+        const { furnitureTopUVs, furnitureTextureFor } = loadFurnitureHelpers();
         const alongX = furnitureTopUVs(0, 0, 1, 1, 0);
         const alongZ = furnitureTopUVs(0, 0, 1, 1, 2);
 

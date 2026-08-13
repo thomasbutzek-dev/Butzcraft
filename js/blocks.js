@@ -1,22 +1,6 @@
 import * as THREE from 'three';
-import { graphicsPrototype } from './graphicsPrototype.js?v=20260718c';
-
-export const BLOCK_TYPES = {
-        AIR: 0, GRASS: 1, DIRT: 2, STONE: 3, WATER: 4, WOOD: 5, LEAVES: 6, SAND: 7, CLOUD: 8, FLOWER_RED: 9, FLOWER_YELLOW: 10, SNOW: 11, ICE: 12, JUNGLE_WOOD: 13, JUNGLE_LEAVES: 14, PALM_WOOD: 15, PALM_LEAVES: 16, EGG: 17, MILK: 18, WOOL: 19, BEDROCK: 20, FISH: 21, RAW_MEAT: 22, RAW_CHICKEN: 23, ROTTEN_FLESH: 24, MUTTON: 25, PLANKS: 26, STICK: 27, WORKBENCH: 28, STONE_BRICK: 29, SANDSTONE: 30, BONE: 31, WINDOW: 32, DOOR_BOTTOM: 33, DOOR_TOP: 34, WORKBENCH_SIDE: 36, BED_HEAD: 38, BED_FOOT: 39,
-        BERRY_BUSH: 43, TALL_GRASS: 44, CACTUS: 45, DEAD_BUSH: 46, MUSHROOM_RED: 47, MUSHROOM_BROWN: 48, SUGARCANE: 49, FERN: 50, BERRIES: 51, BERRY_BUSH_EMPTY: 52, SEAGRASS: 54, TURTLE_MEAT: 55,
-        COAL_ORE: 56, IRON_ORE: 57, GOLD_ORE: 58, FURNACE: 59,
-        COAL: 60, IRON_INGOT: 61, GOLD_INGOT: 62,
-        WOOD_PICKAXE: 63, STONE_PICKAXE: 64, IRON_PICKAXE: 65, GOLD_PICKAXE: 66,
-        WOOD_AXE: 67, STONE_AXE: 68, IRON_AXE: 69, GOLD_AXE: 70,
-        WOOD_SHOVEL: 71, STONE_SHOVEL: 72, IRON_SHOVEL: 73, GOLD_SHOVEL: 74,
-        CHEST: 75,
-        SNOW_BLOCK: 77, ICE_BLOCK: 78, PRESSURE_PLATE: 79, MINE_RAIL: 80, MINE_SUPPORT: 81, SANDSTONE_CARVED: 82,
-        SPAWNER: 83, MOSSY_STONE: 84, COBBLESTONE: 85, FIRE: 86, VILLAGE_PATH: 87, HAY_BALE: 88,
-        WOOD_SWORD: 89, STONE_SWORD: 90, IRON_SWORD: 91, GOLD_SWORD: 92,
-        STRING: 93, BOW: 94, ARROW: 95,
-        COOKED_FISH: 96, COOKED_MEAT: 97, COOKED_CHICKEN: 98, COOKED_MUTTON: 99, COOKED_TURTLE_MEAT: 100,
-        TORCH: 101, WOOD_FENCE: 102, WOOD_GATE: 103, VILLAGE_LANTERN: 104
-        };
+import { BLOCK_TYPES } from './blockTypes.js?v=20260723a';
+export { BLOCK_TYPES };
 
         export const BLOCK_COLORS = {
             [BLOCK_TYPES.GRASS]: 0x3B8C1E, [BLOCK_TYPES.DIRT]: 0x5C3F28, [BLOCK_TYPES.STONE]: 0x808080, [BLOCK_TYPES.WATER]: 0x40a4df,
@@ -41,7 +25,15 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.COOKED_FISH]: 0xB9783E, [BLOCK_TYPES.COOKED_MEAT]: 0x8B4513, [BLOCK_TYPES.COOKED_CHICKEN]: 0xC98B52,
             [BLOCK_TYPES.COOKED_MUTTON]: 0xA65A3A, [BLOCK_TYPES.COOKED_TURTLE_MEAT]: 0x6F7A3D,
             [BLOCK_TYPES.TORCH]: 0xFFB02E, [BLOCK_TYPES.WOOD_FENCE]: 0x7A4826,
-            [BLOCK_TYPES.WOOD_GATE]: 0x8B5A2B, [BLOCK_TYPES.VILLAGE_LANTERN]: 0xFFD36A
+            [BLOCK_TYPES.WOOD_GATE]: 0x8B5A2B, [BLOCK_TYPES.VILLAGE_LANTERN]: 0xFFD36A,
+            [BLOCK_TYPES.POLAR_BEAR_FUR]: 0xE9EDF0,
+            [BLOCK_TYPES.BRUSH_HELMET]: 0x587D39, [BLOCK_TYPES.BRUSH_CHEST]: 0x587D39, [BLOCK_TYPES.BRUSH_ARMS]: 0x587D39, [BLOCK_TYPES.BRUSH_LEGS]: 0x587D39, [BLOCK_TYPES.BRUSH_BOOTS]: 0x587D39,
+            [BLOCK_TYPES.FUR_HELMET]: 0xD8D1BD, [BLOCK_TYPES.FUR_CHEST]: 0xD8D1BD, [BLOCK_TYPES.FUR_ARMS]: 0xD8D1BD, [BLOCK_TYPES.FUR_LEGS]: 0xD8D1BD, [BLOCK_TYPES.FUR_BOOTS]: 0xD8D1BD,
+            [BLOCK_TYPES.WOOD_ARMOR_HELMET]: 0x7A4F2B, [BLOCK_TYPES.WOOD_ARMOR_CHEST]: 0x7A4F2B, [BLOCK_TYPES.WOOD_ARMOR_ARMS]: 0x7A4F2B, [BLOCK_TYPES.WOOD_ARMOR_LEGS]: 0x7A4F2B, [BLOCK_TYPES.WOOD_ARMOR_BOOTS]: 0x7A4F2B,
+            [BLOCK_TYPES.IRON_HELMET]: 0xAEB8BF, [BLOCK_TYPES.IRON_CHEST]: 0xAEB8BF, [BLOCK_TYPES.IRON_ARMS]: 0xAEB8BF, [BLOCK_TYPES.IRON_LEGS]: 0xAEB8BF, [BLOCK_TYPES.IRON_BOOTS]: 0xAEB8BF,
+            [BLOCK_TYPES.REINFORCED_IRON_HELMET]: 0x697780, [BLOCK_TYPES.REINFORCED_IRON_CHEST]: 0x697780, [BLOCK_TYPES.REINFORCED_IRON_ARMS]: 0x697780, [BLOCK_TYPES.REINFORCED_IRON_LEGS]: 0x697780, [BLOCK_TYPES.REINFORCED_IRON_BOOTS]: 0x697780,
+            [BLOCK_TYPES.BLOOD_MOON_HELMET]: 0x5B1524, [BLOCK_TYPES.BLOOD_MOON_CHEST]: 0x5B1524, [BLOCK_TYPES.BLOOD_MOON_ARMS]: 0x5B1524, [BLOCK_TYPES.BLOOD_MOON_LEGS]: 0x5B1524, [BLOCK_TYPES.BLOOD_MOON_BOOTS]: 0x5B1524,
+            [BLOCK_TYPES.SPOILED_FOOD]: 0x596B35
         };
 
         export const BLOCK_TEX = {
@@ -67,7 +59,15 @@ export const BLOCK_TYPES = {
             [BLOCK_TYPES.COOKED_FISH]: 96, [BLOCK_TYPES.COOKED_MEAT]: 97, [BLOCK_TYPES.COOKED_CHICKEN]: 98,
             [BLOCK_TYPES.COOKED_MUTTON]: 99, [BLOCK_TYPES.COOKED_TURTLE_MEAT]: 100,
             [BLOCK_TYPES.TORCH]: 200, [BLOCK_TYPES.WOOD_FENCE]: 27,
-            [BLOCK_TYPES.WOOD_GATE]: 27, [BLOCK_TYPES.VILLAGE_LANTERN]: 200
+            [BLOCK_TYPES.WOOD_GATE]: 27, [BLOCK_TYPES.VILLAGE_LANTERN]: 200,
+            [BLOCK_TYPES.POLAR_BEAR_FUR]: 26,
+            [BLOCK_TYPES.BRUSH_HELMET]: 5, [BLOCK_TYPES.BRUSH_CHEST]: 5, [BLOCK_TYPES.BRUSH_ARMS]: 5, [BLOCK_TYPES.BRUSH_LEGS]: 5, [BLOCK_TYPES.BRUSH_BOOTS]: 5,
+            [BLOCK_TYPES.FUR_HELMET]: 26, [BLOCK_TYPES.FUR_CHEST]: 26, [BLOCK_TYPES.FUR_ARMS]: 26, [BLOCK_TYPES.FUR_LEGS]: 26, [BLOCK_TYPES.FUR_BOOTS]: 26,
+            [BLOCK_TYPES.WOOD_ARMOR_HELMET]: 27, [BLOCK_TYPES.WOOD_ARMOR_CHEST]: 27, [BLOCK_TYPES.WOOD_ARMOR_ARMS]: 27, [BLOCK_TYPES.WOOD_ARMOR_LEGS]: 27, [BLOCK_TYPES.WOOD_ARMOR_BOOTS]: 27,
+            [BLOCK_TYPES.IRON_HELMET]: 61, [BLOCK_TYPES.IRON_CHEST]: 61, [BLOCK_TYPES.IRON_ARMS]: 61, [BLOCK_TYPES.IRON_LEGS]: 61, [BLOCK_TYPES.IRON_BOOTS]: 61,
+            [BLOCK_TYPES.REINFORCED_IRON_HELMET]: 61, [BLOCK_TYPES.REINFORCED_IRON_CHEST]: 61, [BLOCK_TYPES.REINFORCED_IRON_ARMS]: 61, [BLOCK_TYPES.REINFORCED_IRON_LEGS]: 61, [BLOCK_TYPES.REINFORCED_IRON_BOOTS]: 61,
+            [BLOCK_TYPES.BLOOD_MOON_HELMET]: 61, [BLOCK_TYPES.BLOOD_MOON_CHEST]: 61, [BLOCK_TYPES.BLOOD_MOON_ARMS]: 61, [BLOCK_TYPES.BLOOD_MOON_LEGS]: 61, [BLOCK_TYPES.BLOOD_MOON_BOOTS]: 61,
+            [BLOCK_TYPES.SPOILED_FOOD]: 76
         };
 
 // --- TEXTURE GENERATOR ---
@@ -1187,36 +1187,48 @@ export const BLOCK_TYPES = {
 
             // Dynamische Gleisformen; der Worker dreht sie anhand der Nachbargleise.
             drawTile(251, 0, (c) => {
-                c.fillStyle = '#5A4A3A'; c.fillRect(0,0,64,64);
-                c.strokeStyle = '#666'; c.lineWidth = 7;
-                for (const radius of [8, 24, 40, 56]) {
-                    c.beginPath(); c.arc(64, 0, radius, Math.PI / 2, Math.PI); c.stroke();
+                c.fillStyle = '#4A382B'; c.fillRect(0,0,64,64);
+                c.fillStyle = '#765235';
+                for (let angle = Math.PI / 2 + 0.12; angle < Math.PI - 0.08; angle += 0.25) {
+                    c.save();
+                    c.translate(64 + Math.cos(angle) * 32, Math.sin(angle) * 32);
+                    c.rotate(angle);
+                    c.fillRect(-22, -4, 44, 8);
+                    c.restore();
                 }
-                c.strokeStyle = '#999'; c.lineWidth = 8;
-                for (const radius of [13, 51]) {
+                for (const radius of [18, 46]) {
+                    c.strokeStyle = '#34383A'; c.lineWidth = 7;
+                    c.beginPath(); c.arc(64, 0, radius, Math.PI / 2, Math.PI); c.stroke();
+                    c.strokeStyle = '#858C8D'; c.lineWidth = 4;
                     c.beginPath(); c.arc(64, 0, radius, Math.PI / 2, Math.PI); c.stroke();
                 }
             });
             drawTile(252, 0, (c) => {
-                c.fillStyle = '#5A4A3A'; c.fillRect(0,0,64,64);
-                c.fillStyle = '#666';
-                for (let offset=4; offset<64; offset+=16) {
-                    c.fillRect(0,offset,64,6);
-                    if (offset < 36) c.fillRect(offset,0,6,40);
+                c.fillStyle = '#4A382B'; c.fillRect(0,0,64,64);
+                c.fillStyle = '#765235';
+                for (let offset=6; offset<64; offset+=16) {
+                    c.fillRect(offset, 14, 7, 40);
                 }
-                c.fillStyle = '#999';
-                c.fillRect(8,0,9,38); c.fillRect(47,0,9,38);
-                c.fillRect(0,27,64,9); c.fillRect(0,47,64,9);
+                c.fillRect(10, 3, 44, 7); c.fillRect(10, 19, 44, 7);
+                c.fillStyle = '#34383A';
+                c.fillRect(14,0,8,40); c.fillRect(42,0,8,40);
+                c.fillRect(0,14,64,8); c.fillRect(0,42,64,8);
+                c.fillStyle = '#858C8D';
+                c.fillRect(16,0,4,40); c.fillRect(44,0,4,40);
+                c.fillRect(0,16,64,4); c.fillRect(0,44,64,4);
             });
             drawTile(253, 0, (c) => {
-                c.fillStyle = '#5A4A3A'; c.fillRect(0,0,64,64);
-                c.fillStyle = '#666';
-                for (let offset=4; offset<64; offset+=16) {
-                    c.fillRect(0,offset,64,6); c.fillRect(offset,0,6,64);
+                c.fillStyle = '#4A382B'; c.fillRect(0,0,64,64);
+                c.fillStyle = '#765235';
+                for (let offset=6; offset<64; offset+=16) {
+                    c.fillRect(offset, 0, 7, 64); c.fillRect(0, offset, 64, 7);
                 }
-                c.fillStyle = '#999';
-                c.fillRect(8,0,9,64); c.fillRect(47,0,9,64);
-                c.fillRect(0,8,64,9); c.fillRect(0,47,64,9);
+                c.fillStyle = '#34383A';
+                c.fillRect(14,0,8,64); c.fillRect(42,0,8,64);
+                c.fillRect(0,14,64,8); c.fillRect(0,42,64,8);
+                c.fillStyle = '#858C8D';
+                c.fillRect(16,0,4,64); c.fillRect(44,0,4,64);
+                c.fillRect(0,16,64,4); c.fillRect(0,44,64,4);
             });
 
             // MINENBALKEN (Tile 81) – Holzstützbalken
@@ -1448,7 +1460,7 @@ export const BLOCK_TYPES = {
             drawCookedFoodTile(99, '#A65A3A', '#673522');
             drawCookedFoodTile(100, '#6F7A3D', '#3D4822');
 
-            if (graphicsPrototype.usesPainterlyTextures) {
+            {
                 const fallbackFamilies = [
                     [0, [101, 102, 103]], [1, [104, 105, 106]],
                     [4, [107, 108, 109]], [5, [110, 111, 112]],
@@ -1489,10 +1501,10 @@ export const BLOCK_TYPES = {
 
 
             const tex = new THREE.CanvasTexture(canvas);
-            const prototypeFilter = graphicsPrototype.usesPainterlyTextures ? THREE.LinearFilter : THREE.NearestFilter;
-            tex.magFilter = prototypeFilter; tex.minFilter = prototypeFilter;
+            const textureFilter = THREE.LinearFilter;
+            tex.magFilter = textureFilter; tex.minFilter = textureFilter;
             tex.generateMipmaps = false;
-            if (graphicsPrototype.usesPainterlyTextures) {
+            {
                 tex.colorSpace = THREE.SRGBColorSpace;
                 const loadImage = (url) => new Promise((resolve) => {
                     const image = new Image();
@@ -1501,21 +1513,21 @@ export const BLOCK_TYPES = {
                     image.src = url;
                 });
                 Promise.all([
-                    loadImage(new URL('../assets/graphics-prototype/forest-material-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/forest-variation-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/biome-material-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/undergrowth-variation-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/crafted-wood-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/mine-village-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/desert-snow-village-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/dungeon-special-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/underground-material-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/dry-wet-biome-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/tropical-tree-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/furnishing-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/equipment-item-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/combat-food-item-tiles.png', import.meta.url).href),
-                    loadImage(new URL('../assets/graphics-prototype/raw-item-tiles.png', import.meta.url).href)
+                    loadImage(new URL('../assets/painterly/forest-material-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/forest-variation-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/biome-material-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/undergrowth-variation-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/crafted-wood-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/mine-village-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/desert-snow-village-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/dungeon-special-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/underground-material-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/dry-wet-biome-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/tropical-tree-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/furnishing-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/equipment-item-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/combat-food-item-tiles.png', import.meta.url).href),
+                    loadImage(new URL('../assets/painterly/raw-item-tiles.png', import.meta.url).href)
                 ]).then(([image, variationImage, biomeImage, undergrowthImage, craftedWoodImage, mineVillageImage, desertSnowVillageImage, dungeonSpecialImage, undergroundMaterialImage, dryWetBiomeImage, tropicalTreeImage, furnishingImage, equipmentItemImage, combatFoodItemImage, rawItemImage]) => {
                     if (!image || !variationImage) return;
                     const tileReplacements = [
@@ -1646,11 +1658,11 @@ export const BLOCK_TYPES = {
 let atlasObjectURL = null;
 let atlasSnapshotVersion = 0;
 
-function publishAtlasDataURL(canvas, prototypeReady = false) {
+function publishAtlasDataURL(canvas, painterlyReady = false) {
     const version = ++atlasSnapshotVersion;
     const notify = () => {
         window.dispatchEvent(new CustomEvent('butzcraft:atlas-ready'));
-        if (prototypeReady) window.dispatchEvent(new CustomEvent('butzcraft:prototype-atlas-ready'));
+        if (painterlyReady) window.dispatchEvent(new CustomEvent('butzcraft:painterly-atlas-ready'));
     };
     const publishFallback = () => {
         if (version !== atlasSnapshotVersion) return;

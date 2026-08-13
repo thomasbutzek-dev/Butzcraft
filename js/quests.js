@@ -189,12 +189,19 @@ const PROFESSION_QUEST_CHAINS = [
         {
             title: 'Echo der Quelle', requiredTrust: 7, requiredStoryIndex: 10,
             objective: { type: 'boss', bossType: 'bloodMoonEcho', required: 1 },
-            reward: { type: 92, count: 1 }, trustReward: 5,
+            reward: {
+                label: 'Blutmondrüstungsset',
+                items: [
+                    { type: 131, count: 1 }, { type: 132, count: 1 }, { type: 133, count: 1 },
+                    { type: 134, count: 1 }, { type: 135, count: 1 }
+                ]
+            },
+            trustReward: 5,
             dialogue: {
                 offer: 'Der Wächter ist gefallen, doch sein Echo kehrt zurück. Stelle dich ihm noch einmal am Altar.',
                 details: 'Aktiviere den Ritualaltar nach Abschluss der Hauptgeschichte und besiege das Blutmondecho.',
                 progress: 'Das Echo ist noch nicht verstummt. Der Altar wartet in der Endkammer.',
-                complete: 'Jetzt ist selbst der Nachhall gebrochen. Diese Klinge trägt die Geschichte deines Sieges.'
+                complete: 'Jetzt ist selbst der Nachhall gebrochen. Diese Rüstung trägt die Geschichte deines Sieges.'
             }
         }
     ]
@@ -327,6 +334,7 @@ export function createQuestState(legacyStoryIndex = 0) {
         abandonedQuestIds: [],
         villages: {},
         questItems: {},
+        storyMilestones: {},
         storyFlags: {}
     };
 }
@@ -351,6 +359,9 @@ export function normalizeQuestState(rawState, legacyStoryIndex = 0) {
             : {},
         questItems: rawState.questItems && typeof rawState.questItems === 'object' && !Array.isArray(rawState.questItems)
             ? rawState.questItems
+            : {},
+        storyMilestones: rawState.storyMilestones && typeof rawState.storyMilestones === 'object' && !Array.isArray(rawState.storyMilestones)
+            ? rawState.storyMilestones
             : {},
         storyFlags: rawState.storyFlags && typeof rawState.storyFlags === 'object' && !Array.isArray(rawState.storyFlags)
             ? rawState.storyFlags
@@ -406,7 +417,7 @@ export function generateVillageOffers(village, dayCount = 0, problemProfile = nu
         objective: {
             ...template.objective,
             current: 0,
-            ...(center ? { target: center } : {})
+            ...(template.objective.type === 'place' && center ? { target: center } : {})
         },
         reward: { ...template.reward },
         trustReward: template.trustReward,
@@ -487,7 +498,7 @@ export function getProfessionChainStatus(questState, villageId, professionIdx, m
             objective: {
                 ...template.objective,
                 current: 0,
-                ...(village.center ? { target: { ...village.center } } : {})
+                ...(template.objective.type === 'place' && village.center ? { target: { ...village.center } } : {})
             },
             reward: { ...template.reward },
             trustReward: template.trustReward,

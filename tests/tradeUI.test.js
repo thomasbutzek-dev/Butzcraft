@@ -130,11 +130,35 @@ describe('NPC trade transactions', () => {
         };
 
         openTradeUI(npc, { unlock() {} });
+        expect(document.getElementById('trade-title').textContent).toContain('Vertrauen 3 · Bekannt');
         expect(document.querySelector('#trade-row-0 .trade-label').textContent).toContain('9×');
         document.querySelector('#trade-row-0 .trade-btn').click();
 
         expect(inventory.inventorySlots[0]).toEqual({ type: 60, count: 1 });
         expect(inventory.inventorySlots.some(slot => slot.type === 61 && slot.count === 1)).toBe(true);
+    });
+
+    it('buys a complete armor set as one smith transaction', () => {
+        inventory.inventorySlots[0] = { type: 61, count: 12 };
+        const npc = {
+            profession: {
+                name: 'Schmied',
+                quest: null,
+                trades: [{
+                    give: { type: 61, count: 12 },
+                    receive: {
+                        label: 'Holzrüstungsset',
+                        items: [116, 117, 118, 119, 120].map(type => ({ type, count: 1 }))
+                    }
+                }]
+            }
+        };
+
+        openTradeUI(npc, { unlock() {} });
+        document.querySelector('.trade-btn').click();
+
+        expect(inventory.inventorySlots.filter(slot => slot.type >= 116 && slot.type <= 120)).toHaveLength(5);
+        expect(document.querySelector('#trade-row-0').textContent).toContain('Holzrüstungsset');
     });
 
     it('accepts and turns in a generated village delivery quest', () => {
@@ -166,12 +190,21 @@ describe('NPC trade transactions', () => {
         document.querySelector('.quest-offer-row .trade-btn').click();
         expect(questState.activeSideQuests).toHaveLength(1);
 
+        const trustListener = vi.fn();
+        window.addEventListener('butzcraft:village-trust-earned', trustListener, { once: true });
         inventory.inventorySlots[0] = { type: 60, count: 4 };
         openTradeUI(npc, { unlock() {} });
         document.querySelector('.quest-active-row .trade-btn').click();
 
         expect(questState.activeSideQuests).toEqual([]);
         expect(questState.villages['village:1,2'].trust).toBe(2);
+        expect(trustListener).toHaveBeenCalledWith(expect.objectContaining({
+            detail: expect.objectContaining({
+                villageId: 'village:1,2',
+                trustEarned: 2,
+                trust: 2
+            })
+        }));
         expect(inventory.inventorySlots.some(slot => slot.type === 61 && slot.count === 1)).toBe(true);
     });
 

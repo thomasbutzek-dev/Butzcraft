@@ -18,7 +18,7 @@ function loadVillageGenerator() {
     });
     const source = readChunkWorkerSource();
     vm.runInContext(
-        `${source}\nself.__villageGenerator = { createVillagePlan, spawnVillage, generateTerrain, getVillageCandidate, setWorldGenerationVersion: version => { WORLD_GENERATION_VERSION = version; }, mulberry32, BIOMES };`,
+        `${source}\nself.__villageGenerator = { createVillagePlan, spawnVillage, generateTerrain, getVillageCandidate, getTerrainHeightAt, setWorldGenerationVersion: version => { WORLD_GENERATION_VERSION = version; }, mulberry32, BIOMES };`,
         context
     );
     return self.__villageGenerator;
@@ -31,6 +31,78 @@ function countBlocks(data, blockType) {
 }
 
 describe('biome-specific village generation', () => {
+    it('keeps accepted V2 village foundations within two blocks of local terrain', () => {
+        const { getVillageCandidate, createVillagePlan, spawnVillage, getTerrainHeightAt, mulberry32, BIOMES } = loadVillageGenerator();
+        const foundBiomes = new Set();
+        const formerExtremeSite = getVillageCandidate(-44, 3, 2);
+
+        expect(formerExtremeSite).not.toBeNull();
+
+        for (let cx = -45; cx <= 30; cx++) {
+            for (let cz = -30; cz <= 30; cz++) {
+                const village = getVillageCandidate(cx, cz, 2);
+                if (!village) continue;
+                foundBiomes.add(village.biome);
+                let minimumCenterTerrainY = Infinity;
+                for (let dx = -3; dx <= 3; dx++) {
+                    for (let dz = -3; dz <= 3; dz++) {
+                        minimumCenterTerrainY = Math.min(
+                            minimumCenterTerrainY,
+                            getTerrainHeightAt(village.x + dx, village.z + dz)
+                        );
+                    }
+                }
+                expect(village.baseY - 1 - minimumCenterTerrainY, `${village.biome} ${cx},${cz} center`).toBeLessThanOrEqual(2);
+                const villageSeed = (village.x * 428759) ^ (village.z * 756839) ^ 314159;
+                const plan = createVillagePlan(mulberry32(villageSeed), village.biome, 2);
+                const info = spawnVillage(
+                    new Uint8Array(16 * 64 * 16),
+                    8,
+                    village.baseY,
+                    8,
+                    mulberry32(villageSeed),
+                    village.x,
+                    village.z,
+                    village.biome,
+                    village.variant,
+                    2
+                );
+
+                for (let index = 0; index < plan.buildings.length; index++) {
+                    const building = plan.buildings[index];
+                    const house = info.houses[index];
+                    const iglooRadius = building.purpose === 'hall' ? 4 : 3;
+                    const footprint = village.biome === BIOMES.SNOW && !building.isLandmark
+                        ? {
+                            x: village.x + building.dx + Math.floor(building.width / 2) - iglooRadius,
+                            z: village.z + building.dz + Math.floor(building.depth / 2) - iglooRadius,
+                            width: iglooRadius * 2 + 1,
+                            depth: iglooRadius * 2 + 1
+                        }
+                        : {
+                            x: village.x + building.dx,
+                            z: village.z + building.dz,
+                            width: building.width,
+                            depth: building.depth
+                        };
+                    let minimumTerrainY = Infinity;
+                    for (let dx = 0; dx < footprint.width; dx++) {
+                        for (let dz = 0; dz < footprint.depth; dz++) {
+                            minimumTerrainY = Math.min(
+                                minimumTerrainY,
+                                getTerrainHeightAt(footprint.x + dx, footprint.z + dz)
+                            );
+                        }
+                    }
+                    const foundationHeight = house.home.y - 1 - minimumTerrainY;
+                    expect(foundationHeight, `${village.biome} ${cx},${cz} ${building.type}`).toBeLessThanOrEqual(2);
+                }
+            }
+        }
+
+        expect(foundBiomes).toEqual(new Set([BIOMES.PLAINS, BIOMES.DESERT, BIOMES.SNOW]));
+    });
+
     it('keeps V2 desert villages discoverable in a practical search area', () => {
         const { getVillageCandidate, BIOMES } = loadVillageGenerator();
         const candidates = [];
@@ -53,6 +125,13 @@ describe('biome-specific village generation', () => {
         expect(result.villageInfos).toEqual([
             expect.objectContaining({ layout: 'courtyard', center: 'market' })
         ]);
+        expect(result.chestInfos).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                role: 'village_supply',
+                villageId: 'village:11,-4',
+                lootTable: 'village_courtyard'
+            })
+        ]));
     });
 
     it('supports V2 village posts and gates instead of leaving them floating', () => {

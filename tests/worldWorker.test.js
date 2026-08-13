@@ -288,8 +288,17 @@ describe('World mesh result scheduling', () => {
                 spawnerKeys: new Set()
             });
             world.pendingMeshes.add(key);
+            world.meshRequestedAt.set(key, performance.now() - 10);
             worker.onmessage({
-                data: { type: 'meshResult', cx, cz: 0, opaque: arrays, water: null, epoch: world.meshEpoch }
+                data: {
+                    type: 'meshResult',
+                    cx,
+                    cz: 0,
+                    opaque: arrays,
+                    water: null,
+                    epoch: world.meshEpoch,
+                    timings: { workerMeshBuildMs: 4 + cx }
+                }
             });
         }
 
@@ -305,5 +314,10 @@ describe('World mesh result scheduling', () => {
         expect(world.processPendingMeshResults(1)).toBe(1);
         expect(world.chunks.get('1,0').mesh).toBeInstanceOf(THREE.Mesh);
         expect(world.pendingMeshResults).toHaveLength(0);
+        const timings = world.consumePerformanceTimings();
+        expect(timings.workerMeshBuildMs).toEqual([4, 5]);
+        expect(timings.meshRoundTripMs).toHaveLength(2);
+        expect(timings.meshRoundTripMs.every(value => value >= 10)).toBe(true);
+        expect(timings.mainThreadMeshAdoptionMs).toHaveLength(2);
     }, 15000);
 });

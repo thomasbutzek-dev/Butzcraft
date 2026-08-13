@@ -126,14 +126,15 @@ describe('WeatherSystem transitions', () => {
         expect(restored.rainCyclesWithoutStorm).toBe(2);
     });
 
-    it('keeps painterly precipitation brighter and less foggy', () => {
-        const original = getWeatherVisualProfile(false);
-        const painterly = getWeatherVisualProfile(true);
-
-        expect(painterly.rainSkyDarkening).toBeLessThan(original.rainSkyDarkening);
-        expect(painterly.stormSkyDarkening).toBeLessThan(original.stormSkyDarkening);
-        expect(painterly.rainFog).toBeLessThan(original.rainFog);
-        expect(painterly.snowFog).toBeLessThan(original.snowFog);
+    it('uses the painterly weather profile', () => {
+        expect(getWeatherVisualProfile()).toEqual({
+            rainSkyDarkening: 0.2,
+            stormSkyDarkening: 0.36,
+            rainFog: 0.014,
+            stormFog: 0.022,
+            snowFog: 0.017,
+            lightningFlash: 1.35
+        });
     });
 
     it('adds small branches to painterly lightning', () => {

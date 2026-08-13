@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { applyTouchLookDelta, initTouchControls, isTouchDevice } from '../js/touch.js';
 import { Game } from '../js/Game.js';
+import { Input } from '../js/Input.js';
 
 const origMaxTouchPoints = navigator.maxTouchPoints;
 const origMatchMedia = window.matchMedia;
@@ -39,6 +40,10 @@ afterEach(() => {
     document.documentElement.classList.remove('touch-device');
     document.body.classList.remove('touch-device');
     Game.touchActive = false;
+    Input.moveF = Input.moveB = Input.moveL = Input.moveR = Input.moveUp = false;
+    Input.sprint = false;
+    Input.touchJumpHeld = Input.touchJumpQueued = false;
+    delete window.__butzcraftRequestFullscreen;
 });
 
 describe('isTouchDevice', () => {
@@ -83,9 +88,127 @@ describe('isTouchDevice', () => {
         expect(document.getElementById('touch-btn-place')).not.toBeNull();
         expect(document.getElementById('touch-btn-inv')).not.toBeNull();
         expect(document.getElementById('touch-btn-pause')).not.toBeNull();
+        expect(document.getElementById('touch-btn-fullscreen')).not.toBeNull();
+        expect(document.getElementById('touch-btn-camera')).not.toBeNull();
+        expect(document.getElementById('touch-dpad')).not.toBeNull();
+        expect(document.getElementById('touch-dpad-up')).not.toBeNull();
+        expect(document.getElementById('touch-dpad-down')).not.toBeNull();
+        expect(document.getElementById('touch-dpad-left')).not.toBeNull();
+        expect(document.getElementById('touch-dpad-right')).not.toBeNull();
+        expect(document.getElementById('touch-joystick-base')).toBeNull();
         expect(document.getElementById('touch-btn-dig')).toBeNull();
         expect(document.getElementById('touch-btn-slot-prev')).toBeNull();
         expect(document.getElementById('touch-btn-slot-next')).toBeNull();
+    });
+
+    it('ordnet Inventar und Quest oben sowie Bauen und Springen rechts unten an', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const topActions = document.getElementById('touch-top-actions');
+        const actionStack = document.getElementById('touch-button-stack');
+
+        expect(topActions.contains(document.getElementById('touch-btn-inv'))).toBe(true);
+        expect(topActions.contains(document.getElementById('touch-btn-journal'))).toBe(true);
+        expect(actionStack.contains(document.getElementById('touch-btn-inv'))).toBe(false);
+        expect(actionStack.contains(document.getElementById('touch-btn-journal'))).toBe(false);
+        expect([...actionStack.children].map(element => element.id)).toEqual([
+            'touch-btn-place',
+            'touch-btn-jump'
+        ]);
+    });
+
+    it('verwendet das linke Steuerkreuz ausschließlich für vier Laufrichtungen', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const directions = [
+            ['touch-dpad-up', 'forward'],
+            ['touch-dpad-down', 'backward'],
+            ['touch-dpad-left', 'left'],
+            ['touch-dpad-right', 'right']
+        ];
+
+        directions.forEach(([id, activeDirection], index) => {
+            const button = document.getElementById(id);
+            const touch = { identifier: 30 + index, clientX: 50, clientY: 50 };
+            dispatchTouchEvent(button, 'touchstart', touch);
+            expect({
+                forward: Input.moveF,
+                backward: Input.moveB,
+                left: Input.moveL,
+                right: Input.moveR,
+                sprint: Input.sprint,
+                jump: Input.touchJumpQueued
+            }).toEqual({
+                forward: activeDirection === 'forward',
+                backward: activeDirection === 'backward',
+                left: activeDirection === 'left',
+                right: activeDirection === 'right',
+                sprint: false,
+                jump: false
+            });
+            dispatchTouchEvent(button, 'touchend', touch);
+            expect(Input.moveF || Input.moveB || Input.moveL || Input.moveR).toBe(false);
+        });
+    });
+
+    it('wechselt die Kamera im Touch-HUD ohne externe Tastatur', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const player = { cameraMode: 'first' };
+        const toggleCameraMode = vi.fn(() => {
+            player.cameraMode = player.cameraMode === 'third' ? 'first' : 'third';
+            return player.cameraMode;
+        });
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            player,
+            toggleCameraMode,
+            isInventoryOpenedProvider: () => false
+        });
+
+        const cameraButton = document.getElementById('touch-btn-camera');
+        expect(cameraButton.textContent).toBe('3P');
+
+        dispatchTouchEvent(cameraButton, 'touchstart', {
+            identifier: 4,
+            clientX: 10,
+            clientY: 10
+        });
+
+        expect(toggleCameraMode).toHaveBeenCalledOnce();
+        expect(cameraButton.textContent).toBe('1P');
+        expect(cameraButton.getAttribute('aria-label')).toBe('Zu First Person wechseln');
+    });
+
+    it('bietet Vollbild erneut über den zentralen Mobile-Pfad an', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        window.__butzcraftRequestFullscreen = vi.fn().mockResolvedValue(true);
+
+        initTouchControls({
+            camera: { rotation: { x: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const fullscreenButton = document.getElementById('touch-btn-fullscreen');
+        dispatchTouchEvent(fullscreenButton, 'touchstart', {
+            identifier: 5,
+            clientX: 10,
+            clientY: 10
+        });
+
+        expect(window.__butzcraftRequestFullscreen).toHaveBeenCalledOnce();
     });
 
     it('Touch-Bauen feuert eine Rechtsklick-Interaktion', () => {
@@ -184,6 +307,67 @@ describe('isTouchDevice', () => {
         }
     });
 
+    it('toleriert kleine Fingerbewegungen vor und nach Beginn des Abbaus', () => {
+        vi.useFakeTimers();
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const events = [];
+        const onMouseDown = (e) => events.push(`down:${e.button}`);
+        const onMouseUp = (e) => events.push(`up:${e.button}`);
+        document.addEventListener('mousedown', onMouseDown);
+        document.addEventListener('mouseup', onMouseUp);
+
+        try {
+            initTouchControls({
+                camera: { rotation: { x: 0 } },
+                controls: { getObject: () => ({ rotation: { y: 0 } }) },
+                isInventoryOpenedProvider: () => false
+            });
+
+            const area = document.getElementById('touch-look-area');
+            dispatchTouchEvent(area, 'touchstart', { identifier: 18, clientX: 100, clientY: 100 });
+            dispatchTouchEvent(area, 'touchmove', { identifier: 18, clientX: 111, clientY: 100 });
+            vi.advanceTimersByTime(181);
+            expect(events).toEqual(['down:0']);
+
+            dispatchTouchEvent(area, 'touchmove', { identifier: 18, clientX: 126, clientY: 110 });
+            expect(events).toEqual(['down:0']);
+
+            dispatchTouchEvent(area, 'touchend', { identifier: 18, clientX: 126, clientY: 110 });
+            expect(events).toEqual(['down:0', 'up:0']);
+        } finally {
+            document.removeEventListener('mousedown', onMouseDown);
+            document.removeEventListener('mouseup', onMouseUp);
+            vi.useRealTimers();
+        }
+    });
+
+    it('behandelt eine deutliche Bewegung vor dem Langdruck weiterhin als Umschauen', () => {
+        vi.useFakeTimers();
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const events = [];
+        const onMouseDown = (e) => events.push(`down:${e.button}`);
+        document.addEventListener('mousedown', onMouseDown);
+
+        try {
+            initTouchControls({
+                camera: { rotation: { x: 0 } },
+                controls: { getObject: () => ({ rotation: { y: 0 } }) },
+                isInventoryOpenedProvider: () => false
+            });
+
+            const area = document.getElementById('touch-look-area');
+            dispatchTouchEvent(area, 'touchstart', { identifier: 19, clientX: 100, clientY: 100 });
+            dispatchTouchEvent(area, 'touchmove', { identifier: 19, clientX: 130, clientY: 100 });
+            vi.advanceTimersByTime(181);
+            dispatchTouchEvent(area, 'touchend', { identifier: 19, clientX: 130, clientY: 100 });
+
+            expect(events).toEqual([]);
+        } finally {
+            document.removeEventListener('mousedown', onMouseDown);
+            vi.useRealTimers();
+        }
+    });
+
     it('loest bei einem abgebrochenen Touch keinen Schlag aus', () => {
         Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
         const buttons = [];
@@ -261,5 +445,81 @@ describe('isTouchDevice', () => {
 
         expect(camera.rotation.x).toBeLessThan(Math.PI / 2);
         expect(camera.rotation.z).toBe(0);
+    });
+
+    it('kombiniert Springen und Kameradrehung auf dem Sprungbutton', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const camera = { rotation: { x: 0, y: 0, z: 0, order: 'YXZ' } };
+        const attacks = [];
+        const onAttack = (event) => attacks.push(event.button);
+        document.addEventListener('mousedown', onAttack);
+
+        initTouchControls({
+            camera,
+            controls: { getObject: () => camera },
+            isInventoryOpenedProvider: () => false
+        });
+        Input.moveF = true;
+
+        const jump = document.getElementById('touch-btn-jump');
+        const start = { identifier: 20, clientX: 300, clientY: 300 };
+        dispatchTouches(jump, 'touchstart', [start], [start]);
+        expect(Input.touchJumpQueued).toBe(true);
+        expect(Input.touchJumpHeld).toBe(true);
+
+        dispatchTouches(jump, 'touchmove', [{ ...start, clientX: 325, clientY: 285 }]);
+        dispatchTouches(jump, 'touchend', [], [{ ...start, clientX: 325, clientY: 285 }]);
+        document.removeEventListener('mousedown', onAttack);
+
+        expect(camera.rotation.y).toBeLessThan(0);
+        expect(camera.rotation.x).toBeGreaterThan(0);
+        expect(Input.moveF).toBe(true);
+        expect(Input.touchJumpHeld).toBe(false);
+        expect(attacks).toEqual([]);
+    });
+
+    it('loest beim Ziehen aus der Blickfläche keinen unbeabsichtigten Sprung aus', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        const camera = { rotation: { x: 0, y: 0, z: 0, order: 'YXZ' } };
+        initTouchControls({
+            camera,
+            controls: { getObject: () => camera },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const jump = document.getElementById('touch-btn-jump');
+        jump.getBoundingClientRect = () => ({
+            left: 250, right: 310, top: 250, bottom: 310, width: 60, height: 60
+        });
+        const area = document.getElementById('touch-look-area');
+        const start = { identifier: 21, clientX: 200, clientY: 200 };
+        dispatchTouches(area, 'touchstart', [start], [start]);
+        dispatchTouches(area, 'touchmove', [{ ...start, clientX: 270, clientY: 270 }]);
+
+        expect(Input.touchJumpQueued).toBe(false);
+        expect(Input.touchJumpHeld).toBe(false);
+
+        dispatchTouches(area, 'touchmove', [{ ...start, clientX: 280, clientY: 280 }]);
+        expect(Input.touchJumpQueued).toBe(false);
+
+        dispatchTouches(area, 'touchend', [], [{ ...start, clientX: 280, clientY: 280 }]);
+        expect(Input.touchJumpHeld).toBe(false);
+    });
+
+    it('setzt eine abgebrochene Sprunggeste vollständig zurück', () => {
+        Object.defineProperty(navigator, 'maxTouchPoints', { value: 4, configurable: true });
+        initTouchControls({
+            camera: { rotation: { x: 0, y: 0, z: 0 } },
+            controls: { getObject: () => ({ rotation: { y: 0 } }) },
+            isInventoryOpenedProvider: () => false
+        });
+
+        const jump = document.getElementById('touch-btn-jump');
+        const touch = { identifier: 22, clientX: 300, clientY: 300 };
+        dispatchTouches(jump, 'touchstart', [touch], [touch]);
+        dispatchTouches(jump, 'touchcancel', [], [touch]);
+
+        expect(Input.touchJumpHeld).toBe(false);
+        expect(Input.touchJumpQueued).toBe(false);
     });
 });

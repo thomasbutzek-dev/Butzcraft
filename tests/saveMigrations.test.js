@@ -15,6 +15,97 @@ import {
     CURRENT_SAVE_VERSION
 } from '../js/saveMigrations.js';
 
+describe('migrateSave - v17 to v18 (village chest penalties)', () => {
+    it('adds persistent tracking for village chests that already reduced trust', () => {
+        const migrated = migrateSave({
+            version: 17,
+            inventory: []
+        });
+
+        expect(migrated.version).toBe(18);
+        expect(migrated.penalizedVillageChests).toEqual([]);
+    });
+});
+
+describe('migrateSave - v16 to v17 (blood moon survival)', () => {
+    it('preserves an active blood moon attempt across saving and loading', () => {
+        const migrated = migrateSave({
+            version: 16,
+            inventory: [],
+            bloodMoonSurvival: {
+                activeNight: 2,
+                failedNight: null
+            }
+        });
+
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.bloodMoonSurvival).toEqual({
+            activeNight: 2,
+            failedNight: null
+        });
+    });
+});
+
+describe('migrateSave - v15 to v16 (story milestones)', () => {
+    it('reconstructs completed milestones from persistent world and quest state', () => {
+        const migrated = migrateSave({
+            version: 15,
+            inventory: [],
+            lastBloodMoonRewardDay: 2,
+            structureProgress: {
+                'dungeon:0,0:v2': {
+                    keyFound: true,
+                    gateOpened: true,
+                    ritualActivated: true
+                }
+            },
+            questState: {
+                mainQuestIndex: 4,
+                homeVillageId: 'village:0,0',
+                villages: {
+                    'village:0,0': { trust: 2 }
+                },
+                questItems: {
+                    deepCrystal: 1,
+                    bloodSeal: 1
+                },
+                storyFlags: {
+                    bossDefeated: true
+                }
+            }
+        });
+
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.questState.storyMilestones).toEqual(expect.objectContaining({
+            'butzcraft:villager-met': true,
+            'butzcraft:village-trust-earned': true,
+            'butzcraft:blood-moon-survived': true,
+            'butzcraft:mine-completed': true,
+            'butzcraft:dungeon-key-found': true,
+            'butzcraft:dungeon-gate-opened': true,
+            'butzcraft:dungeon-completed': true,
+            'butzcraft:ritual-activated': true,
+            'butzcraft:boss-defeated': true
+        }));
+    });
+});
+
+describe('migrateSave - v14 to v15 (item metadata)', () => {
+    it('preserves durability and spoilage metadata while advancing the schema', () => {
+        const migrated = migrateSave({
+            version: 14,
+            inventory: [
+                { type: 17, count: 2, spoilAt: 900 },
+                { type: 106, count: 1, durability: 40 }
+            ]
+        });
+
+        expect(migrated.version).toBe(CURRENT_SAVE_VERSION);
+        expect(migrated.inventory[0]).toEqual({ type: 17, count: 2, spoilAt: 900 });
+        expect(migrated.inventory[1]).toEqual({ type: 106, count: 1, durability: 40 });
+    });
+});
+
 describe('migrateSave - v13 to v14 (quest state)', () => {
     it('preserves the existing journey index in the new quest state', () => {
         const migrated = migrateSave({ version: 13, inventory: [], storyObjectiveIndex: 3 });
@@ -210,6 +301,7 @@ describe('stampSaveVersion', () => {
         expect(stamped.version).toBe(CURRENT_SAVE_VERSION);
         expect(stamped.worldGenerationVersion).toBe(2);
         expect(stamped.structureProgress).toEqual({});
+        expect(stamped.penalizedVillageChests).toEqual([]);
         expect(stamped.foo).toBe('bar');
     });
 

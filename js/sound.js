@@ -40,6 +40,7 @@ export const SoundManager = {
                     this.loadSound('sheep', 'sounds/sheep.ogg');
                     this.loadSound('zombie', 'sounds/zombie.ogg');
                     this.loadSound('sword', 'sounds/sword.ogg');
+                    this.loadSound('damage', 'sounds/damage.ogg');
                     this.loadSound('cow', 'sounds/cow.ogg');
                     this.loadSound('step_grass', 'sounds/step_grass.ogg');
                     this.loadSound('step_stone', 'sounds/step_stone.ogg');

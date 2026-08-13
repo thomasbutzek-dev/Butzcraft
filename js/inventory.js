@@ -1,17 +1,18 @@
 /* js/inventory.js - Butzcraft Inventory Module */
 import { craftingGridData, craftingResultData, checkCrafting, setCraftingGridSize } from './crafting.js?v=20260721b';
-import { craftingRecipes, getRecipeTrustLockReason } from './recipes.js?v=20260721b';
-import { initRecipeBook } from './recipe_book.js?v=20260721c';
-import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260717z';
-import { SoundManager } from './sound.js?v=20260507b';
+import { craftingRecipes, getRecipeTrustLockReason } from './recipes.js?v=20260723e';
+import { initRecipeBook } from './recipe_book.js?v=20260731b';
+import { BLOCK_TYPES, BLOCK_TEX, atlasDataURL } from './blocks.js?v=20260801b';
+import { SoundManager } from './sound.js?v=20260731a';
 import { Game } from './Game.js?v=20260716b';
 import { getToolInfo } from './miningRules.js?v=20260716a';
 import { getBowInfo, getSwordInfo } from './combatRules.js?v=20260716b';
-import { getFoodInfo } from './foodRules.js?v=20260716a';
+import { getFoodInfo } from './foodRules.js?v=20260723e';
+import { getArmorIconHTML, getArmorInfo } from './equipmentRules.js?v=20260723e';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
 
 function getDurableItemInfo(type) {
-    return getToolInfo(type) || getSwordInfo(type) || getBowInfo(type);
+    return getToolInfo(type) || getSwordInfo(type) || getBowInfo(type) || getArmorInfo(type);
 }
 
 function isDurableItemType(type) {
@@ -24,6 +25,10 @@ function isDurableItemType(type) {
 // CONFIG.GAMEPLAY zentralisieren (Future-Work).
 function buildItemTooltip(name, type) {
     let tip = name;
+    const armor = getArmorInfo(type);
+    if (armor) {
+        tip += `\n${Math.round(armor.protection * 100)}% Schutz · ${armor.slot === 'body' ? 'Körper' : armor.slot}`;
+    }
     const food = getFoodInfo(type);
     if (food) {
         tip += `\n+${food.hunger} Hunger`;
@@ -46,6 +51,7 @@ function clearItem(item) {
     item.type = 0;
     item.count = 0;
     delete item.durability;
+    delete item.spoilAt;
 }
 
 function moveItem(target, source) {
@@ -53,6 +59,8 @@ function moveItem(target, source) {
     target.count = source.count;
     if (Number.isFinite(source.durability)) target.durability = source.durability;
     else delete target.durability;
+    if (Number.isFinite(source.spoilAt)) target.spoilAt = source.spoilAt;
+    else delete target.spoilAt;
     clearItem(source);
 }
 
@@ -62,10 +70,20 @@ function swapItems(first, second) {
     first.count = second.count;
     if (Number.isFinite(second.durability)) first.durability = second.durability;
     else delete first.durability;
+    if (Number.isFinite(second.spoilAt)) first.spoilAt = second.spoilAt;
+    else delete first.spoilAt;
     second.type = snapshot.type;
     second.count = snapshot.count;
     if (Number.isFinite(snapshot.durability)) second.durability = snapshot.durability;
     else delete second.durability;
+    if (Number.isFinite(snapshot.spoilAt)) second.spoilAt = snapshot.spoilAt;
+    else delete second.spoilAt;
+}
+
+function mergeSpoilage(target, source) {
+    const deadlines = [target.spoilAt, source.spoilAt].filter(Number.isFinite);
+    if (deadlines.length > 0) target.spoilAt = Math.min(...deadlines);
+    else delete target.spoilAt;
 }
 
 // Temporäre Migrations-Map für altes Speichersystem
@@ -94,7 +112,8 @@ const TRANSLATIONS = {
     'STRING': 'Sehne', 'BOW': 'Bogen', 'ARROW': 'Pfeil',
     'COOKED_FISH': 'Gebratener Fisch', 'COOKED_MEAT': 'Gebratenes Fleisch', 'COOKED_CHICKEN': 'Gebratenes Hähnchen',
     'COOKED_MUTTON': 'Gebratenes Hammelfleisch', 'COOKED_TURTLE_MEAT': 'Gebratenes Schildkrötenfleisch',
-    'TORCH': 'Fackel', 'WOOD_FENCE': 'Holzzaun', 'WOOD_GATE': 'Holzgatter', 'VILLAGE_LANTERN': 'Dorflaterne'
+    'TORCH': 'Fackel', 'WOOD_FENCE': 'Holzzaun', 'WOOD_GATE': 'Holzgatter', 'VILLAGE_LANTERN': 'Dorflaterne',
+    'POLAR_BEAR_FUR': 'Eisbärenfell', 'SPOILED_FOOD': 'Verdorbene Nahrung'
 };
 
 
@@ -157,7 +176,12 @@ export function tryAddItemsToInventory(items) {
 }
 
 export function tryExchangeInventory(give, receive) {
-    if (!give || !receive || give.type === 0 || receive.type === 0 || give.count <= 0 || receive.count <= 0) {
+    const receiveItems = Array.isArray(receive?.items) ? receive.items : [receive];
+    if (
+        !give || give.type === 0 || give.count <= 0 ||
+        receiveItems.length === 0 ||
+        receiveItems.some(item => !item || item.type === 0 || item.count <= 0)
+    ) {
         return { exchanged: false, reason: 'invalid-exchange' };
     }
 
@@ -180,11 +204,13 @@ export function tryExchangeInventory(give, receive) {
         if (slot.count <= 0) inventorySlots[i] = { type: 0, count: 0 };
     }
 
-    const result = addItemToInventory(receive.type, receive.count);
-    if (result.remaining > 0) {
-        for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = snapshot[i];
-        updateInventoryUI();
-        return { exchanged: false, reason: 'inventory-full' };
+    for (const item of receiveItems) {
+        const result = addItemToInventory(item.type, item.count);
+        if (result.remaining > 0) {
+            for (let i = 0; i < inventorySlots.length; i++) inventorySlots[i] = snapshot[i];
+            updateInventoryUI();
+            return { exchanged: false, reason: 'inventory-full' };
+        }
     }
 
     return { exchanged: true, reason: null };
@@ -234,8 +260,9 @@ export function addItemToInventory(type, count) {
 
 // Erzeugt HTML für ein Block-/Item-Icon (2D flat oder 3D Cube)
 export function createBlockHTML(type) {
+    if (getArmorInfo(type)) return getArmorIconHTML(type);
     const is2D = (type === 9 || type === 10 || type === 17 || type === 18 || type === 19 || type === 21 || type === 22 || type === 23 || type === 24 || type === 25 || type === 27 || type === 31
-        || (type >= 60 && type <= 74) || (type >= 89 && type <= 101)); // Kohle, Barren, Werkzeuge, Waffen, Nahrung und Fackel als 2D-Icons
+        || (type >= 60 && type <= 74) || (type >= 89 && type <= 101) || type === BLOCK_TYPES.POLAR_BEAR_FUR); // Kohle, Barren, Werkzeuge, Waffen, Nahrung, Fackel und Fell als 2D-Icons
     let texIdx = 0;
     if (type === 17) texIdx = 21; else if (type === 18) texIdx = 23; else if (type === 19) texIdx = 26; else texIdx = BLOCK_TEX[type] || 0;
     const u = (texIdx % 16) * 100 / 15; const v = Math.floor(texIdx / 16) * 100 / 15;
@@ -246,6 +273,8 @@ export function createBlockHTML(type) {
 
 // Gibt den deutschen Namen eines Block-Types zurück
 export function getItemName(type) {
+    const armor = getArmorInfo(type);
+    if (armor) return armor.name;
     const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === type) || '';
     return TRANSLATIONS[bName] || bName;
 }
@@ -276,7 +305,7 @@ function updateDurabilityBar(slot, item) {
     const ratio = Math.max(0, Math.min(1, durability / durableInfo.maxDurability));
     track.querySelector('.durability-fill').style.width = `${Math.round(ratio * 100)}%`;
     track.classList.toggle('low', ratio <= 0.15);
-    track.title = `Haltbarkeit ${durability}/${durableInfo.maxDurability}`;
+    track.title = `Haltbarkeit ${Math.ceil(durability)}/${durableInfo.maxDurability}`;
     return true;
 }
 
@@ -307,10 +336,9 @@ export function updateInventoryUI() {
             }
             icon.style.background = 'none'; icon.style.backgroundColor = 'transparent';
             if (count.textContent !== String(item.count)) count.textContent = item.count;
-            const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
-            const translatedName = TRANSLATIONS[bName] ? TRANSLATIONS[bName].toUpperCase() : bName.toUpperCase();
+            const translatedName = getItemName(item.type).toUpperCase();
             if (name.textContent !== translatedName) name.textContent = translatedName;
-            slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
+            slot.title = buildItemTooltip(getItemName(item.type), item.type);
         } else {
             updateDurabilityBar(slot, null);
             icon.style.display = 'none'; count.style.display = 'none'; name.style.display = 'none'; slot.title = buildSlotLabel('Hotbar', i, item);
@@ -356,8 +384,7 @@ export function updateInventoryUI() {
                 icon.dataset.itemType = String(item.type);
             }
             if (count.textContent !== String(item.count)) count.textContent = item.count;
-            const bName = Object.keys(BLOCK_TYPES).find(k => BLOCK_TYPES[k] === item.type) || '';
-            slot.title = buildItemTooltip(TRANSLATIONS[bName] || bName, item.type);
+            slot.title = buildItemTooltip(getItemName(item.type), item.type);
         } else {
             updateDurabilityBar(slot, null);
             icon.style.display = 'none'; count.style.display = 'none';
@@ -370,7 +397,14 @@ export function updateInventoryUI() {
 
     const craftButton = document.getElementById('crafting-create-btn');
     if (craftButton) craftButton.disabled = craftingResultData.count <= 0;
+    if (inventoryOpened) renderRecipeBook();
 }
+
+window.addEventListener('butzcraft:atlas-ready', () => {
+    document.querySelectorAll('.slot-color-preview .flat-icon, .slot-color-preview .mc-face').forEach(element => {
+        element.style.backgroundImage = `url("${atlasDataURL}")`;
+    });
+});
 
 function handleSlotClick(e, sType, index) {
     if (e.button !== 0 && e.button !== 2) return; 
@@ -400,6 +434,7 @@ function handleSlotClick(e, sType, index) {
                 const space = 64 - itemObj.count;
                 if (space > 0) {
                     const add = Math.min(space, cursorItem.count);
+                    mergeSpoilage(itemObj, cursorItem);
                     itemObj.count += add;
                     cursorItem.count -= add;
                     if (cursorItem.count <= 0) clearItem(cursorItem);
@@ -417,6 +452,8 @@ function handleSlotClick(e, sType, index) {
                     const half = Math.ceil(itemObj.count / 2);
                     cursorItem.type = itemObj.type;
                     cursorItem.count = half;
+                    if (Number.isFinite(itemObj.spoilAt)) cursorItem.spoilAt = itemObj.spoilAt;
+                    else delete cursorItem.spoilAt;
                     itemObj.count -= half;
                     if (itemObj.count <= 0) clearItem(itemObj);
                 }
@@ -428,10 +465,13 @@ function handleSlotClick(e, sType, index) {
                 } else {
                     itemObj.type = cursorItem.type;
                     itemObj.count = 1;
+                    if (Number.isFinite(cursorItem.spoilAt)) itemObj.spoilAt = cursorItem.spoilAt;
+                    else delete itemObj.spoilAt;
                     cursorItem.count--;
                     if (cursorItem.count <= 0) clearItem(cursorItem);
                 }
             } else if (itemObj.type === cursorItem.type && !isDurableItemType(itemObj.type) && itemObj.count < 64) {
+                mergeSpoilage(itemObj, cursorItem);
                 itemObj.count++;
                 cursorItem.count--;
                 if (cursorItem.count <= 0) clearItem(cursorItem);
@@ -818,7 +858,6 @@ function openCraftingOverlay(station, gameStarted, spawning, controls) {
             ? '3×3-Werkbank bereit. Wähle ein Rezept.'
             : '2×2-Crafting. Für Werkzeuge brauchst du eine Werkbank.'
     );
-    renderRecipeBook();
     updateInventoryUI();
     return true;
 }

@@ -1,4 +1,4 @@
-import { addItemToInventory } from './inventory.js?v=20260721c';
+import { addItemToInventory } from './inventory.js?v=20260801c';
 
 export function addItemOrCreateDrop(type, count, createDrop) {
     const result = addItemToInventory(type, count);
@@ -22,8 +22,8 @@ export function tryCollectDroppedItem(items, index, disposeDrop) {
     return true;
 }
 
-export function updateDroppedItemVisual(item, delta, painterly) {
-    if (!painterly || !item?.mesh?.rotation) return;
+export function updateDroppedItemVisual(item, delta) {
+    if (!item?.mesh?.rotation) return;
     if (!Number.isFinite(item.visualPhase)) {
         item.visualPhase = ((item.blockType || 0) * 0.73) % (Math.PI * 2);
     }

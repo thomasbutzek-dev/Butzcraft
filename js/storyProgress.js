@@ -1,6 +1,7 @@
 export const STORY_EVENTS = Object.freeze({
     VILLAGER_MET: 'butzcraft:villager-met',
     QUEST_COMPLETED: 'butzcraft:quest-completed',
+    VILLAGE_TRUST_EARNED: 'butzcraft:village-trust-earned',
     BLOOD_MOON_SURVIVED: 'butzcraft:blood-moon-survived',
     MINE_COMPLETED: 'butzcraft:mine-completed',
     DUNGEON_KEY_FOUND: 'butzcraft:dungeon-key-found',
@@ -26,20 +27,20 @@ const STORY_OBJECTIVES = [
     {
         label: 'Deine Reise',
         text: 'Gewinne das Vertrauen des Dorfes',
-        hint: 'Sprich mit einem Dorfbewohner und erfülle seinen Auftrag.',
-        touchHint: 'Sprich mit einem Dorfbewohner und erfülle seinen Auftrag.'
+        hint: 'Nimm bei einem Dorfbewohner eine Dorfquest an und gib sie dort ab. Die Vertrauensbelohnung lässt deine Reise weitergehen.',
+        touchHint: 'Nimm bei einem Dorfbewohner eine Dorfquest an und gib sie dort ab. Die Vertrauensbelohnung lässt deine Reise weitergehen.'
     },
     {
         label: 'Deine Reise',
-        text: 'Stelle dich dem Blutmond',
-        hint: 'Jede dritte Nacht wird gefährlich. Nimm Essen mit und sichere deinen Unterschlupf.',
-        touchHint: 'Jede dritte Nacht wird gefährlich. Nimm Essen mit und sichere deinen Unterschlupf.'
+        text: 'Überlebe die erste Blutmondnacht',
+        hint: 'Jede dritte Nacht wird zum Blutmond. Bleibe bis zum Morgen am Leben; während des Blutmonds kannst du nicht schlafen.',
+        touchHint: 'Jede dritte Nacht wird zum Blutmond. Bleibe bis zum Morgen am Leben; während des Blutmonds kannst du nicht schlafen.'
     },
     {
         label: 'Spuren in der Tiefe',
-        text: 'Durchsuche eine große Mine',
-        hint: 'Folge Mineneingängen und Schienen bis zur Belohnungskammer.',
-        touchHint: 'Folge Mineneingängen und Schienen bis zur Belohnungskammer.'
+        text: 'Besiege den Tiefenwächter',
+        hint: 'Folge den Schienen bis zur Belohnungskammer. Besiege den gepanzerten Wächter und plündere danach seine Truhe.',
+        touchHint: 'Folge den Schienen bis zur Belohnungskammer. Besiege den gepanzerten Wächter und plündere danach seine Truhe.'
     },
     {
         label: 'Die versiegelte Tiefe',
@@ -55,9 +56,9 @@ const STORY_OBJECTIVES = [
     },
     {
         label: 'Die Blutmondquelle',
-        text: 'Erreiche die Endkammer',
-        hint: 'Überwinde die Spawner und öffne die Belohnungstruhe hinter dem Tor.',
-        touchHint: 'Überwinde die Spawner und öffne die Belohnungstruhe hinter dem Tor.'
+        text: 'Besiege den Siegelhüter',
+        hint: 'Überwinde die Spawner und zerstöre die Schutzrunen des Siegelhüters. Danach kannst du die Belohnungstruhe öffnen.',
+        touchHint: 'Überwinde die Spawner und zerstöre die Schutzrunen des Siegelhüters. Danach kannst du die Belohnungstruhe öffnen.'
     },
     {
         label: 'Die Blutmondquelle',
@@ -86,7 +87,7 @@ const STORY_OBJECTIVES = [
 const EXPECTED_EVENT_BY_INDEX = [
     null,
     STORY_EVENTS.VILLAGER_MET,
-    STORY_EVENTS.QUEST_COMPLETED,
+    STORY_EVENTS.VILLAGE_TRUST_EARNED,
     STORY_EVENTS.BLOOD_MOON_SURVIVED,
     STORY_EVENTS.MINE_COMPLETED,
     STORY_EVENTS.DUNGEON_KEY_FOUND,
@@ -96,6 +97,7 @@ const EXPECTED_EVENT_BY_INDEX = [
     STORY_EVENTS.BOSS_DEFEATED,
     null
 ];
+const STORY_MILESTONE_EVENTS = new Set(EXPECTED_EVENT_BY_INDEX.filter(Boolean));
 
 function getVillageCenter(village) {
     const houses = Array.isArray(village?.houses) ? village.houses : [];
@@ -161,4 +163,20 @@ export function advanceStoryProgress(restoredIndex, eventName) {
     const index = normalizeIndex(restoredIndex);
     if (EXPECTED_EVENT_BY_INDEX[index] !== eventName) return index;
     return Math.min(index + 1, STORY_OBJECTIVES.length);
+}
+
+export function recordStoryMilestone(currentMilestones, eventName) {
+    const milestones = currentMilestones && typeof currentMilestones === 'object' && !Array.isArray(currentMilestones)
+        ? currentMilestones
+        : {};
+    if (!STORY_MILESTONE_EVENTS.has(eventName)) return milestones;
+    return { ...milestones, [eventName]: true };
+}
+
+export function reconcileStoryProgress(restoredIndex, milestones = {}) {
+    let index = normalizeIndex(restoredIndex);
+    while (EXPECTED_EVENT_BY_INDEX[index] && milestones[EXPECTED_EVENT_BY_INDEX[index]] === true) {
+        index++;
+    }
+    return index;
 }

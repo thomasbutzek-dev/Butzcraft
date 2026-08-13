@@ -22,19 +22,9 @@ describe('precipitation collision helpers', () => {
 });
 
 describe('painterly precipitation', () => {
-    it('keeps the original particle shape in variant A', () => {
-        const rain = getPrecipitationVisualProfile('rain', false);
-        const snow = getPrecipitationVisualProfile('snow', false);
-
-        expect(rain).toMatchObject({ width: 0.05, height: 0.3, opacity: 0.5 });
-        expect(snow).toMatchObject({ width: 0.08, height: 0.08, opacity: 0.75 });
-        expect(rain.colors).toHaveLength(1);
-        expect(snow.colors).toHaveLength(1);
-    });
-
-    it('uses several restrained shapes and tones in variants B and C', () => {
-        const rain = getPrecipitationVisualProfile('rain', true);
-        const snow = getPrecipitationVisualProfile('snow', true);
+    it('uses several restrained shapes and tones', () => {
+        const rain = getPrecipitationVisualProfile('rain');
+        const snow = getPrecipitationVisualProfile('snow');
 
         expect(rain.height).toBeGreaterThan(0.3);
         expect(rain.colors.length).toBeGreaterThan(1);

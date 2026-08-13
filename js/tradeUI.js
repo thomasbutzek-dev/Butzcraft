@@ -5,7 +5,7 @@
  * Spieler klickt auf ein Angebot → Items werden getauscht wenn genug vorhanden.
  */
 
-import { createBlockHTML, getItemName, inventorySlots, tryAddItemsToInventory, tryExchangeInventory } from './inventory.js?v=20260721c';
+import { createBlockHTML, getItemName, inventorySlots, tryAddItemsToInventory, tryExchangeInventory } from './inventory.js?v=20260801c';
 import {
     acceptSideQuest,
     completeSideQuest,
@@ -14,13 +14,29 @@ import {
     getQuestProgress,
     getSideQuestProgress,
     getTrustTier
-} from './quests.js?v=20260721b';
+} from './quests.js?v=20260730a';
 import { getNpcConversation } from './npcDialogue.js?v=20260721b';
 import { Game } from './Game.js?v=20260716b';
-import { STORY_EVENTS } from './storyProgress.js?v=20260721b';
+import { STORY_EVENTS } from './storyProgress.js?v=20260730c';
 import { activateDialog, deactivateDialog } from './dialogFocus.js?v=20260718b';
+import { getQuestObjectiveText } from './questObjectiveText.js?v=20260730a';
 
 let currentNPC = null;
+
+function rewardItems(reward) {
+    return Array.isArray(reward?.items) ? reward.items : [reward];
+}
+
+function rewardLabel(reward) {
+    if (reward?.label) return reward.label;
+    const item = rewardItems(reward)[0];
+    return item ? `${item.count}× ${getItemName(item.type)}` : 'Belohnung';
+}
+
+function rewardIcon(reward) {
+    const item = rewardItems(reward)[0];
+    return item ? createBlockHTML(item.type) : '';
+}
 
 /**
  * Öffnet das Handels-UI für einen NPC.
@@ -38,10 +54,11 @@ export function openTradeUI(npc, controls) {
     const title = overlay.querySelector('#trade-title');
     const questState = window.getQuestState?.() || null;
     const villageState = npc.villageId ? questState?.villages?.[npc.villageId] : null;
-    const trustTier = getTrustTier(villageState?.trust || 0);
+    const trust = Math.max(0, Number(villageState?.trust) || 0);
+    const trustTier = getTrustTier(trust);
     if (title) {
         const npcName = npc.displayName && npc.displayName !== prof.name ? `${npc.displayName} · ` : '';
-        title.textContent = `🤝 ${npcName}${prof.name}${villageState ? ` · ${trustTier.label}` : ''}`;
+        title.textContent = `🤝 ${npcName}${prof.name}${villageState ? ` · Vertrauen ${trust} · ${trustTier.label}` : ''}`;
     }
 
     renderNpcDialogue(overlay, npc, questState, villageState);
@@ -81,8 +98,8 @@ export function openTradeUI(npc, controls) {
         const receiveDiv = document.createElement('div');
         receiveDiv.className = 'trade-item';
         receiveDiv.innerHTML = `
-            <div class="trade-icon">${createBlockHTML(pricedTrade.receive.type)}</div>
-            <span class="trade-label">${pricedTrade.receive.count}× ${getItemName(pricedTrade.receive.type)}</span>
+            <div class="trade-icon">${rewardIcon(pricedTrade.receive)}</div>
+            <span class="trade-label">${rewardLabel(pricedTrade.receive)}</span>
         `;
 
         // Trade-Button
@@ -188,26 +205,15 @@ function buildVillageQuestRows(npc, questState, villageState) {
     return rows;
 }
 
-function objectiveText(objective) {
-    if (!objective) return 'Unbekanntes Ziel';
-    if (objective.type === 'delivery') return `${objective.required}× ${getItemName(objective.itemType)} abgeben`;
-    if (objective.type === 'craft') return `${objective.required}× ${getItemName(objective.itemType)} herstellen`;
-    if (objective.type === 'place') return `${objective.required}× ${getItemName(objective.itemType)} im Dorf platzieren`;
-    if (objective.type === 'hunt') return `${objective.required}× ${objective.mobType} besiegen`;
-    if (objective.type === 'structure') return `${objective.structureKind === 'mine' ? 'Mine' : 'Dungeon'} abschließen`;
-    if (objective.type === 'boss') return 'Blutmondecho am Ritualaltar besiegen';
-    return objective.type;
-}
-
 function buildVillageQuestOfferRow(offer, questState, isChain = false) {
     const row = document.createElement('div');
     row.className = `trade-row quest-row quest-offer-row${isChain ? ' profession-chain-row' : ''}`;
     const details = document.createElement('div');
     details.className = 'trade-item';
-    details.innerHTML = `<strong>${offer.title}</strong><span class="trade-label">${objectiveText(offer.objective)}</span>`;
+    details.innerHTML = `<strong>${offer.title}</strong><span class="trade-label">${getQuestObjectiveText(offer.objective, offer.professionIdx)}</span>`;
     const reward = document.createElement('div');
     reward.className = 'trade-item';
-    reward.innerHTML = `<div class="trade-icon">${createBlockHTML(offer.reward.type)}</div><span class="trade-label">${offer.reward.count}× ${getItemName(offer.reward.type)} · +${offer.trustReward} Vertrauen</span>`;
+    reward.innerHTML = `<div class="trade-icon">${rewardIcon(offer.reward)}</div><span class="trade-label">${rewardLabel(offer.reward)} · +${offer.trustReward} Vertrauen</span>`;
     const btn = document.createElement('button');
     btn.className = 'trade-btn';
     btn.textContent = 'Annehmen';
@@ -230,10 +236,10 @@ function buildActiveVillageQuestRow(quest, questState) {
     row.className = 'trade-row quest-row quest-active-row';
     const details = document.createElement('div');
     details.className = 'trade-item';
-    details.innerHTML = `<strong>${quest.title}</strong><span class="trade-label">${progress.current}/${progress.required} · ${objectiveText(quest.objective)}</span>`;
+    details.innerHTML = `<strong>${quest.title}</strong><span class="trade-label">${getQuestObjectiveText(quest.objective, quest.professionIdx)} – ${progress.current}/${progress.required}</span>`;
     const reward = document.createElement('div');
     reward.className = 'trade-item';
-    reward.innerHTML = `<div class="trade-icon">${createBlockHTML(quest.reward.type)}</div><span class="trade-label">${quest.reward.count}× ${getItemName(quest.reward.type)}</span>`;
+    reward.innerHTML = `<div class="trade-icon">${rewardIcon(quest.reward)}</div><span class="trade-label">${rewardLabel(quest.reward)}</span>`;
     const btn = document.createElement('button');
     btn.className = 'trade-btn';
     btn.textContent = progress.complete ? 'Abgeben' : `Fehlt ${progress.required - progress.current}`;
@@ -251,17 +257,26 @@ function executeVillageQuest(quest, questState) {
             { type: quest.objective.itemType, count: quest.objective.required },
             quest.reward
         )
-        : tryAddItemsToInventory([quest.reward]);
+        : tryAddItemsToInventory(rewardItems(quest.reward));
     const succeeded = quest.objective.type === 'delivery' ? result.exchanged : result.added;
     if (!succeeded) {
         showTradeMessage('Inventar voll! ❌', '#ff9800');
         return;
     }
-    completeSideQuest(questState, quest.id, window.getQuestDayCount?.() || 0);
+    const completedQuest = completeSideQuest(questState, quest.id, window.getQuestDayCount?.() || 0);
     const village = questState.villages?.[quest.villageId];
     if (village) village.offers = (village.offers || []).filter(offer => offer.id !== quest.id);
     if (window.updateInventoryUI) window.updateInventoryUI();
     showTradeMessage(`Quest erledigt: +${quest.trustReward} Vertrauen`, '#4caf50');
+    if (completedQuest && quest.trustReward > 0) {
+        window.dispatchEvent(new CustomEvent(STORY_EVENTS.VILLAGE_TRUST_EARNED, {
+            detail: {
+                villageId: quest.villageId,
+                trustEarned: quest.trustReward,
+                trust: village?.trust || 0
+            }
+        }));
+    }
     window.dispatchEvent(new CustomEvent(STORY_EVENTS.QUEST_COMPLETED, { detail: { quest } }));
     if (currentNPC) openTradeUI(currentNPC);
 }
@@ -319,7 +334,7 @@ function executeTrade(trade, idx) {
     // UI aktualisieren
     if (window.updateInventoryUI) window.updateInventoryUI();
 
-    showTradeMessage(`+${trade.receive.count}× ${getItemName(trade.receive.type)} ✅`, '#4caf50');
+    showTradeMessage(`+ ${rewardLabel(trade.receive)}`, '#4caf50');
 
     // Button kurz animieren
     const btn = document.querySelector(`#trade-row-${idx} .trade-btn`);

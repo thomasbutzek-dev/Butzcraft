@@ -1,8 +1,15 @@
-import { inventorySlots } from './inventory.js?v=20260721c';
-import { abandonSideQuest, getSideQuestProgress, getTrustTier } from './quests.js?v=20260721b';
-import { getCompassGuidance, getCompassHeadingDegrees, getRelativeCompassBearing, resolveHomeTarget } from './questNavigation.js?v=20260721e';
-
-const PROFESSION_NAMES = ['Schmied', 'Bauer', 'Händler', 'Bibliothekar'];
+import { inventorySlots } from './inventory.js?v=20260801c';
+import { abandonSideQuest, getSideQuestProgress, getTrustTier } from './quests.js?v=20260730a';
+import { getQuestObjectiveText, getQuestProfessionName } from './questObjectiveText.js?v=20260730a';
+import {
+    getCompassGuidance,
+    getCompassHeadingDegrees,
+    getRelativeCompassBearing,
+    resolveHomeTarget,
+    resolveMainQuestTarget,
+    resolveRitualSite,
+    resolveSideQuestTarget
+} from './questNavigation.js?v=20260731a';
 
 function getQuestState() {
     return window.getQuestState?.() || null;
@@ -62,7 +69,7 @@ function renderSideQuests(container, state) {
         const title = document.createElement('strong');
         title.textContent = quest.title;
         const details = document.createElement('span');
-        details.textContent = `${progress.current}/${progress.required} · ${PROFESSION_NAMES[quest.professionIdx] || 'Dorfauftrag'}`;
+        details.textContent = `${getQuestObjectiveText(quest.objective, quest.professionIdx)} – ${progress.current}/${progress.required} · ${getQuestProfessionName(quest.professionIdx)}`;
         const actions = document.createElement('div');
         actions.className = 'quest-journal-actions';
         const tracked = state.trackedTarget?.kind === 'side' && state.trackedTarget.questId === quest.id;
@@ -138,16 +145,36 @@ export function renderQuestJournal() {
 export function showInventoryPanel(panel = 'inventory') {
     const overlay = document.getElementById('inventory-overlay');
     const journal = document.getElementById('quest-journal');
+    const equipment = document.getElementById('equipment-panel');
     if (!overlay || !journal) return;
     const showJournal = panel === 'quests';
+    const showEquipment = panel === 'equipment';
     overlay.classList.toggle('quest-view', showJournal);
+    overlay.classList.toggle('equipment-view', showEquipment);
     journal.hidden = !showJournal;
-    document.getElementById('inventory-view-tab')?.setAttribute('aria-selected', showJournal ? 'false' : 'true');
+    if (equipment) equipment.hidden = !showEquipment;
+    document.getElementById('inventory-view-tab')?.setAttribute('aria-selected', showJournal || showEquipment ? 'false' : 'true');
+    document.getElementById('equipment-view-tab')?.setAttribute('aria-selected', showEquipment ? 'true' : 'false');
     document.getElementById('quest-view-tab')?.setAttribute('aria-selected', showJournal ? 'true' : 'false');
+    const title = document.getElementById('inventory-title');
+    if (title) title.textContent = showJournal ? 'Questjournal' : (showEquipment ? 'Ausrüstung' : 'Inventar');
     if (showJournal) renderQuestJournal();
+    if (showEquipment) window.renderEquipmentPanel?.();
 }
 
 function trackedTarget(state, context) {
+    const ritualSite = resolveRitualSite(
+        state.storyFlags?.ritualSite,
+        context?.world?.structures
+    );
+    if (ritualSite && (
+        ritualSite.structureId !== state.storyFlags?.ritualSite?.structureId ||
+        ritualSite.position.x !== state.storyFlags?.ritualSite?.position?.x ||
+        ritualSite.position.y !== state.storyFlags?.ritualSite?.position?.y ||
+        ritualSite.position.z !== state.storyFlags?.ritualSite?.position?.z
+    )) {
+        state.storyFlags.ritualSite = ritualSite;
+    }
     if (state.trackedTarget?.kind === 'home') {
         const home = resolveHomeTarget(context?.respawnBed, context?.world?.getBlock?.bind(context.world));
         if (!home) state.trackedTarget = { kind: 'main' };
@@ -155,17 +182,48 @@ function trackedTarget(state, context) {
     }
     if (state.trackedTarget?.kind === 'side') {
         const quest = state.activeSideQuests.find(candidate => candidate.id === state.trackedTarget.questId);
-        if (quest?.objective?.target) {
-            return {
-                ...quest.objective.target,
-                label: quest.title,
-                discovered: quest.objective.type !== 'structure',
-                searchRadius: quest.objective.type === 'structure' ? 80 : 30
-            };
+        if (quest) {
+            const progress = getSideQuestProgress(quest, inventorySlots);
+            const target = resolveSideQuestTarget({
+                quest,
+                progressComplete: progress.complete,
+                village: state.villages?.[quest.villageId],
+                playerPosition: context?.playerPosition,
+                structures: context?.world?.structures,
+                structureProgress: context?.world?.structureProgress,
+                ritualSite
+            });
+            if (
+                quest.objective?.type === 'structure' &&
+                target?.discovered &&
+                target.structureId
+            ) {
+                quest.objective.target = {
+                    x: target.x,
+                    z: target.z,
+                    structureId: target.structureId
+                };
+            }
+            return target ? {
+                ...target,
+                label: target.handIn ? `${quest.title} · Abgeben` : quest.title
+            } : null;
         }
         state.trackedTarget = { kind: 'main' };
     }
-    return context?.mainTarget ? { ...context.mainTarget, label: 'Hauptquest' } : null;
+    const villages = Object.values(state.villages || {}).map(village => ({
+        ...village,
+        isHome: village.id === state.homeVillageId
+    }));
+    return resolveMainQuestTarget({
+        mainQuestIndex: state.mainQuestIndex,
+        playerPosition: context?.playerPosition,
+        knownVillages: villages,
+        generatedVillages: context?.world?.villages,
+        structures: context?.world?.structures,
+        structureProgress: context?.world?.structureProgress,
+        ritualSite
+    });
 }
 
 export function updateQuestCompass() {
