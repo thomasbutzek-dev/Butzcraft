@@ -23,7 +23,7 @@ describe('browser module identity', () => {
     it('cache-busts the browser entry after atlas changes', () => {
         const source = readFileSync('index.html', 'utf8');
 
-        expect(source).toContain('./js/GameMain.js?v=20260801i');
+        expect(source).toContain('./js/GameMain.js?v=20260813d');
     });
 
     it('loads the painterly held-item models through current browser URLs', () => {
@@ -139,7 +139,7 @@ describe('browser module identity', () => {
             return source.match(/\.\/touch\.js\?v=[^'\"]+/)?.[0];
         });
 
-        expect(new Set(specifiers)).toEqual(new Set(['./touch.js?v=20260801a']));
+        expect(new Set(specifiers)).toEqual(new Set(['./touch.js?v=20260813d']));
     });
 
     it('loads story progress through one versioned URL everywhere', () => {

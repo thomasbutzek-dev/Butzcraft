@@ -44,7 +44,8 @@ describe('developer diary releases', () => {
             .toBe(`Seite ${DEVELOPER_DIARY_ENTRIES.length} von ${DEVELOPER_DIARY_ENTRIES.length}`);
 
         diary.querySelector('[data-diary-previous]').click();
-        expect(diary.querySelector('.diary-version').textContent).toContain('0.2.2');
+        expect(diary.querySelector('.diary-version').textContent)
+            .toContain(DEVELOPER_DIARY_ENTRIES.at(-2).version);
         expect(diary.querySelector('[data-diary-next]').disabled).toBe(false);
     });
 });

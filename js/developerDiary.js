@@ -52,6 +52,19 @@ export const DEVELOPER_DIARY_ENTRIES = Object.freeze([
             'Charaktereditor, First und Third Person sowie die mobile Zwei-Daumen-Steuerung greifen zuverlässiger ineinander und wurden auf einem echten Mobilgerät abgenommen.',
             'Rezeptbuch, Schadenssound, Serverbetrieb und Performance-Diagnose erhielten gezielte Korrekturen und neue automatisierte Prüfungen.'
         ])
+    }),
+    Object.freeze({
+        version: '0.3.1',
+        date: '2026-08-13',
+        title: 'Handy-Steuerung mit mehr Übersicht',
+        summary: 'Version 0.3.1 ist ein gezielter Mobilpatch. Bedienelemente, Menüs und Startablauf nutzen den knappen Platz im Handy-Querformat besser, während die Desktop-Version unverändert vollständig bleibt.',
+        changes: Object.freeze([
+            'Ein festes Vier-Wege-Steuerkreuz ersetzt den analogen Joystick und trennt die Laufrichtungen eindeutig von Sprung und Blicksteuerung.',
+            'Der größere Sprungknopf lässt sich beim Umschauen weiterziehen; ein Sprung beginnt nur noch durch eine bewusste Berührung direkt auf diesem Knopf.',
+            'Inventar und Questjournal liegen oben und bleiben im niedrigen Querformat über eigene Scrollbereiche vollständig bedienbar.',
+            'Das Startmenü kennzeichnet die Mobilversion als experimentell, priorisiert die Startaktionen und blockiert den Spielstart nicht bei abgelehntem Vollbild.',
+            'FPS-Diagnose und Touch-HUD nehmen auf dem Handy keinen unnötigen Platz mehr ein; längeres Abbauen toleriert natürliche Fingerbewegungen.'
+        ])
     })
 ]);
 

@@ -2,7 +2,7 @@
  *
  * Architektur:
  *  - Wird beim Spielstart aufgerufen. Bei Nicht-Touch-Devices ist es ein No-Op.
- *  - Joystick (links): mappt auf Input.moveF/B/L/R
+ *  - Steuerkreuz (links): mappt eindeutig auf Input.moveF/B/L/R
  *  - Look-Bereich (rechte Bildschirmhälfte ohne Buttons): swipt → camera/controls Rotation
  *  - SPRINGEN kombiniert Sprung und Blicksteuerung, BAUEN nutzt mousedown button=2
  *  - Kurzer Tap in den Look-Bereich: ABBAUEN/Angreifen (mousedown button=0)
@@ -18,10 +18,9 @@ import { Input } from './Input.js?v=20260731a';
 import { Game } from './Game.js?v=20260716b';
 
 const LOOK_SENSITIVITY = 0.005;
-const JOYSTICK_DEADZONE = 0.18;
-const JOYSTICK_RADIUS_PX = 60;
 const PITCH_LIMIT = Math.PI / 2 - 0.01;
 const TAP_MAX_MOVE_PX = 10;
+const MINE_HOLD_MOVE_PX = 24;
 const TAP_MAX_MS = 260;
 const MINE_HOLD_DELAY_MS = 180;
 
@@ -74,21 +73,17 @@ function releaseTouchJump(cancelled = false) {
     if (cancelled) Input.touchJumpQueued = false;
 }
 
-function isTouchInsideElement(touch, element) {
-    const rect = element.getBoundingClientRect();
-    return touch.clientX >= rect.left && touch.clientX <= rect.right
-        && touch.clientY >= rect.top && touch.clientY <= rect.bottom;
-}
-
 /**
  * Initialisiert Touch-UI. Idempotent (mehrfache Aufrufe sind sicher).
  * @param {object} ctx - { camera, controls, player, toggleCameraMode, isInventoryOpenedProvider }
  *
  * Mobile HUD:
+ *   ⛶  Vollbild erneut anfordern, wenn der Browser es beendet hat
  *   ⏸  Pause/Menü oben rechts
- *   📦 Inventar rechts unten
+ *   📦 Inventar und Q Questjournal oben
+ *   Steuerkreuz links: exakt eine Laufrichtung, ohne Zusatzbelegung
  *   ▣  Block platzieren rechts unten
- *   ⤒  Springen unten rechts; Ziehen steuert zugleich den Blick
+ *   ⤒  Springen unten rechts; nur dort beginnen, Ziehen steuert den Blick
  *   Tap im Look-Bereich: Block abbauen / Mob angreifen
  */
 export function initTouchControls(ctx) {
@@ -102,17 +97,22 @@ export function initTouchControls(ctx) {
     const overlay = document.createElement('div');
     overlay.id = 'touch-overlay';
     overlay.innerHTML = `
-        <div id="touch-joystick-base">
-            <div id="touch-joystick-knob"></div>
+        <div id="touch-dpad" role="group" aria-label="Bewegung">
+            <button id="touch-dpad-up" class="touch-dpad-btn" data-direction="forward" aria-label="Vorwärts">▲</button>
+            <button id="touch-dpad-left" class="touch-dpad-btn" data-direction="left" aria-label="Links">◀</button>
+            <span id="touch-dpad-center" aria-hidden="true"></span>
+            <button id="touch-dpad-right" class="touch-dpad-btn" data-direction="right" aria-label="Rechts">▶</button>
+            <button id="touch-dpad-down" class="touch-dpad-btn" data-direction="backward" aria-label="Rückwärts">▼</button>
         </div>
         <div id="touch-look-area"></div>
         <div id="touch-top-actions">
+            <button id="touch-btn-fullscreen" class="touch-btn touch-btn-small" aria-label="Vollbild aktivieren">⛶</button>
             <button id="touch-btn-camera" class="touch-btn touch-btn-small" aria-label="Zu Third Person wechseln">3P</button>
+            <button id="touch-btn-inv" class="touch-btn touch-btn-small" aria-label="Inventar">📦</button>
+            <button id="touch-btn-journal" class="touch-btn touch-btn-small" aria-label="Questjournal">Q</button>
             <button id="touch-btn-pause" class="touch-btn touch-btn-small" aria-label="Pause">⏸</button>
         </div>
         <div id="touch-button-stack">
-            <button id="touch-btn-inv" class="touch-btn touch-btn-small" aria-label="Inventar">📦</button>
-            <button id="touch-btn-journal" class="touch-btn touch-btn-small" aria-label="Questjournal">Q</button>
             <button id="touch-btn-place" class="touch-btn" aria-label="Bauen">▣</button>
             <button id="touch-btn-jump" class="touch-btn touch-btn-primary" aria-label="Springen">⤒</button>
         </div>
@@ -120,7 +120,7 @@ export function initTouchControls(ctx) {
     document.body.appendChild(overlay);
 
     _injectTouchStyles();
-    _bindJoystick();
+    _bindDpad();
     _bindLookArea(ctx);
     _bindActionButtons(ctx);
 }
@@ -133,32 +133,49 @@ function _injectTouchStyles() {
             user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
             --touch-safe-bottom: max(16px, env(safe-area-inset-bottom));
             --touch-safe-left: max(16px, env(safe-area-inset-left));
-            --touch-safe-right: max(16px, env(safe-area-inset-right));
+            --touch-safe-right: max(24px, env(safe-area-inset-right));
             --touch-safe-top: max(16px, env(safe-area-inset-top));
             --touch-look-bottom: 128px;
         }
-        #touch-joystick-base {
+        #touch-dpad {
             position: absolute;
             left: var(--touch-safe-left);
             bottom: var(--touch-safe-bottom);
-            width: clamp(108px, 18vw, 140px);
-            height: clamp(108px, 18vw, 140px);
-            background: rgba(255,255,255,0.12);
-            border: 2px solid rgba(255,255,255,0.35);
-            border-radius: 50%;
-            pointer-events: auto;
+            width: clamp(126px, 20vw, 150px);
+            height: clamp(126px, 20vw, 150px);
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-template-rows: repeat(3, 1fr);
+            pointer-events: none;
             touch-action: none;
         }
-        #touch-joystick-knob {
-            position: absolute; left: 50%; top: 50%;
-            width: 60px; height: 60px;
-            margin-left: -30px; margin-top: -30px;
-            background: rgba(255,255,255,0.4);
-            border: 2px solid rgba(255,255,255,0.7);
-            border-radius: 50%;
-            pointer-events: none;
-            transition: background 0.1s;
+        .touch-dpad-btn {
+            width: 100%; height: 100%;
+            padding: 0;
+            background: rgba(255,255,255,0.18);
+            border: 2px solid rgba(255,255,255,0.48);
+            border-radius: 11px;
+            color: white;
+            font-size: clamp(20px, 4vw, 26px);
+            line-height: 1;
+            pointer-events: auto;
+            touch-action: none;
+            -webkit-tap-highlight-color: transparent;
         }
+        .touch-dpad-btn.is-active,
+        .touch-dpad-btn:active { background: rgba(255,255,255,0.42); }
+        #touch-dpad-up { grid-column: 2; grid-row: 1; }
+        #touch-dpad-left { grid-column: 1; grid-row: 2; }
+        #touch-dpad-center {
+            grid-column: 2; grid-row: 2;
+            margin: 5px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.24);
+            pointer-events: none;
+        }
+        #touch-dpad-right { grid-column: 3; grid-row: 2; }
+        #touch-dpad-down { grid-column: 2; grid-row: 3; }
         #touch-look-area {
             position: absolute; right: 0; top: 0; bottom: var(--touch-look-bottom);
             width: 58%;
@@ -170,21 +187,23 @@ function _injectTouchStyles() {
             top: var(--touch-safe-top);
             right: var(--touch-safe-right);
             display: flex;
-            gap: clamp(8px, 1.5vw, 12px);
+            gap: clamp(5px, 1vw, 9px);
             width: auto;
-            height: clamp(46px, 8vw, 58px);
+            height: clamp(42px, 7vw, 54px);
             pointer-events: auto;
         }
         #touch-top-actions .touch-btn {
-            width: clamp(46px, 8vw, 58px);
+            width: clamp(42px, 7vw, 54px);
+            flex: 0 0 clamp(42px, 7vw, 54px);
         }
+        #touch-btn-fullscreen[hidden] { display: none; }
         #touch-button-stack {
             position: absolute;
             right: var(--touch-safe-right);
             bottom: var(--touch-safe-bottom);
             display: grid;
-            grid-template-columns: repeat(2, clamp(48px, 9vw, 64px));
-            grid-auto-rows: clamp(48px, 9vw, 64px);
+            grid-template-columns: clamp(78px, 12vw, 92px);
+            grid-template-rows: clamp(48px, 8vw, 58px) clamp(78px, 12vw, 92px);
             gap: clamp(8px, 1.5vw, 12px);
             align-items: center;
             justify-items: center;
@@ -208,21 +227,22 @@ function _injectTouchStyles() {
             font-size: clamp(22px, 5vw, 28px);
         }
         .touch-btn:active { background: rgba(255,255,255,0.4); }
-        #touch-btn-inv { grid-column: 1; }
-        #touch-btn-journal { grid-column: 1; grid-row: 2; }
-        #touch-btn-place { grid-column: 2; }
-        #touch-btn-jump { grid-column: 2; grid-row: 2; touch-action: none; }
+        #touch-btn-place {
+            grid-column: 1; grid-row: 1;
+            width: 82%; height: 82%;
+        }
+        #touch-btn-jump { grid-column: 1; grid-row: 2; touch-action: none; }
         @media (orientation: portrait) and (max-width: 560px) {
             #touch-overlay {
                 --touch-look-bottom: 150px;
             }
             #touch-button-stack {
-                grid-template-columns: repeat(2, 52px);
-                grid-auto-rows: 52px;
+                grid-template-columns: 84px;
+                grid-template-rows: 52px 84px;
             }
-            #touch-joystick-base {
-                width: 116px;
-                height: 116px;
+            #touch-dpad {
+                width: 132px;
+                height: 132px;
             }
         }
         @media (orientation: landscape) and (max-height: 460px) {
@@ -230,16 +250,20 @@ function _injectTouchStyles() {
                 --touch-look-bottom: 104px;
             }
             #touch-button-stack {
-                grid-template-columns: repeat(2, 50px);
-                grid-auto-rows: 50px;
+                grid-template-columns: 84px;
+                grid-template-rows: 46px 84px;
             }
             #touch-top-actions {
-                width: 50px;
-                height: 50px;
+                width: auto;
+                height: 44px;
             }
-            #touch-joystick-base {
-                width: 104px;
-                height: 104px;
+            #touch-top-actions .touch-btn {
+                width: 44px;
+                flex-basis: 44px;
+            }
+            #touch-dpad {
+                width: 120px;
+                height: 120px;
             }
         }
         /* Bei Desktop-Browsern ist Touch-UI versteckt (Erkennung über CSS-Media falls JS-Detection irrt) */
@@ -263,71 +287,58 @@ function _dispatchInteraction(button, type = 'mousedown') {
     document.dispatchEvent(evt);
 }
 
-function _bindJoystick() {
-    const base = document.getElementById('touch-joystick-base');
-    const knob = document.getElementById('touch-joystick-knob');
+function _bindDpad() {
+    const dpad = document.getElementById('touch-dpad');
+    const buttons = [...dpad.querySelectorAll('[data-direction]')];
     let activeId = null;
-    let centerX = 0, centerY = 0;
 
     const reset = () => {
-        knob.style.transform = '';
         Input.moveF = Input.moveB = Input.moveL = Input.moveR = false;
         Input.sprint = false;
+        buttons.forEach((button) => button.classList.remove('is-active'));
         activeId = null;
     };
 
-    base.addEventListener('touchstart', (e) => {
-        e.preventDefault();
-        const t = e.changedTouches[0];
-        const rect = base.getBoundingClientRect();
-        centerX = rect.left + rect.width / 2;
-        centerY = rect.top + rect.height / 2;
-        activeId = t.identifier;
-    }, { passive: false });
-
-    base.addEventListener('touchmove', (e) => {
-        if (activeId === null) return;
-        e.preventDefault();
-        for (const t of e.touches) {
-            if (t.identifier !== activeId) continue;
-            let dx = t.clientX - centerX;
-            let dy = t.clientY - centerY;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            const max = JOYSTICK_RADIUS_PX;
-            if (dist > max) { dx = dx * max / dist; dy = dy * max / dist; }
-            knob.style.transform = `translate(${dx}px, ${dy}px)`;
-            const nx = dx / max, ny = dy / max; // -1..1
-            Input.moveF = ny < -JOYSTICK_DEADZONE;
-            Input.moveB = ny > JOYSTICK_DEADZONE;
-            Input.moveL = nx < -JOYSTICK_DEADZONE;
-            Input.moveR = nx > JOYSTICK_DEADZONE;
-            // Auto-Sprint, wenn Joystick fast voll ausgeschlagen ist (>85%)
-            const intensity = Math.min(1, dist / max);
-            Input.sprint = intensity > 0.85 && Input.moveF;
-        }
-    }, { passive: false });
+    const activate = (button) => {
+        Input.moveF = Input.moveB = Input.moveL = Input.moveR = false;
+        Input.sprint = false;
+        buttons.forEach((candidate) => candidate.classList.toggle('is-active', candidate === button));
+        const direction = button.dataset.direction;
+        if (direction === 'forward') Input.moveF = true;
+        if (direction === 'backward') Input.moveB = true;
+        if (direction === 'left') Input.moveL = true;
+        if (direction === 'right') Input.moveR = true;
+    };
 
     const endHandler = (e) => {
         for (const t of e.changedTouches) {
             if (t.identifier === activeId) { reset(); break; }
         }
     };
-    base.addEventListener('touchend', endHandler);
-    base.addEventListener('touchcancel', endHandler);
+
+    buttons.forEach((button) => {
+        button.addEventListener('touchstart', (e) => {
+            if (activeId !== null) return;
+            e.preventDefault();
+            activeId = e.changedTouches[0].identifier;
+            activate(button);
+        }, { passive: false });
+        button.addEventListener('touchend', endHandler);
+        button.addEventListener('touchcancel', endHandler);
+    });
 }
 
 function _bindLookArea(ctx) {
     const area = document.getElementById('touch-look-area');
-    const jumpBtn = document.getElementById('touch-btn-jump');
     let activeId = null;
     let lastX = 0, lastY = 0;
     let startX = 0, startY = 0, startTime = 0;
     let moved = false;
+    let miningCancelled = false;
     let miningStarted = false;
     let miningTimer = null;
     let pinching = false;
     let pinchDistance = 0;
-    let jumpActivated = false;
 
     const distanceBetween = (touches) => Math.hypot(
         touches[0].clientX - touches[1].clientX,
@@ -353,6 +364,7 @@ function _bindLookArea(ctx) {
                 e.preventDefault();
                 pinching = true;
                 moved = true;
+                miningCancelled = true;
                 pinchDistance = distanceBetween(e.touches);
                 stopMining();
             }
@@ -364,12 +376,12 @@ function _bindLookArea(ctx) {
         lastY = startY = t.clientY;
         startTime = performance.now();
         moved = false;
+        miningCancelled = false;
         miningStarted = false;
-        jumpActivated = false;
         if (miningTimer) clearTimeout(miningTimer);
         miningTimer = setTimeout(() => {
             miningTimer = null;
-            if (activeId === null || moved) return;
+            if (activeId === null || miningCancelled) return;
             miningStarted = true;
             _dispatchInteraction(0, 'mousedown');
         }, MINE_HOLD_DELAY_MS);
@@ -392,21 +404,16 @@ function _bindLookArea(ctx) {
             const dx = t.clientX - lastX;
             const dy = t.clientY - lastY;
             lastX = t.clientX; lastY = t.clientY;
-            if (Math.hypot(t.clientX - startX, t.clientY - startY) > TAP_MAX_MOVE_PX) {
-                moved = true;
+            const distanceFromStart = Math.hypot(t.clientX - startX, t.clientY - startY);
+            if (distanceFromStart > TAP_MAX_MOVE_PX) moved = true;
+            if (!miningStarted && distanceFromStart > MINE_HOLD_MOVE_PX) {
+                miningCancelled = true;
                 if (miningTimer) {
                     clearTimeout(miningTimer);
                     miningTimer = null;
                 }
-                if (miningStarted) {
-                    _dispatchInteraction(0, 'mouseup');
-                    miningStarted = false;
-                }
             }
-            if (!jumpActivated && isTouchInsideElement(t, jumpBtn)) {
-                jumpActivated = true;
-                pressTouchJump();
-            }
+            if (miningStarted) continue;
             applyTouchLookDelta(ctx, dx, dy);
         }
     }, { passive: false });
@@ -417,7 +424,6 @@ function _bindLookArea(ctx) {
             moved = true;
             if (e.touches.length < 2) pinching = false;
             if (e.touches.length === 0) {
-                if (jumpActivated) releaseTouchJump();
                 activeId = null;
             }
             return;
@@ -436,7 +442,6 @@ function _bindLookArea(ctx) {
                     _dispatchInteraction(0, 'mousedown');
                     _dispatchInteraction(0, 'mouseup');
                 }
-                if (jumpActivated) releaseTouchJump();
                 activeId = null;
                 break;
             }
@@ -447,7 +452,6 @@ function _bindLookArea(ctx) {
         for (const t of e.changedTouches) {
             if (t.identifier !== activeId) continue;
             stopMining();
-            if (jumpActivated) releaseTouchJump(true);
             activeId = null;
             break;
         }
@@ -461,6 +465,7 @@ function _bindActionButtons(ctx) {
     const placeBtn = document.getElementById('touch-btn-place');
     const invBtn = document.getElementById('touch-btn-inv');
     const journalBtn = document.getElementById('touch-btn-journal');
+    const fullscreenBtn = document.getElementById('touch-btn-fullscreen');
     const cameraBtn = document.getElementById('touch-btn-camera');
     const pauseBtn = document.getElementById('touch-btn-pause');
     const pauseOverlay = document.getElementById('instructions');
@@ -474,6 +479,14 @@ function _bindActionButtons(ctx) {
             : 'Zu Third Person wechseln');
     };
     updateCameraButton();
+
+    const syncFullscreenButton = () => {
+        if (!fullscreenBtn) return;
+        fullscreenBtn.hidden = Boolean(document.fullscreenElement || document.webkitFullscreenElement);
+    };
+    syncFullscreenButton();
+    document.addEventListener('fullscreenchange', syncFullscreenButton);
+    document.addEventListener('webkitfullscreenchange', syncFullscreenButton);
 
     if (pauseOverlay) {
         pauseOverlay.addEventListener('click', (e) => {
@@ -545,6 +558,14 @@ function _bindActionButtons(ctx) {
         journalBtn.addEventListener('touchstart', (e) => {
             e.preventDefault();
             window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyJ', key: 'j', bubbles: true }));
+        }, { passive: false });
+    }
+    if (fullscreenBtn) {
+        fullscreenBtn.addEventListener('touchstart', async (e) => {
+            e.preventDefault();
+            if (typeof window.__butzcraftRequestFullscreen !== 'function') return;
+            await window.__butzcraftRequestFullscreen();
+            syncFullscreenButton();
         }, { passive: false });
     }
     if (cameraBtn) {

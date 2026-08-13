@@ -1014,6 +1014,19 @@ body {
             text-transform: uppercase;
         }
 
+        #mobile-experimental-notice {
+            display: none;
+            max-width: 420px;
+            padding: 10px 12px;
+            border: 1px solid rgba(255, 216, 77, 0.45);
+            border-radius: 8px;
+            background: rgba(82, 61, 15, 0.42);
+            color: #ffe6a1;
+            font-size: 13px;
+            line-height: 1.4;
+            text-align: center;
+        }
+
         .menu-btn {
             padding: 12px 24px;
             margin: 4px 10px 0;
@@ -1891,7 +1904,19 @@ html.touch-device body {
     touch-action: none;
 }
 
+html.touch-device #fps-summary {
+    display: none;
+}
+
+#inventory-overlay[aria-hidden="false"] ~ #touch-overlay {
+    visibility: hidden;
+}
+
 @media (pointer: coarse), (max-width: 760px) {
+    #mobile-experimental-notice {
+        display: block;
+    }
+
     #ui {
         padding:
             max(8px, env(safe-area-inset-top))
@@ -2365,6 +2390,192 @@ html.touch-device body {
 }
 
 @media (pointer: coarse) and (orientation: landscape) and (max-height: 460px) {
+    #start-menu-content {
+        width: min(96vw, 720px);
+        max-height: calc(100svh - 12px);
+        padding: 8px 16px;
+        gap: 7px;
+    }
+
+    #start-menu-content .logo-img {
+        width: auto;
+        max-height: 58px;
+    }
+
+    #start-promise,
+    #start-goals {
+        display: none;
+    }
+
+    #mobile-experimental-notice {
+        max-width: 560px;
+        padding: 6px 10px;
+        font-size: 11px;
+        line-height: 1.25;
+    }
+
+    #start-menu-content .menu-btn {
+        min-height: 38px;
+        padding: 7px 16px;
+        margin-top: 0;
+        font-size: 14px;
+    }
+
+    #inventory-overlay {
+        padding:
+            max(6px, env(safe-area-inset-top))
+            max(6px, env(safe-area-inset-right))
+            max(6px, env(safe-area-inset-bottom))
+            max(6px, env(safe-area-inset-left)) !important;
+        flex-direction: row !important;
+        align-items: stretch !important;
+        gap: 8px !important;
+        overflow: hidden !important;
+    }
+
+    #inventory-main-content {
+        order: 2;
+        flex: 1 1 auto;
+        min-width: 0;
+        width: auto !important;
+        max-width: none !important;
+        height: 100%;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #recipe-book {
+        order: 1;
+        flex: 0 0 min(30vw, 220px);
+        width: min(30vw, 220px) !important;
+        height: 100% !important;
+        max-height: none;
+        contain: none;
+        padding: 8px;
+        overflow-x: hidden !important;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #recipe-book-title {
+        margin-bottom: 6px;
+        font-size: 13px;
+    }
+
+    #recipe-category-tabs,
+    #recipe-search {
+        margin-bottom: 6px;
+    }
+
+    #inventory-header {
+        position: sticky;
+        top: 0;
+        z-index: 5;
+        flex: 0 0 auto;
+        gap: 6px;
+        margin-bottom: 5px;
+        padding-bottom: 4px;
+        background: rgba(49, 55, 39, 0.98);
+    }
+
+    #inventory-title {
+        display: none;
+    }
+
+    #inventory-view-tabs {
+        flex: 1 1 auto;
+        min-width: 0;
+        gap: 4px;
+    }
+
+    #inventory-view-tabs button {
+        flex: 1 1 auto;
+        min-width: 0;
+        padding: 6px 5px;
+        font-size: 11px;
+        white-space: nowrap;
+    }
+
+    #inventory-close-btn {
+        min-width: 70px;
+        height: 32px;
+        padding: 0 8px;
+        font-size: 11px;
+    }
+
+    #inventory-objective {
+        width: 100%;
+        margin-bottom: 5px;
+        padding: 5px 8px;
+    }
+
+    #inventory-objective .inventory-objective-kicker,
+    #inventory-objective-hint {
+        display: none;
+    }
+
+    #inventory-objective strong {
+        font-size: 12px;
+        line-height: 1.2;
+    }
+
+    #crafting-label {
+        margin: 0 0 4px;
+    }
+
+    #crafting-area {
+        width: auto;
+        margin-bottom: 5px !important;
+    }
+
+    #crafting-status {
+        min-height: 12px;
+        margin: 0 0 4px;
+        font-size: 9px;
+    }
+
+    #inventory-grid {
+        grid-template-columns: repeat(8, 40px) !important;
+        gap: 4px !important;
+        margin-top: 4px;
+    }
+
+    #inventory-grid .inv-slot {
+        width: 40px !important;
+        height: 40px !important;
+    }
+
+    #inventory-grid .inv-section-title,
+    #inventory-grid #inventory-divider {
+        grid-column: span 8 !important;
+    }
+
+    #inventory-overlay.quest-view #inventory-main-content,
+    #inventory-overlay.equipment-view #inventory-main-content {
+        width: auto !important;
+        max-width: none !important;
+        align-items: stretch !important;
+        overflow: hidden !important;
+    }
+
+    #quest-journal,
+    #equipment-panel {
+        flex: 1 1 auto;
+        min-height: 0;
+        width: 100%;
+        box-sizing: border-box;
+        padding: 0 4px 8px;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+    }
+
+    #quest-journal h2 {
+        margin: 7px 0 5px;
+        font-size: 12px;
+    }
+
     #top-ui {
         padding: 6px 112px 6px 6px;
     }
@@ -2404,6 +2615,31 @@ html.touch-device body {
 
     .slot {
         font-size: 12px;
+    }
+
+    #first-objective,
+    #first-objective.visible {
+        top: max(6px, env(safe-area-inset-top));
+        left: max(6px, env(safe-area-inset-left));
+        width: min(38vw, 240px);
+        padding: 7px 9px 8px;
+        transform: none;
+    }
+
+    #first-objective .first-objective-kicker,
+    #first-objective-progress {
+        display: none;
+    }
+
+    #first-objective strong {
+        font-size: 13px;
+        line-height: 1.2;
+    }
+
+    #first-objective-hint {
+        margin-top: 2px;
+        font-size: 10px;
+        line-height: 1.25;
     }
 
     #instructions {

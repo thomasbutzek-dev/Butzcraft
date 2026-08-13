@@ -1,6 +1,6 @@
         import * as THREE from 'three';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
-        import { APP_VERSION } from './version.js?v=20260723a';
+        import { APP_VERSION } from './version.js?v=20260813a';
         import { CONFIG } from '../config.js?v=20260511a';
         import { SoundManager } from './sound.js?v=20260731a';
         import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas, atlasDataURL } from './blocks.js?v=20260801b';
@@ -11,7 +11,7 @@
         import { DeepGuardian, SealKeeper } from './structureBosses.js?v=20260722c';
 
         import { Input } from './Input.js?v=20260731a';
-        import { initTouchControls, isTouchDevice } from './touch.js?v=20260801a';
+        import { initTouchControls, isTouchDevice } from './touch.js?v=20260813d';
         import { getWorldGenerationLoadNotice, prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260731c';
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260801b';

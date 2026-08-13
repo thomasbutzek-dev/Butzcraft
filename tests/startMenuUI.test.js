@@ -8,10 +8,37 @@ describe('start menu loading feedback', () => {
         const startButton = document.getElementById('start-button');
         const status = document.getElementById('mobile-start-status');
 
-        expect(startButton.getAttribute('aria-describedby')).toBe('mobile-start-status');
+        expect(startButton.getAttribute('aria-describedby')).toBe('mobile-experimental-notice mobile-start-status');
         expect(status.getAttribute('role')).toBe('status');
         expect(status.getAttribute('aria-live')).toBe('polite');
         expect(status.getAttribute('aria-atomic')).toBe('true');
+    });
+
+    it('explains the experimental mobile version and starts without depending on fullscreen', () => {
+        const html = readFileSync('index.html', 'utf8');
+        const document = new DOMParser().parseFromString(html, 'text/html');
+        const notice = document.getElementById('mobile-experimental-notice');
+
+        expect(notice.textContent).toContain('experimentell');
+        expect(notice.textContent).toContain('Desktop-Version');
+        expect(document.getElementById('start-without-fullscreen-button')).toBeNull();
+        expect(html).toContain("request.call(el, { navigationUI: 'hide' })");
+        expect(html).toContain('window.__butzcraftRequestFullscreen();');
+        expect(html).toContain('window.__butzcraftBeginGameStart();');
+    });
+
+    it('prioritizes the notice and start controls in short mobile landscape viewports', () => {
+        const styles = readFileSync('style.css', 'utf8');
+        const start = styles.indexOf('@media (pointer: coarse) and (orientation: landscape) and (max-height: 460px)');
+        const end = styles.indexOf('.village-chest-warning', start);
+        const landscapeRules = styles.slice(start, end);
+
+        expect(landscapeRules).toContain('#start-menu-content');
+        expect(landscapeRules).toContain('max-height: calc(100svh - 12px)');
+        expect(landscapeRules).toContain('.logo-img');
+        expect(landscapeRules).toContain('max-height: 58px');
+        expect(landscapeRules).toContain('#start-promise');
+        expect(landscapeRules).toContain('display: none');
     });
 
     it('keeps the menu inside short desktop viewports with its own scroll area', () => {
@@ -50,6 +77,19 @@ describe('first-day objective HUD', () => {
         expect(source).toContain('if (!isInventoryOpened() || !objective)');
         expect(styles).toContain('#inventory-objective.visible');
     });
+
+    it('uses a compact top-left objective in short touch landscape viewports', () => {
+        const styles = readFileSync('style.css', 'utf8');
+        const start = styles.indexOf('@media (pointer: coarse) and (orientation: landscape) and (max-height: 460px)');
+        const end = styles.indexOf('.village-chest-warning', start);
+        const landscapeRules = styles.slice(start, end);
+
+        expect(landscapeRules).toContain('#first-objective.visible');
+        expect(landscapeRules).toContain('left: max(6px, env(safe-area-inset-left))');
+        expect(landscapeRules).toContain('width: min(38vw, 240px)');
+        expect(landscapeRules).toContain('#first-objective-progress');
+        expect(landscapeRules).toContain('display: none');
+    });
 });
 
 describe('pause menu focus', () => {
@@ -84,5 +124,13 @@ describe('time and performance HUD', () => {
         expect(fpsSummary.textContent).toContain('Aktuell');
         expect(fpsSummary.textContent).toContain('Min');
         expect(fpsSummary.textContent).toContain('Max');
+    });
+
+    it('hides the FPS summary only in touch mode', () => {
+        const styles = readFileSync('style.css', 'utf8');
+        const touchRule = styles.match(/html\.touch-device\s+#fps-summary\s*\{([^}]*)\}/)?.[1] || '';
+
+        expect(touchRule).toContain('display: none');
+        expect(styles).not.toMatch(/#world-time-info\s*\{[^}]*display:\s*none/);
     });
 });

@@ -68,7 +68,7 @@
             display: none;
         }
     </style>
-    <link rel="stylesheet" href="style.css?v=20260801a">
+    <link rel="stylesheet" href="style.css?v=20260813c">
     <link rel="icon" type="image/png" href="favicon.png">
     <script>
         window.__butzcraftStartRequested = false;
@@ -114,16 +114,27 @@
             window.__butzcraftRefreshStartStatus('Engine wird geladen. Das Spiel startet automatisch...');
             return false;
         };
-        window.__butzcraftRequestFullscreen = function() {
+        window.__butzcraftUsesTouch = function() {
+            return navigator.maxTouchPoints > 0
+                || ('ontouchstart' in window)
+                || Boolean(window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+        };
+        window.__butzcraftFullscreenElement = function() {
+            return document.fullscreenElement || document.webkitFullscreenElement || null;
+        };
+        window.__butzcraftRequestFullscreen = async function() {
             const el = document.documentElement;
-            if (document.fullscreenElement || document.webkitFullscreenElement) return;
+            if (window.__butzcraftFullscreenElement()) return true;
             const request = el.requestFullscreen || el.webkitRequestFullscreen;
-            if (typeof request !== 'function') return;
+            if (typeof request !== 'function') return false;
             try {
-                const result = request.call(el);
-                if (result && typeof result.catch === 'function') result.catch(() => {});
+                const result = el.requestFullscreen
+                    ? request.call(el, { navigationUI: 'hide' })
+                    : request.call(el);
+                if (result && typeof result.then === 'function') await result;
+                return Boolean(window.__butzcraftFullscreenElement());
             } catch (err) {
-                // Mobile Browser erlauben Fullscreen nur, wenn es aus dem Start-Tap kommt.
+                return false;
             }
         };
         window.addEventListener('error', (event) => {
@@ -134,17 +145,7 @@
             const reason = event.reason && (event.reason.message || String(event.reason));
             window.__butzcraftShowStartError('Fehler: ' + (reason || 'Promise abgebrochen'));
         });
-        window.__butzcraftPressStart = function(event) {
-            const now = performance.now();
-            if (now - window.__butzcraftLastStartPress < 350) return false;
-            window.__butzcraftLastStartPress = now;
-            if (event && event.cancelable) event.preventDefault();
-            if (window.location.protocol === 'file:') {
-                window.location.href = window.__butzcraftLocalServerUrl;
-                return false;
-            }
-            window.__butzcraftRequestFullscreen();
-
+        window.__butzcraftBeginGameStart = function() {
             window.__butzcraftStartRequested = true;
 
             const startButton = document.getElementById('start-button');
@@ -160,6 +161,19 @@
             }
 
             window.__butzcraftStartWhenReady();
+        };
+        window.__butzcraftPressStart = function(event) {
+            const now = performance.now();
+            if (now - window.__butzcraftLastStartPress < 350) return false;
+            window.__butzcraftLastStartPress = now;
+            if (event && event.cancelable) event.preventDefault();
+            if (window.location.protocol === 'file:') {
+                window.location.href = window.__butzcraftLocalServerUrl;
+                return false;
+            }
+            if (window.__butzcraftUsesTouch()) window.__butzcraftRequestFullscreen();
+
+            window.__butzcraftBeginGameStart();
             return false;
         };
     </script>
@@ -173,11 +187,14 @@
                 <span>Deine Welt. Dein Weg. Dein Abenteuer.</span>
                 Erkunde, baue, kämpfe und entdecke, was jenseits des nächsten Horizonts wartet.
             </div>
+            <div id="mobile-experimental-notice">
+                Die Mobilversion ist experimentell. Das vollständige Spielerlebnis bietet die Desktop-Version.
+            </div>
             <button
                 id="start-button"
                 class="menu-btn"
                 type="button"
-                aria-describedby="mobile-start-status"
+                aria-describedby="mobile-experimental-notice mobile-start-status"
                 ontouchstart="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
                 onpointerdown="if (event.pointerType !== 'mouse') return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
                 onclick="return window.__butzcraftPressStart && window.__butzcraftPressStart(event)"
@@ -208,6 +225,7 @@
             const startButton = document.getElementById('start-button');
             const requestStart = window.__butzcraftPressStart;
             if (!startButton || typeof requestStart !== 'function') return;
+            if (window.__butzcraftUsesTouch()) startButton.textContent = 'Spiel starten';
             if (window.__butzcraftLastStartError) {
                 window.__butzcraftShowStartError(window.__butzcraftLastStartError);
             }
@@ -288,7 +306,7 @@
         <div id="instructions" role="dialog" aria-modal="true" aria-labelledby="pause-title" aria-hidden="true">
             <img src="logo.png" alt="BUTZCRAFT" style="width: 200px; margin-bottom: 10px; display: block; margin-left: auto; margin-right: auto;">
             <h1 id="pause-title">Pause</h1>
-            <p style="margin: -4px 0 0; color: #aaa; font-size: 12px;">Butzcraft Version <span data-app-version>0.3.0</span></p>
+            <p style="margin: -4px 0 0; color: #aaa; font-size: 12px;">Butzcraft Version <span data-app-version>0.3.1</span></p>
             <div style="display: flex; gap: 20px; justify-content: center; margin: 20px 0;">
                 <button class="save-btn" type="button" data-resume-game style="padding: 15px 30px; font-size: 18px; cursor: pointer;" onclick="window.resumeGame && window.resumeGame();">Weiter spielen</button>
                 <button id="pause-character-editor-button" class="save-btn" type="button" data-open-character-editor onclick="event.stopPropagation()">Charakter</button>
@@ -534,7 +552,7 @@
     <script type="module" src="./js/characterTransferBootstrap.js?v=20260720a"></script>
     <script
         type="module"
-        src="./js/GameMain.js?v=20260801i"
+        src="./js/GameMain.js?v=20260813d"
         onerror="window.__butzcraftShowStartError && window.__butzcraftShowStartError('GameMain.js konnte nicht geladen werden')"
     ></script>
 </body>
