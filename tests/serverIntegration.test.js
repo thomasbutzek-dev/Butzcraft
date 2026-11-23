@@ -88,6 +88,78 @@ describe('server application', () => {
         });
     });
 
+    it('sends security headers and rate-limits admin logins per forwarded visitor in production', () => {
+        const root = mkdtempSync(path.join(tmpdir(), 'butzcraft-server-'));
+        temporaryDirectories.push(root);
+        const probe = spawnSync(process.execPath, ['-e', `
+            const { createApp } = require('./server.js');
+            (async () => {
+                const runtime = createApp();
+                const server = runtime.app.listen(0, '127.0.0.1');
+                await new Promise((resolve, reject) => {
+                    server.once('listening', resolve);
+                    server.once('error', reject);
+                });
+                const port = server.address().port;
+                const login = visitor => fetch('http://127.0.0.1:' + port + '/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-Forwarded-For': visitor },
+                    body: JSON.stringify({ username: 'admin', password: 'wrong' })
+                }).then(response => response.status);
+                const health = await fetch('http://127.0.0.1:' + port + '/health');
+                const attacker = [];
+                for (let attempt = 0; attempt < 6; attempt++) attacker.push(await login('203.0.113.1'));
+                const otherVisitor = await login('203.0.113.2');
+                const result = {
+                    headers: {
+                        poweredBy: health.headers.get('x-powered-by'),
+                        nosniff: health.headers.get('x-content-type-options'),
+                        frameOptions: health.headers.get('x-frame-options'),
+                        csp: health.headers.get('content-security-policy'),
+                        hsts: health.headers.get('strict-transport-security'),
+                        referrer: health.headers.get('referrer-policy')
+                    },
+                    attacker,
+                    otherVisitor
+                };
+                await new Promise(resolve => server.close(resolve));
+                runtime.close();
+                console.log(JSON.stringify(result));
+            })().catch(error => {
+                console.error(error);
+                process.exitCode = 1;
+            });
+        `], {
+            cwd: process.cwd(),
+            encoding: 'utf8',
+            timeout: 10000,
+            env: {
+                ...process.env,
+                NODE_ENV: 'production',
+                PORT: '0',
+                ENABLE_REMOTE_SAVES: 'false',
+                SITE_ADMIN_PASSWORD: 'correct-test-password',
+                SITE_CONTENT_DIR: path.join(root, 'site-content'),
+                STATISTICS_DIR: path.join(root, 'statistics'),
+                SAVES_DIR: path.join(root, 'saves')
+            }
+        });
+
+        expect(probe.status, probe.stderr).toBe(0);
+        expect(JSON.parse(probe.stdout.trim().split(/\r?\n/).at(-1))).toEqual({
+            headers: {
+                poweredBy: null,
+                nosniff: 'nosniff',
+                frameOptions: 'SAMEORIGIN',
+                csp: "frame-ancestors 'self'",
+                hsts: 'max-age=15552000',
+                referrer: 'strict-origin-when-cross-origin'
+            },
+            attacker: [401, 401, 401, 401, 401, 429],
+            otherVisitor: 401
+        });
+    });
+
     it('keeps the IPv4 localhost server available when the IPv6 listener cannot bind', async () => {
         const root = mkdtempSync(path.join(tmpdir(), 'butzcraft-server-'));
         temporaryDirectories.push(root);

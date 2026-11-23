@@ -65,6 +65,19 @@ export const DEVELOPER_DIARY_ENTRIES = Object.freeze([
             'Das Startmenü kennzeichnet die Mobilversion als experimentell, priorisiert die Startaktionen und blockiert den Spielstart nicht bei abgelehntem Vollbild.',
             'FPS-Diagnose und Touch-HUD nehmen auf dem Handy keinen unnötigen Platz mehr ein; längeres Abbauen toleriert natürliche Fingerbewegungen.'
         ])
+    }),
+    Object.freeze({
+        version: '0.3.2',
+        date: '2026-11-23',
+        title: 'Ein sichereres Fundament für die Online-Version',
+        summary: 'Version 0.3.2 ist ein Sicherheitsupdate für Website und Spielserver. Am Spiel selbst ändert sich nichts, aber der öffentlich erreichbare Server ist besser gegen Angriffe und Missbrauch geschützt.',
+        changes: Object.freeze([
+            'Serverbibliotheken für Anfragen, Komprimierung und HTML-Bereinigung wurden auf Versionen mit geschlossenen Sicherheitslücken aktualisiert.',
+            'Der Mailversand des Kontaktformulars nutzt eine neue Nodemailer-Generation mit robusterer Adressprüfung.',
+            'Login-Sperre und Kontaktlimit zählen wieder pro Besucher, sodass einzelne Personen den Adminzugang oder das Formular nicht mehr für alle blockieren können.',
+            'Neue Sicherheits-Header verhindern das Einbetten der Seiten in fremde Websites, erzwingen HTTPS und verraten die Servertechnik nicht mehr.',
+            'Neue automatisierte Servertests prüfen Sicherheits-Header und die Login-Sperre pro Besucher.'
+        ])
     })
 ]);
 

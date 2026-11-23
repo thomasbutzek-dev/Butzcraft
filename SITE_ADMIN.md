@@ -46,4 +46,4 @@ Butzcraft verwendet Versionen im Format `0.MINOR.PATCH`:
 - `MINOR` für neue Spielinhalte oder größere Funktionen, zum Beispiel `0.3.0`.
 - `1.0.0` wird erst für die bewusst freigegebene stabile Vollversion verwendet.
 
-Die aktuelle Version steht in `package.json` und `js/version.js`. Beide Werte müssen bei einer neuen Version gemeinsam geändert werden. Ab `v0.2.0` veröffentlicht ein Git-Tag zusätzlich die Container-Tags der jeweiligen Version und `stable`. Normale Pushes auf `stabilization/game-optimization` aktualisieren weiterhin nur den Container-Tag `stabilization`.
+Die aktuelle Version steht in `package.json` und `js/version.js`. Beide Werte müssen bei einer neuen Version gemeinsam geändert werden. Ab `v0.2.0` veröffentlicht ein Git-Tag zusätzlich die Container-Tags der jeweiligen Version und `stable`. Seit `v0.3.2` baut nur noch ein Git-Tag ein Container-Image; Hostinger verwendet den Container-Tag `stable`.

@@ -2,7 +2,7 @@ name: butzcraft
 
 services:
   app:
-    image: ghcr.io/thomasbutzek-dev/butzcraft:stabilization
+    image: ghcr.io/thomasbutzek-dev/butzcraft:stable
     pull_policy: always
     restart: unless-stopped
     init: true

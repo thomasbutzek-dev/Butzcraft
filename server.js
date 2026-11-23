@@ -34,6 +34,18 @@ function isWebsiteRequest(req) {
     const hostname = req.hostname.toLowerCase();
     return websiteHosts.has(hostname) || (!isProduction && ['localhost', '127.0.0.1', '::1'].includes(hostname));
 }
+app.disable('x-powered-by');
+// In production Traefik terminates TLS in front of the app; trust exactly that one hop
+// so req.ip is the visitor's address and rate limits apply per visitor, not globally.
+if (isProduction) app.set('trust proxy', 1);
+app.use((req, res, next) => {
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.set('X-Frame-Options', 'SAMEORIGIN');
+    res.set('Content-Security-Policy', "frame-ancestors 'self'");
+    if (isProduction) res.set('Strict-Transport-Security', 'max-age=15552000');
+    next();
+});
 app.use(compression());
 
 app.get('/health', (req, res) => {
