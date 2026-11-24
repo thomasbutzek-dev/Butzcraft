@@ -33,4 +33,17 @@ describe('natural spawn surfaces', () => {
             expect(isNaturalSpawnSurfaceAllowed('ground', mobType)).toBe(true);
         }
     );
+
+    it('treats a column as island only where the island top actually is', () => {
+        const sample = findFloatingIslandSurface();
+        const island = getFloatingIslandAt(sample.x, sample.z);
+        const top = island.y + island.thick - 1;
+
+        expect(getNaturalSpawnSurfaceAt(sample.x, sample.z, { surfaceY: top, generationVersion: 2 })).toBe('floatingIsland');
+        // Worldgen 3 lifts islands by four blocks.
+        expect(getNaturalSpawnSurfaceAt(sample.x, sample.z, { surfaceY: top + 4, generationVersion: 3 })).toBe('floatingIsland');
+        expect(getNaturalSpawnSurfaceAt(sample.x, sample.z, { surfaceY: top, generationVersion: 3 })).toBe('ground');
+        // Worldgen 3 drops some islands: the column then shows ordinary ground far below.
+        expect(getNaturalSpawnSurfaceAt(sample.x, sample.z, { surfaceY: 40, generationVersion: 3 })).toBe('ground');
+    });
 });

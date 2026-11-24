@@ -8,7 +8,7 @@ export function readChunkWorkerSource() {
     return readFileSync('js/chunkWorker.js', 'utf8')
         .replace(
             /^import .*undergroundStructures.*\r?\n/m,
-            'const generateUndergroundStructures = () => ({ structures: [], entities: [], chests: [], spawners: [] });\n'
+            'const generateUndergroundStructures = () => ({ structures: [], entities: [], chests: [], spawners: [] });\nconst getDungeonEntrancesNear = () => [];\n'
         )
         .replace(
             /^import .*naturalSpawnRules.*\r?\n/m,

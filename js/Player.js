@@ -16,6 +16,14 @@ const THIRD_PERSON_CHARACTER_SHOW_DISTANCE = 1.35;
 const GHOST_FLY_SPEED = 12;
 const GHOST_FAST_MULTIPLIER = 2.5;
 
+// Damage for landing at the given downward speed (blocks/s): nothing up to the threshold,
+// then growing linearly with the speed above it.
+export function getFallDamage(impactSpeed, threshold, multiplier) {
+    const limit = Math.abs(threshold);
+    if (!(impactSpeed > limit)) return 0;
+    return Math.round((impactSpeed - limit) * multiplier);
+}
+
 export class Player {
     constructor(scene, camera, domElement, CONFIG, characterProfile = null, cameraControlElement = domElement) {
         this.camera = camera;
@@ -32,6 +40,8 @@ export class Player {
 
         // Physics State
         this.velocity = new THREE.Vector3();
+        // Fall damage from the last landing, collected and applied by the game loop.
+        this.pendingFallDamage = 0;
         this.direction = new THREE.Vector3();
         this.canJ = false;
         this.distanceTravelled = 0;
@@ -694,6 +704,8 @@ export class Player {
             if (!onGround || this.velocity.y > 0) {
                 this.velocity.y -= GRAVITY * GRAVITY_MULTIPLIER * delta;
             } else {
+                // A fall can also end here, when the last step stopped just above the ground.
+                this._registerLanding(-this.velocity.y);
                 this.velocity.y = 0; this.canJ = true;
             }
 
@@ -723,12 +735,21 @@ export class Player {
             } else this.distanceTravelled = 0;
 
             // Y-Bewegung: bei Boden-Hit canJ setzen (Decke nicht).
+            const impactSpeed = -this.velocity.y;
             const yHit = stepY(this.velocity.y * delta);
-            if (yHit === 'ground') this.canJ = true;
+            if (yHit === 'ground') {
+                this.canJ = true;
+                this._registerLanding(impactSpeed);
+            }
 
             stepHoriz('x', (fwdH.x * -this.velocity.z + rgt.x * this.velocity.x) * delta);
             stepHoriz('z', (fwdH.z * -this.velocity.z + rgt.z * this.velocity.x) * delta);
         }
+    }
+
+    _registerLanding(impactSpeed) {
+        const { FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULT } = this.CONFIG.GAMEPLAY;
+        this.pendingFallDamage += getFallDamage(impactSpeed, FALL_DAMAGE_THRESHOLD, FALL_DAMAGE_MULT);
     }
 
     updateGhostMovement(delta, Input) {

@@ -47,8 +47,18 @@ export function getFloatingIslandAt(wx, wz) {
     };
 }
 
-export function getNaturalSpawnSurfaceAt(wx, wz) {
-    return (getFloatingIslandAt(wx, wz)?.thick || 0) > 0
+// Worldgen 3 lifts every floating island by this many blocks (and drops some islands).
+export const FLOATING_ISLAND_LIFT_V3 = 4;
+
+// With the found surface height, a column only counts as island when its top block is
+// where the island's top would be. Worldgen 3 drops islands over villages and high
+// ground; those columns then show ordinary ground and must allow spawns again.
+export function getNaturalSpawnSurfaceAt(wx, wz, { surfaceY = null, generationVersion = 2 } = {}) {
+    const island = getFloatingIslandAt(wx, wz);
+    if (!((island?.thick || 0) > 0)) return NATURAL_SPAWN_SURFACES.GROUND;
+    if (surfaceY === null) return NATURAL_SPAWN_SURFACES.FLOATING_ISLAND;
+    const lift = generationVersion >= 3 ? FLOATING_ISLAND_LIFT_V3 : 0;
+    return surfaceY === island.y + lift + island.thick - 1
         ? NATURAL_SPAWN_SURFACES.FLOATING_ISLAND
         : NATURAL_SPAWN_SURFACES.GROUND;
 }

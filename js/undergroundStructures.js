@@ -866,6 +866,32 @@ function publicDungeonStructure(candidate) {
     };
 }
 
+const dungeonEntranceCache = new WeakMap();
+
+/**
+ * Surface entrances of the dungeons whose regions lie near a block column, so terrain
+ * generation can keep trees off a dungeon's gatehouse. Cached per world and region.
+ */
+export function getDungeonEntrancesNear(wx, wz, reach, world, terrain) {
+    if (!(world?.version >= 2)) return [];
+    let cache = dungeonEntranceCache.get(terrain);
+    if (!cache) dungeonEntranceCache.set(terrain, cache = new Map());
+    const regionSize = DUNGEON_REGION_CHUNKS * world.chunkSize;
+    const entrances = [];
+    for (let regionX = Math.floor((wx - reach) / regionSize); regionX <= Math.floor((wx + reach) / regionSize); regionX++) {
+        for (let regionZ = Math.floor((wz - reach) / regionSize); regionZ <= Math.floor((wz + reach) / regionSize); regionZ++) {
+            const key = `${world.version}:${world.seed}:${regionX},${regionZ}`;
+            if (!cache.has(key)) {
+                const candidate = createDungeonCandidate(regionX, regionZ, world, terrain);
+                cache.set(key, candidate ? { x: candidate.x, z: candidate.z } : null);
+            }
+            const entrance = cache.get(key);
+            if (entrance) entrances.push(entrance);
+        }
+    }
+    return entrances;
+}
+
 /**
  * Stamps every worldgen-v2 underground structure intersecting one chunk.
  * Runtime metadata is emitted only by the structure's origin chunk.

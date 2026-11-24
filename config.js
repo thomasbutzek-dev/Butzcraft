@@ -27,8 +27,8 @@ export const CONFIG = {
         UNDERWATER_DAMAGE_PER_SECOND: 4,
         REGEN_RATE: 2.0,           // Gesundheit pro Sekunde bei vollem Hunger
         REGEN_THRESHOLD: 90,       // Hunger-Level ab dem man heilt
-        FALL_DAMAGE_THRESHOLD: -35, // Ab dieser Fallgeschwindigkeit gibt es Schaden
-        FALL_DAMAGE_MULT: 0.5      // Schaden = Fallgeschwindigkeit * Multiplikator
+        FALL_DAMAGE_THRESHOLD: -26.5, // Ab dieser Aufprallgeschwindigkeit (etwa 9 Blöcke Fall) gibt es Schaden
+        FALL_DAMAGE_MULT: 2.0         // Schaden = (Aufprallgeschwindigkeit - Schwelle) * Multiplikator
     },
 
     // Mobs (Wesen)

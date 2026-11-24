@@ -4,8 +4,8 @@
 // Läuft komplett off-main-thread für ruckelfreies Gameplay.
 // ============================================================
 
-import { generateUndergroundStructures } from './undergroundStructures.js?v=20260721b';
-import { getFloatingIslandAt, getFloatingIslandCellAt } from './naturalSpawnRules.js?v=20260731a';
+import { generateUndergroundStructures, getDungeonEntrancesNear } from './undergroundStructures.js?v=20260721b';
+import { FLOATING_ISLAND_LIFT_V3, getFloatingIslandAt, getFloatingIslandCellAt } from './naturalSpawnRules.js?v=20260731a';
 import { getOceanDepthFactor } from './terrainHeightRules.js?v=20260801a';
 
 let CHUNK_SIZE = 16, CHUNK_HEIGHT = 64, WATER_LEVEL = 32, CLOUD_HEIGHT = 50;
@@ -462,6 +462,20 @@ function columnTreeRng(wx, wz) {
     return mulberry32(Math.imul(wx, 1597334677) ^ Math.imul(wz, 2869860233) ^ 0x51a3);
 }
 
+// Worldgen 3 keeps trees and palms clear of dungeon gatehouses (5x5, canopies reach 4).
+const DUNGEON_TREE_CLEARANCE = 6;
+const UNDERGROUND_WORLD = { seed: 0, chunkSize: 16, chunkHeight: 64, waterLevel: 32, version: 3 };
+
+function isNearDungeonEntrance(wx, wz) {
+    if (WORLD_GENERATION_VERSION < 3) return false;
+    UNDERGROUND_WORLD.chunkSize = CHUNK_SIZE;
+    UNDERGROUND_WORLD.chunkHeight = CHUNK_HEIGHT;
+    UNDERGROUND_WORLD.waterLevel = WATER_LEVEL;
+    UNDERGROUND_WORLD.version = WORLD_GENERATION_VERSION;
+    return getDungeonEntrancesNear(wx, wz, DUNGEON_TREE_CLEARANCE, UNDERGROUND_WORLD, UNDERGROUND_TERRAIN)
+        .some(entrance => Math.max(Math.abs(wx - entrance.x), Math.abs(wz - entrance.z)) <= DUNGEON_TREE_CLEARANCE);
+}
+
 function getColumnTree(wx, wz) {
     const h = getTerrainHeightAt(wx, wz);
     if (h <= WATER_LEVEL + 1) return null;
@@ -469,7 +483,7 @@ function getColumnTree(wx, wz) {
     let surfaceBlock = biome === BIOMES.SNOW ? 11 : (biome === BIOMES.DESERT || biome === BIOMES.OCEAN) ? 7 : 1;
     surfaceBlock = getTransitionSurfaceBlock(wx, wz, biome, surfaceBlock);
     const treeBiome = (biome === BIOMES.SNOW || surfaceBlock === 11) ? BIOMES.SNOW : biome;
-    if (!hasColumnTree(wx, wz, getTreeChance(treeBiome)) || isInVillageClearZone(wx, wz)) return null;
+    if (!hasColumnTree(wx, wz, getTreeChance(treeBiome)) || isInVillageClearZone(wx, wz) || isNearDungeonEntrance(wx, wz)) return null;
     return { h, treeBiome };
 }
 
@@ -1336,7 +1350,6 @@ function isNearVillage(wx, wz, margin) {
 // Worldgen 3 lifts floating islands a few blocks and keeps only those that float well
 // clear of the ground: none over a village, none sitting on a hill with their vines in
 // the treetops. Vines never hang under an island without blocks.
-const ISLAND_LIFT_V3 = 4;
 const ISLAND_MIN_CLEARANCE = 12;
 const islandSiteCache = new Map();
 
@@ -1347,13 +1360,13 @@ function getWorldFloatingIslandAt(wx, wz) {
     const cell = getFloatingIslandCellAt(wx, wz);
     const key = `${Math.floor(cell.centerX)},${Math.floor(cell.centerZ)}`;
     if (!cachedVillageValue(islandSiteCache, key, () => isIslandSiteClear(cell))) return null;
-    return { y: island.y + ISLAND_LIFT_V3, thick: island.thick };
+    return { y: island.y + FLOATING_ISLAND_LIFT_V3, thick: island.thick };
 }
 
 function isIslandSiteClear(cell) {
     const centerX = Math.floor(cell.centerX), centerZ = Math.floor(cell.centerZ);
     if (getVillageDistance(centerX, centerZ).distance < VILLAGE_CLEAR_RADIUS + cell.radius) return false;
-    const maxGround = Math.floor(cell.y) + ISLAND_LIFT_V3 - ISLAND_MIN_CLEARANCE;
+    const maxGround = Math.floor(cell.y) + FLOATING_ISLAND_LIFT_V3 - ISLAND_MIN_CLEARANCE;
     const reach = Math.ceil(cell.radius) + 1;
     for (let dx = -reach; dx <= reach; dx++) {
         for (let dz = -reach; dz <= reach; dz++) {
@@ -2429,9 +2442,9 @@ function generateTerrain(cx, cz, buffer) {
                 const tc = getTreeChance(treeBiome);
                 const treeRoll = rng();
                 if (WORLD_GENERATION_VERSION >= 3) {
-                    if (hasColumnTree(wx, wz, tc) && !villageClear) spawnTree(data, x, h, z, treeBiome, columnTreeRng(wx, wz), wx, wz);
+                    if (hasColumnTree(wx, wz, tc) && !villageClear && !isNearDungeonEntrance(wx, wz)) spawnTree(data, x, h, z, treeBiome, columnTreeRng(wx, wz), wx, wz);
                 } else if (treeRoll < tc && !villageClear) spawnTree(data, x, h, z, treeBiome, rng, wx, wz);
-                if (biome === BIOMES.DESERT && rng() < 0.008 && !villageClear && canSpawnPalmAt(wx, wz, h)) {
+                if (biome === BIOMES.DESERT && rng() < 0.008 && !villageClear && !isNearDungeonEntrance(wx, wz) && canSpawnPalmAt(wx, wz, h)) {
                     spawnPalm(data, x, h, z, wx, wz);
                 }
             }

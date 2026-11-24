@@ -2177,7 +2177,10 @@
                     }
                     if (spawnY > 0) {
                         const spawnBiome = getBiomeAt(ox, oz);
-                        const naturalSpawnSurface = getNaturalSpawnSurfaceAt(ox, oz);
+                        const naturalSpawnSurface = getNaturalSpawnSurfaceAt(ox, oz, {
+                            surfaceY: Math.floor(spawnY) - 1,
+                            generationVersion: world.worldGenerationVersion
+                        });
                         const naturalSpawnSurfaceAllowed = isNaturalSpawnSurfaceAllowed(naturalSpawnSurface);
                         // Prüfe nur direkte Umgebung auf Wasser (Radius 1) an der Oberfläche
                         let waterNearby = false;
@@ -2297,6 +2300,10 @@
                     }
                 } else {
                     Game.player.updatePhysics(delta, Input, world, SoundManager);
+                    if (Game.player.pendingFallDamage > 0) {
+                        applyPlayerDamage(Game.player.pendingFallDamage);
+                        Game.player.pendingFallDamage = 0;
+                    }
                 }
                 if (!Game.player.ghostMode) {
                     Game.player.hunger -= HUNGER_LOSS_PASSIVE * delta; if (Game.player.hunger <= 0) { Game.player.hunger = 0; Game.player.health -= 2 * delta; }

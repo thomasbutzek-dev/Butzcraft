@@ -110,6 +110,19 @@ export const DEVELOPER_DIARY_ENTRIES = Object.freeze([
             'Die Sichtweite steht auf dem Desktop jetzt standardmäßig auf 6 Chunks; die Einstellung im Menü wirkt wieder auf die ganze Welt.',
             'Neue automatisierte Tests sichern Dörfer, Untergrund, Gleise, Loren und die gemeinsame Spielkonfiguration ab.'
         ])
+    }),
+    Object.freeze({
+        version: '0.4.1',
+        date: '2026-11-24',
+        title: 'Fallschaden und kleine Feinschliffe',
+        summary: 'Version 0.4.1 führt Fallschaden ein und räumt drei Kleinigkeiten aus 0.4.0 auf.',
+        changes: Object.freeze([
+            'Stürze ab etwa neun Blöcken Höhe kosten jetzt Lebenspunkte, je tiefer, desto mehr: aus 20 Blöcken etwa ein Viertel der Lebensenergie.',
+            'Landungen im Wasser, im Geistmodus und in der Lore bleiben folgenlos, und Rüstung dämpft den Sturz wie jeden anderen Treffer.',
+            'Wo in neuen Welten eine schwebende Insel weggelassen wurde, erscheinen auf dem Boden darunter wieder Tiere und Monster.',
+            'Bäume und Palmen halten Abstand zum Torbau der Dungeons, der Eingang liegt nun auf einer kleinen Lichtung.',
+            'Neue automatisierte Tests sichern Fallschaden, Insel-Erkennung und den Freiraum am Dungeoneingang ab.'
+        ])
     })
 ]);
 
