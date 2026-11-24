@@ -5,7 +5,7 @@
 // ============================================================
 
 import { generateUndergroundStructures } from './undergroundStructures.js?v=20260721b';
-import { getFloatingIslandAt } from './naturalSpawnRules.js?v=20260731a';
+import { getFloatingIslandAt, getFloatingIslandCellAt } from './naturalSpawnRules.js?v=20260731a';
 import { getOceanDepthFactor } from './terrainHeightRules.js?v=20260801a';
 
 let CHUNK_SIZE = 16, CHUNK_HEIGHT = 64, WATER_LEVEL = 32, CLOUD_HEIGHT = 50;
@@ -270,6 +270,12 @@ function getTransitionSurfaceBlock(wx, wz, biome, baseBlock) {
 }
 
 function getTerrainHeightAt(wx, wz) {
+    const rawHeight = getRawTerrainHeightAt(wx, wz);
+    if (WORLD_GENERATION_VERSION < 3) return rawHeight;
+    return levelTerrainForVillages(wx, wz, rawHeight);
+}
+
+function getRawTerrainHeightAt(wx, wz) {
     const biome = getBiomeAt(wx, wz);
     const temperature = (Math.sin(wx * 0.01) + Math.cos(wz * 0.01)) * 0.5;
     const humidity = (Math.sin(wx * 0.01 + 500) + Math.cos(wz * 0.01 + 500)) * 0.5;
@@ -363,7 +369,7 @@ function spawnTree(data, x, h, z, biome, rng, worldX, worldZ) {
     const th = (isJ ? 8 : isSnow ? 6 : 4) + Math.floor(rng() * 3);
     const wt = isJ ? 13 : 5, lt = isJ ? 14 : 6;
     for (let ty = 0; ty < th; ty++) {
-        const iy = h + ty; if (iy < CHUNK_HEIGHT) data[(iy * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x] = wt;
+        setBlockLocal(data, x, h + ty, z, wt);
     }
     const treeRng = mulberry32(Math.imul(worldX, 73856093) ^ Math.imul(worldZ, 19349663));
         const style = Math.floor(treeRng() * 4);
@@ -421,16 +427,64 @@ function frostSnowyTreeCanopies(data, cx, cz) {
                 const worldX = cx * CHUNK_SIZE + rootX;
                 const worldZ = cz * CHUNK_SIZE + rootZ;
                 if (getBiomeAt(worldX, worldZ) !== BIOMES.SNOW && data[rootIndex - layerSize] !== 11) continue;
-
-                for (let y = rootY + 2; y <= Math.min(CHUNK_HEIGHT - 2, rootY + 11); y++) {
-                    for (let z = Math.max(0, rootZ - 4); z <= Math.min(CHUNK_SIZE - 1, rootZ + 4); z++) {
-                        for (let x = Math.max(0, rootX - 4); x <= Math.min(CHUNK_SIZE - 1, rootX + 4); x++) {
-                            const index = y * layerSize + z * CHUNK_SIZE + x;
-                            if (data[index] === 6 && data[index + layerSize] === 0) data[index] = 77;
-                        }
-                    }
-                }
+                frostCanopyAround(data, rootX, rootY, rootZ);
             }
+        }
+    }
+}
+
+function frostCanopyAround(data, rootX, rootY, rootZ) {
+    const layerSize = CHUNK_SIZE * CHUNK_SIZE;
+    for (let y = rootY + 2; y <= Math.min(CHUNK_HEIGHT - 2, rootY + 11); y++) {
+        for (let z = Math.max(0, rootZ - 4); z <= Math.min(CHUNK_SIZE - 1, rootZ + 4); z++) {
+            for (let x = Math.max(0, rootX - 4); x <= Math.min(CHUNK_SIZE - 1, rootX + 4); x++) {
+                const index = y * layerSize + z * CHUNK_SIZE + x;
+                if (data[index] === 6 && data[index + layerSize] === 0) data[index] = 77;
+            }
+        }
+    }
+}
+
+// Worldgen 3 decides trees per column instead of from the chunk's running RNG, so a chunk
+// can rebuild the trees rooted in its neighbours and draw the part of their canopy that
+// reaches across the border (canopies used to end in a flat wall at chunk edges).
+const TREE_CANOPY_REACH = 4;
+
+function getTreeChance(treeBiome) {
+    return (treeBiome === BIOMES.JUNGLE) ? 0.08 : (treeBiome === BIOMES.PLAINS) ? 0.015 : (treeBiome === BIOMES.SNOW) ? 0.0015 : 0;
+}
+
+function hasColumnTree(wx, wz, chance) {
+    return chance > 0 && mulberry32(Math.imul(wx, 2246822519) ^ Math.imul(wz, 3266489917) ^ 0x2f6b)() < chance;
+}
+
+function columnTreeRng(wx, wz) {
+    return mulberry32(Math.imul(wx, 1597334677) ^ Math.imul(wz, 2869860233) ^ 0x51a3);
+}
+
+function getColumnTree(wx, wz) {
+    const h = getTerrainHeightAt(wx, wz);
+    if (h <= WATER_LEVEL + 1) return null;
+    const biome = getBiomeAt(wx, wz);
+    let surfaceBlock = biome === BIOMES.SNOW ? 11 : (biome === BIOMES.DESERT || biome === BIOMES.OCEAN) ? 7 : 1;
+    surfaceBlock = getTransitionSurfaceBlock(wx, wz, biome, surfaceBlock);
+    const treeBiome = (biome === BIOMES.SNOW || surfaceBlock === 11) ? BIOMES.SNOW : biome;
+    if (!hasColumnTree(wx, wz, getTreeChance(treeBiome)) || isInVillageClearZone(wx, wz)) return null;
+    return { h, treeBiome };
+}
+
+function stampNeighborTreeCanopies(data, cx, cz) {
+    const minX = cx * CHUNK_SIZE, minZ = cz * CHUNK_SIZE;
+    for (let wx = minX - TREE_CANOPY_REACH; wx < minX + CHUNK_SIZE + TREE_CANOPY_REACH; wx++) {
+        for (let wz = minZ - TREE_CANOPY_REACH; wz < minZ + CHUNK_SIZE + TREE_CANOPY_REACH; wz++) {
+            const insideX = wx >= minX && wx < minX + CHUNK_SIZE;
+            const insideZ = wz >= minZ && wz < minZ + CHUNK_SIZE;
+            if (insideX && insideZ) continue;
+            const tree = getColumnTree(wx, wz);
+            if (!tree) continue;
+            const x = wx - minX, z = wz - minZ;
+            spawnTree(data, x, tree.h, z, tree.treeBiome, columnTreeRng(wx, wz), wx, wz);
+            if (tree.treeBiome === BIOMES.SNOW) frostCanopyAround(data, x, tree.h, z);
         }
     }
 }
@@ -608,6 +662,20 @@ function getMineRailStyle(wx, y, wz, getBlock) {
         return { kind: 'straight', rotation: connected[1] || connected[3] ? 1 : 0 };
     }
     return { kind: 'straight', rotation: 0 };
+}
+
+// A straight rail whose next rail sits one block higher is drawn as a ramp up to the top
+// of the next block. Returns the direction index (0 = -z, 1 = +x, 2 = +z, 3 = -x) or -1.
+function getMineRailRampDirection(wx, y, wz, getBlock, style) {
+    if (style.kind !== 'straight') return -1;
+    const steps = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+    let direction = -1;
+    for (let index = 0; index < steps.length; index++) {
+        if (getBlock(wx + steps[index][0], y + 1, wz + steps[index][1]) !== 80) continue;
+        if (direction !== -1) return -1;
+        direction = index;
+    }
+    return direction;
 }
 
 function rotateMineRailUVs(u0, v0, u1, v1, rotation) {
@@ -1049,7 +1117,7 @@ function getVillagePlacement(wx, wz, biome, generationVersion = 2) {
             const sz = wz + dz;
             totalSamples++;
             if (getBiomeAt(sx, sz) === biome) biomeSamples++;
-            const h = getTerrainHeightAt(sx, sz);
+            const h = getRawTerrainHeightAt(sx, sz);
             if (h <= WATER_LEVEL + 1) return null;
             heights.push(h);
             minH = Math.min(minH, h);
@@ -1090,7 +1158,7 @@ function getVillageFootprintTerrain(startX, startZ, width, depth) {
     let maxH = -Infinity;
     for (let dx = 0; dx < width; dx++) {
         for (let dz = 0; dz < depth; dz++) {
-            const height = getTerrainHeightAt(startX + dx, startZ + dz);
+            const height = getRawTerrainHeightAt(startX + dx, startZ + dz);
             minH = Math.min(minH, height);
             maxH = Math.max(maxH, height);
         }
@@ -1129,7 +1197,188 @@ function getVillageSite(villageX, villageZ, biome) {
     return { baseY: centerTerrain.maxH };
 }
 
+// Worldgen 3: villages keep a minimum distance, and the terrain around them is levelled
+// to the village base height so paths and houses sit on the ground instead of on piers.
+// At least flat radius + jitter (60) plus the full reach of a neighbour's slope (100).
+const VILLAGE_MIN_SPACING = 160;
+const VILLAGE_FLAT_RADIUS = 44;
+const VILLAGE_BLEND_WIDTH = 16;
+const VILLAGE_CLEAR_RADIUS = VILLAGE_FLAT_RADIUS + 6;
+const villageCandidateCache = new Map();
+const villageInfluenceCache = new Map();
+
+function cachedVillageValue(cache, key, compute) {
+    if (cache.has(key)) return cache.get(key);
+    if (cache.size > 50000) cache.clear();
+    const value = compute();
+    cache.set(key, value);
+    return value;
+}
+
 function getVillageCandidate(scx, scz, generationVersion = WORLD_GENERATION_VERSION) {
+    if (generationVersion < 3) return findVillageSite(scx, scz, generationVersion);
+    return cachedVillageValue(villageCandidateCache, `spaced:${scx},${scz}`, () => {
+        const site = cachedVillageValue(villageCandidateCache, `site:${scx},${scz}`, () => findVillageSite(scx, scz, 3));
+        if (!site) return null;
+        const priority = getVillagePriority(scx, scz);
+        const radius = Math.ceil(VILLAGE_MIN_SPACING / CHUNK_SIZE) + 1;
+        for (let ox = scx - radius; ox <= scx + radius; ox++) {
+            for (let oz = scz - radius; oz <= scz + radius; oz++) {
+                if (ox === scx && oz === scz) continue;
+                const other = cachedVillageValue(villageCandidateCache, `site:${ox},${oz}`, () => findVillageSite(ox, oz, 3));
+                if (!other || Math.hypot(other.x - site.x, other.z - site.z) >= VILLAGE_MIN_SPACING) continue;
+                if (getVillagePriority(ox, oz) > priority) return null;
+            }
+        }
+        return site;
+    });
+}
+
+function getVillagePriority(scx, scz) {
+    return mulberry32(Math.imul(scx, 73856093) ^ Math.imul(scz, 19349663) ^ 0x51ed)();
+}
+
+function getVillagesInfluencingChunk(cx, cz) {
+    return cachedVillageValue(villageInfluenceCache, `${cx},${cz}`, () => {
+        // Outer edge of levelling and clearance, including the maximum edge jitter.
+        const reach = VILLAGE_FLAT_RADIUS + VILLAGE_EDGE_JITTER_MAX + VILLAGE_BLEND_MAX;
+        const radius = Math.ceil(reach / CHUNK_SIZE) + 1;
+        const villages = [];
+        for (let scx = cx - radius; scx <= cx + radius; scx++) {
+            for (let scz = cz - radius; scz <= cz + radius; scz++) {
+                const village = getVillageCandidate(scx, scz, 3);
+                if (!village) continue;
+                const nearestX = Math.max(cx * CHUNK_SIZE, Math.min(village.x, cx * CHUNK_SIZE + CHUNK_SIZE - 1));
+                const nearestZ = Math.max(cz * CHUNK_SIZE, Math.min(village.z, cz * CHUNK_SIZE + CHUNK_SIZE - 1));
+                if (Math.hypot(nearestX - village.x, nearestZ - village.z) < reach) villages.push(village);
+            }
+        }
+        return villages;
+    });
+}
+
+function getVillageDistance(wx, wz) {
+    let nearest = null;
+    let distance = Infinity;
+    for (const village of getVillagesInfluencingChunk(Math.floor(wx / CHUNK_SIZE), Math.floor(wz / CHUNK_SIZE))) {
+        const d = Math.hypot(wx - village.x, wz - village.z);
+        if (d < distance) {
+            distance = d;
+            nearest = village;
+        }
+    }
+    return { village: nearest, distance };
+}
+
+// Irregular outline (0..16 extra blocks): broad lobes that differ per village plus a
+// small ragged term, so the levelled ground and the forest edge never form a circle.
+const VILLAGE_EDGE_JITTER_MAX = 16;
+// Width of the slope back to natural terrain. Wide enough that hillside villages get a
+// gentle embankment instead of a terrace step.
+const VILLAGE_BLEND_MAX = 40;
+
+function getVillageEdgeJitter(village, wx, wz) {
+    const angle = Math.atan2(wz - village.z, wx - village.x);
+    const phase = getVillagePriority(village.scx, village.scz) * Math.PI * 2;
+    const lobes = 4.5 * Math.sin(2 * angle + phase) + 2.5 * Math.sin(3 * angle + phase * 1.7) + Math.sin(7 * angle + phase * 2.3);
+    const ragged = 0.75 * (Math.sin(wx * 0.29 + phase) + Math.cos(wz * 0.31 + phase));
+    return Math.max(0, Math.min(VILLAGE_EDGE_JITTER_MAX, 8 + lobes + ragged));
+}
+
+function levelTerrainForVillages(wx, wz, rawHeight) {
+    // Each village pulls the terrain towards its base height with weight 1 on its grounds,
+    // fading to 0 across the blend band. Overlapping bands are averaged by weight, so the
+    // result is continuous and independent of village order. The minimum spacing keeps
+    // every other village's band out of a village's flat grounds.
+    let weightSum = 0;
+    let weightedBase = 0;
+    for (const village of getVillagesInfluencingChunk(Math.floor(wx / CHUNK_SIZE), Math.floor(wz / CHUNK_SIZE))) {
+        const distance = Math.hypot(wx - village.x, wz - village.z);
+        const flatRadius = VILLAGE_FLAT_RADIUS + getVillageEdgeJitter(village, wx, wz);
+        if (distance >= flatRadius + VILLAGE_BLEND_MAX) continue;
+        const t = Math.max(0, (distance - flatRadius) / VILLAGE_BLEND_MAX);
+        const weight = 1 - t * t * (3 - 2 * t);
+        weightSum += weight;
+        weightedBase += weight * village.baseY;
+    }
+    if (weightSum === 0) return rawHeight;
+    if (weightSum >= 1) return Math.round(weightedBase / weightSum);
+    return Math.round(rawHeight * (1 - weightSum) + weightedBase);
+}
+
+// 1 inside the village grounds, fading to 0 across a ragged band, so trees, rocks and
+// palms thin out gradually towards the village instead of ending at a hard line.
+const VILLAGE_CLEAR_INNER = 48;
+const VILLAGE_CLEAR_FADE = 20;
+function getVillageClearance(wx, wz) {
+    if (WORLD_GENERATION_VERSION < 3) return 0;
+    const { village, distance } = getVillageDistance(wx, wz);
+    if (!village) return 0;
+    const inner = VILLAGE_CLEAR_INNER + getVillageEdgeJitter(village, wx, wz);
+    if (distance <= inner) return 1;
+    return Math.max(0, 1 - (distance - inner) / VILLAGE_CLEAR_FADE);
+}
+
+function isInVillageClearZone(wx, wz) {
+    const clearance = getVillageClearance(wx, wz);
+    if (clearance <= 0) return false;
+    if (clearance >= 1) return true;
+    return mulberry32(Math.imul(wx, 2654435761) ^ Math.imul(wz, 40503))() < clearance;
+}
+
+// Worldgen 3 keeps standalone structures (temples, igloos, mine and dungeon entrances)
+// off the village grounds and their slope, with room for the structure's own footprint.
+function isNearVillage(wx, wz, margin) {
+    if (WORLD_GENERATION_VERSION < 3) return false;
+    return getVillageDistance(wx, wz).distance < VILLAGE_FLAT_RADIUS + VILLAGE_EDGE_JITTER_MAX + margin;
+}
+
+// Worldgen 3 lifts floating islands a few blocks and keeps only those that float well
+// clear of the ground: none over a village, none sitting on a hill with their vines in
+// the treetops. Vines never hang under an island without blocks.
+const ISLAND_LIFT_V3 = 4;
+const ISLAND_MIN_CLEARANCE = 12;
+const islandSiteCache = new Map();
+
+function getWorldFloatingIslandAt(wx, wz) {
+    const island = getFloatingIslandAt(wx, wz);
+    if (!island || WORLD_GENERATION_VERSION < 3) return island;
+    if (island.thick <= 0) return null;
+    const cell = getFloatingIslandCellAt(wx, wz);
+    const key = `${Math.floor(cell.centerX)},${Math.floor(cell.centerZ)}`;
+    if (!cachedVillageValue(islandSiteCache, key, () => isIslandSiteClear(cell))) return null;
+    return { y: island.y + ISLAND_LIFT_V3, thick: island.thick };
+}
+
+function isIslandSiteClear(cell) {
+    const centerX = Math.floor(cell.centerX), centerZ = Math.floor(cell.centerZ);
+    if (getVillageDistance(centerX, centerZ).distance < VILLAGE_CLEAR_RADIUS + cell.radius) return false;
+    const maxGround = Math.floor(cell.y) + ISLAND_LIFT_V3 - ISLAND_MIN_CLEARANCE;
+    const reach = Math.ceil(cell.radius) + 1;
+    for (let dx = -reach; dx <= reach; dx++) {
+        for (let dz = -reach; dz <= reach; dz++) {
+            if (dx * dx + dz * dz > reach * reach) continue;
+            if (getTerrainHeightAt(centerX + dx, centerZ + dz) > maxGround) return false;
+        }
+    }
+    return true;
+}
+
+// Worldgen 3 moves the cloud layer to the top of the world and leaves it out above high
+// ground, high villages and islands, so clouds no longer cut through hills and roofs.
+function getCloudLayerY() {
+    return WORLD_GENERATION_VERSION >= 3 ? CHUNK_HEIGHT - 1 : CLOUD_HEIGHT;
+}
+
+function isCloudSkyClear(wx, wz, groundHeight, island) {
+    if (WORLD_GENERATION_VERSION < 3) return true;
+    const cloudY = getCloudLayerY();
+    if (island || groundHeight + 14 >= cloudY) return false;
+    const { village, distance } = getVillageDistance(wx, wz);
+    return !(village && distance < VILLAGE_FLAT_RADIUS + VILLAGE_EDGE_JITTER_MAX + 8 && village.baseY + 16 >= cloudY);
+}
+
+function findVillageSite(scx, scz, generationVersion) {
     const rng = mulberry32(scx * 55103 + scz * 97127 + 424242);
     if (rng() >= 0.04) return null;
 
@@ -1595,6 +1844,33 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         }
     };
 
+    // Worldgen 3: a three-step staircase along the side wall, away from the door, leads
+    // through an opening to the upper floor, which gets beds, a chest and a workbench.
+    const buildUpperFloor = (startX, startZ, floorY, width, depth, doorDz) => {
+        const towardBack = doorDz === 0 ? 1 : -1;
+        const landingZ = startZ + (doorDz === 0 ? depth - 2 : 1);
+        const frontZ = startZ + (doorDz === 0 ? 1 : depth - 2);
+        const stairX = startX + 1;
+        const stepBlock = biome === BIOMES.SNOW ? 26 : style.floor;
+        for (let step = 1; step <= 3; step++) {
+            const stepZ = landingZ - towardBack * (4 - step);
+            for (let sy = 1; sy <= 6; sy++) {
+                setBlockLocal(data, stairX, floorY + sy, stepZ, sy <= step ? stepBlock : 0);
+            }
+            // Railing on the upper floor along the stairwell.
+            setBlockLocal(data, stairX + 1, floorY + 5, stepZ, 102);
+        }
+        const upperY = floorY + 5;
+        const bedX = startX + width - 2;
+        for (const bx of [bedX, bedX - 2]) {
+            setBlockLocal(data, bx, upperY, landingZ, 38);
+            setBlockLocal(data, bx, upperY, landingZ - towardBack, 39);
+        }
+        placeVillageChest(bedX, upperY, frontZ);
+        setBlockLocal(data, bedX - 1, upperY, frontZ, 28);
+        setBlockLocal(data, startX + Math.floor(width / 2), upperY, startZ + Math.floor(depth / 2), 101);
+    };
+
     const drawSupportedPath = (startX, startZ, endX, endZ, startY, endY) => {
         const dx = endX - startX;
         const dz = endZ - startZ;
@@ -1620,10 +1896,12 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
 
     const decorateVillageExterior = (startX, startZ, floorY, width, depth, building) => {
         const accentZ = startZ + Math.min(depth - 2, 2);
+        // Worldgen 3 stands the accent on the ground instead of sinking it into the surface.
+        const accentY = generationVersion >= 3 ? floorY + 1 : floorY;
         if (building.purpose === 'storage') {
-            setBlockLocal(data, startX - 1, floorY, accentZ, 88);
+            setBlockLocal(data, startX - 1, accentY, accentZ, 88);
         } else {
-            placeVillageChest(startX - 1, floorY, accentZ);
+            placeVillageChest(startX - 1, accentY, accentZ);
         }
 
         if (!building.hasPen) return;
@@ -1704,6 +1982,17 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         setBlockLocal(data, cx0, floorY, porchZ, style.path);
         setBlockLocal(data, cx0, floorY + 1, porchZ, 0);
         setBlockLocal(data, cx0, floorY + 2, porchZ, 0);
+        if (generationVersion >= 3) {
+            // A timber door frame and a lantern post make igloos readable against the snow.
+            for (let fy = floorY + 1; fy <= floorY + 3; fy++) {
+                setBlockLocal(data, cx0 - 1, fy, doorZ, style.post);
+                setBlockLocal(data, cx0 + 1, fy, doorZ, style.post);
+            }
+            setBlockLocal(data, cx0, floorY + 3, doorZ, style.post);
+            placeSupportedSurface(cx0 + 1, porchZ, floorY + 1, style.path);
+            setBlockLocal(data, cx0 + 1, floorY + 1, porchZ, 102);
+            setBlockLocal(data, cx0 + 1, floorY + 2, porchZ, 104);
+        }
         decorateVillageBuilding(cx0 - r, cz0 - r, floorY, r * 2 + 1, r * 2 + 1, building);
         if (generationVersion >= 2) decorateVillageExterior(cx0 - r, cz0 - r, floorY, r * 2 + 1, r * 2 + 1, building);
 
@@ -1765,6 +2054,16 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         const floorY = getFootprintBaseY(houseWorldX, houseWorldZ, houseW, houseD);
         const wallY = floorY + 1;
         const roofY = wallY + houseH - (generationVersion >= 2 ? 0 : 1);
+        // Worldgen 3 house looks: gable roofs (ridge along the longer side) for most houses,
+        // a timber longhouse with a snow roof as the snow-village hall, and flat adobe roofs
+        // with parapet and protruding beams in the desert.
+        const houseLook = mulberry32(Math.imul(houseWorldX, 668265263) ^ Math.imul(houseWorldZ, 374761393))();
+        const snowLonghouse = generationVersion >= 3 && biome === BIOMES.SNOW && building.isLandmark;
+        const adobeRoof = generationVersion >= 3 && biome === BIOMES.DESERT && !building.isLandmark;
+        const gableRoof = generationVersion >= 3 && biome !== BIOMES.DESERT &&
+            (snowLonghouse || (!building.isLandmark && houseLook < 0.75));
+        const wallBlock = snowLonghouse ? 26 : style.wall;
+        const roofEdgeBlock = snowLonghouse ? 5 : style.roofEdge;
 
         // Boden: Planken auf eigener Haus-Hoehe, damit Hang-Haeuser nicht im Terrain versinken.
         for (let dx = 0; dx < houseW; dx++) {
@@ -1793,7 +2092,7 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
                         if (windowLevel && ((dx === 0 || dx === houseW - 1) && isMidZ || (dz === 0 || dz === houseD - 1) && isMidX)) {
                             setBlockLocal(data, hx + dx, wallY + dy, hz + dz, 32); // GLASS
                         } else {
-                            setBlockLocal(data, hx + dx, wallY + dy, hz + dz, style.wall); // PLANKS
+                            setBlockLocal(data, hx + dx, wallY + dy, hz + dz, wallBlock); // PLANKS
                         }
                     } else {
                         // Innenraum: Luft
@@ -1806,7 +2105,8 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         if (generationVersion >= 2 && building.stories === 2) {
             for (let dx = 1; dx < houseW - 1; dx++) {
                 for (let dz = 1; dz < houseD - 1; dz++) {
-                    const stairOpening = dx === Math.floor(houseW / 2) && dz >= houseD - 3;
+                    // Worldgen 3 cuts its own opening above the staircase (buildUpperFloor).
+                    const stairOpening = generationVersion < 3 && dx === Math.floor(houseW / 2) && dz >= houseD - 3;
                     if (!stairOpening) setBlockLocal(data, hx + dx, floorY + 4, hz + dz, style.floor);
                 }
             }
@@ -1820,7 +2120,55 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
             }
         }
         const roofLayers = generationVersion >= 2 ? Math.ceil(Math.min(houseW, houseD) / 2) : 0;
-        if (generationVersion >= 2) {
+        // A stone base course on some plains houses, so neighbours do not look identical.
+        if (generationVersion >= 3 && biome === BIOMES.PLAINS && houseLook > 0.4) {
+            for (let dx = 0; dx < houseW; dx++) {
+                for (let dz = 0; dz < houseD; dz++) {
+                    const isEdge = dx === 0 || dx === houseW - 1 || dz === 0 || dz === houseD - 1;
+                    if (isEdge) setBlockLocal(data, hx + dx, wallY, hz + dz, style.foundation);
+                }
+            }
+        }
+        if (gableRoof) {
+            const ridgeAlongZ = houseD >= houseW;
+            const span = ridgeAlongZ ? houseW : houseD;
+            const length = ridgeAlongZ ? houseD : houseW;
+            const place = (across, along, y, block) => {
+                const dx = ridgeAlongZ ? across : along;
+                const dz = ridgeAlongZ ? along : across;
+                setBlockLocal(data, hx + dx, y, hz + dz, block);
+            };
+            for (let layer = 0; ; layer++) {
+                const low = -1 + layer;
+                const high = span - layer;
+                if (low > high) break;
+                const y = roofY + layer;
+                for (let along = -1; along <= length; along++) {
+                    place(low, along, y, layer === 0 ? roofEdgeBlock : style.roof);
+                    place(high, along, y, layer === 0 ? roofEdgeBlock : style.roof);
+                }
+                // Close the triangular gable ends with wall material.
+                for (let across = low + 1; across < high; across++) {
+                    place(across, 0, y, wallBlock);
+                    place(across, length - 1, y, wallBlock);
+                }
+            }
+        } else if (adobeRoof) {
+            for (let dx = -1; dx <= houseW; dx++) {
+                for (let dz = -1; dz <= houseD; dz++) {
+                    const outside = dx < 0 || dz < 0 || dx >= houseW || dz >= houseD;
+                    if (outside) {
+                        // Palm-wood beam ends stick out below the roof slab on the long sides.
+                        const beam = (dz === -1 || dz === houseD) && dx > 0 && dx < houseW - 1 && dx % 2 === 1;
+                        if (beam) setBlockLocal(data, hx + dx, roofY - 1, hz + dz, 15);
+                        continue;
+                    }
+                    setBlockLocal(data, hx + dx, roofY, hz + dz, style.floor);
+                    const edge = dx === 0 || dz === 0 || dx === houseW - 1 || dz === houseD - 1;
+                    if (edge && (dx + dz) % 3 !== 1) setBlockLocal(data, hx + dx, roofY + 1, hz + dz, 82);
+                }
+            }
+        } else if (generationVersion >= 2) {
             for (let layer = 0; layer < roofLayers; layer++) {
                 const minX = -1 + layer;
                 const maxX = houseW - layer;
@@ -1859,6 +2207,11 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
             setBlockLocal(data, hx + doorDx - 1, wallY + 2, porchZ, style.roofEdge);
             setBlockLocal(data, hx + doorDx, wallY + 2, porchZ, style.roofEdge);
             setBlockLocal(data, hx + doorDx + 1, wallY + 2, porchZ, style.roofEdge);
+            if (generationVersion >= 3) {
+                // Lantern on a fence post beside the door instead of hanging in the air.
+                placeSupportedSurface(hx + doorDx - 1, porchZ, floorY + 1, style.path);
+                setBlockLocal(data, hx + doorDx - 1, floorY + 1, porchZ, 102);
+            }
             setBlockLocal(data, hx + doorDx - 1, wallY + 1, porchZ, 104);
             if (building.isLandmark || building.purpose === 'workshop') {
                 const chimneyX = hx + houseW - 2;
@@ -1866,6 +2219,17 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
                 for (let chimneyY = roofY; chimneyY <= roofY + roofLayers + 1; chimneyY++) {
                     setBlockLocal(data, chimneyX, chimneyY, chimneyZ, style.foundation);
                 }
+            }
+        }
+
+        // Worldgen 3: flowers or berry bushes along the front of plains houses; the path drawn
+        // below clears any that lie in its way.
+        if (generationVersion >= 3 && biome === BIOMES.PLAINS) {
+            const flowerRng = mulberry32(Math.imul(houseWorldX, 19349663) ^ Math.imul(houseWorldZ, 83492791));
+            for (let dx = 0; dx < houseW; dx++) {
+                if (Math.abs(dx - doorDx) <= 1 || flowerRng() < 0.35) continue;
+                const roll = flowerRng();
+                setBlockLocal(data, hx + dx, floorY + 1, porchZ, roll < 0.4 ? 9 : roll < 0.8 ? 10 : 43);
             }
         }
 
@@ -1901,6 +2265,7 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
         }
 
         decorateVillageBuilding(hx, hz, floorY, houseW, houseD, building);
+        if (generationVersion >= 3 && building.stories === 2) buildUpperFloor(hx, hz, floorY, houseW, houseD, doorDz);
         if (generationVersion >= 2) decorateVillageExterior(hx, hz, floorY, houseW, houseD, building);
 
         const home = { x: hx + Math.floor(houseW / 2), y: floorY + 1, z: hz + Math.floor(houseD / 2) };
@@ -1924,6 +2289,13 @@ function spawnVillage(data, x, y, z, rng, worldX, worldZ, biome = BIOMES.PLAINS,
     return villageInfo;
 }
 
+// One shared object, so the underground generator can cache terrain samples per world.
+const UNDERGROUND_TERRAIN = {
+    biomeAt: (wx, wz) => getBiomeAt(wx, wz),
+    heightAt: (wx, wz) => getTerrainHeightAt(wx, wz),
+    isReserved: (wx, wz) => isNearVillage(wx, wz, 16)
+};
+
 function generateTerrain(cx, cz, buffer) {
     const data = new Uint8Array(buffer);
     data.fill(0);
@@ -1944,8 +2316,11 @@ function generateTerrain(cx, cz, buffer) {
             let baseH = noise2D(wx, wz) + 38;
             baseH -= oceanFactor * 22;
             if (biome === BIOMES.DESERT) baseH += Math.sin(wx * 0.2) * 2;
-            const h = Math.floor(baseH);
-            const island = getFloatingIslandAt(wx, wz);
+            const h = WORLD_GENERATION_VERSION >= 3 ? levelTerrainForVillages(wx, wz, Math.floor(baseH)) : Math.floor(baseH);
+            const villageClear = isInVillageClearZone(wx, wz);
+            const island = getWorldFloatingIslandAt(wx, wz);
+            const cloudY = getCloudLayerY();
+            const cloudAllowed = isCloudSkyClear(wx, wz, h, island);
 
             for (let y = 0; y < CHUNK_HEIGHT; y++) {
                 const idx = (y * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x;
@@ -1986,10 +2361,10 @@ function generateTerrain(cx, cz, buffer) {
                     data[idx] = getTransitionSurfaceBlock(wx, wz, biome, surfaceBlock);
                 } else if (y >= h && y <= WATER_LEVEL) {
                     data[idx] = (biome === BIOMES.SNOW && y === WATER_LEVEL) ? 12 : 4;
-                } else if (y === CLOUD_HEIGHT) {
+                } else if (y === cloudY) {
                     const cloudN = (Math.sin(wx * 0.1) + Math.cos(wz * 0.1)) * 0.5;
                     const cloudLarge = (Math.sin(wx * 0.04) + Math.cos(wz * 0.04)) * 0.5;
-                    if (cloudLarge > 0.88 || (cloudLarge > 0.62 && cloudN > 0.28) || (cloudN > 0.74 && rng() < 0.45)) data[idx] = 8;
+                    if ((cloudLarge > 0.88 || (cloudLarge > 0.62 && cloudN > 0.28) || (cloudN > 0.74 && rng() < 0.45)) && cloudAllowed) data[idx] = 8;
                 } else data[idx] = 0;
             }
 
@@ -2011,7 +2386,7 @@ function generateTerrain(cx, cz, buffer) {
                 }
                 if (biome === BIOMES.DESERT) {
                     const r = rng();
-                    if (r < 0.01) {
+                    if (r < 0.01 && !villageClear) {
                         const ch = 1 + Math.floor(rng() * 3);
                         for (let cy = 0; cy < ch; cy++) {
                             if (h + cy < CHUNK_HEIGHT) data[((h + cy) * CHUNK_SIZE * CHUNK_SIZE) + (z * CHUNK_SIZE) + x] = 45;
@@ -2029,7 +2404,9 @@ function generateTerrain(cx, cz, buffer) {
                 if (isSnowLandscape) {
                     const snowFeatureRng = mulberry32(Math.imul(wx, 374761393) ^ Math.imul(wz, 668265263));
                     const snowFeatureRoll = snowFeatureRng();
-                    if (snowFeatureRoll < 0.018) spawnSnowRock(data, x, h, z, wx, wz);
+                    if (villageClear && snowFeatureRoll < 0.03) {
+                        // Keep rocks and ice mounds out of the village grounds.
+                    } else if (snowFeatureRoll < 0.018) spawnSnowRock(data, x, h, z, wx, wz);
                     else if (snowFeatureRoll < 0.03) spawnIceMound(data, x, h, z, wx, wz);
                     else if (snowFeatureRoll < 0.06) data[surfIdx] = 46;
                 }
@@ -2049,9 +2426,12 @@ function generateTerrain(cx, cz, buffer) {
                     }
                 }
                 const treeBiome = isSnowLandscape ? BIOMES.SNOW : biome;
-                const tc = (treeBiome === BIOMES.JUNGLE) ? 0.08 : (treeBiome === BIOMES.PLAINS) ? 0.015 : (treeBiome === BIOMES.SNOW) ? 0.0015 : 0;
-                if (rng() < tc) spawnTree(data, x, h, z, treeBiome, rng, wx, wz);
-                if (biome === BIOMES.DESERT && rng() < 0.008 && canSpawnPalmAt(wx, wz, h)) {
+                const tc = getTreeChance(treeBiome);
+                const treeRoll = rng();
+                if (WORLD_GENERATION_VERSION >= 3) {
+                    if (hasColumnTree(wx, wz, tc) && !villageClear) spawnTree(data, x, h, z, treeBiome, columnTreeRng(wx, wz), wx, wz);
+                } else if (treeRoll < tc && !villageClear) spawnTree(data, x, h, z, treeBiome, rng, wx, wz);
+                if (biome === BIOMES.DESERT && rng() < 0.008 && !villageClear && canSpawnPalmAt(wx, wz, h)) {
                     spawnPalm(data, x, h, z, wx, wz);
                 }
             }
@@ -2059,6 +2439,7 @@ function generateTerrain(cx, cz, buffer) {
     }
 
     frostSnowyTreeCanopies(data, cx, cz);
+    if (WORLD_GENERATION_VERSION >= 3) stampNeighborTreeCanopies(data, cx, cz);
     drawVillageRoads(data, cx, cz);
 
     // Prozedurale Strukturen: Im 3×3-Nachbar-Chunk-Bereich prüfen, ob eine Struktur startet,
@@ -2106,7 +2487,7 @@ function generateTerrain(cx, cz, buffer) {
                 const tx = wx0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
                 const tz = wz0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
                 const templePlacement = getDesertTemplePlacement(tx, tz);
-                if (templePlacement) {
+                if (templePlacement && !isNearVillage(tx, tz, 12)) {
                     const lx = tx - cx * CHUNK_SIZE;
                     const lz = tz - cz * CHUNK_SIZE;
                     spawnDesertTemple(data, lx, templePlacement.baseY, lz, tx, tz);
@@ -2117,7 +2498,7 @@ function generateTerrain(cx, cz, buffer) {
             if (srng() < 0.03) {
                 const ix = wx0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
                 const iz = wz0 + 5 + Math.floor(srng() * (CHUNK_SIZE - 10));
-                if (getBiomeAt(ix, iz) === BIOMES.SNOW) {
+                if (getBiomeAt(ix, iz) === BIOMES.SNOW && !isNearVillage(ix, iz, 8)) {
                     const ih = Math.floor(noise2D(ix, iz) + 38);
                     if (ih > WATER_LEVEL) {
                         const lx = ix - cx * CHUNK_SIZE;
@@ -2200,10 +2581,7 @@ function generateTerrain(cx, cz, buffer) {
                 chunkHeight: CHUNK_HEIGHT,
                 waterLevel: WATER_LEVEL
             },
-            terrain: {
-                biomeAt: getBiomeAt,
-                heightAt: getTerrainHeightAt
-            }
+            terrain: UNDERGROUND_TERRAIN
         });
         structureInfos.push(...underground.structures);
         chestInfos.push(...underground.chests);
@@ -2481,15 +2859,20 @@ function buildMesh(cx, cz, getBlock, isWater, blockMeta) {
                     const railUVs = rotateMineRailUVs(u0, v0, u1, v1, style.rotation);
                     const inset = 0.02;
                     const railY = y + 0.08;
+                    // Corners: +z/-x, +z/+x, -z/+x, -z/-x. A ramp lifts the two corners on its high side.
+                    const ramp = getMineRailRampDirection(wx, y, wz, getBlock, style);
+                    const highCorners = [[2, 3], [1, 2], [0, 1], [0, 3]][ramp] || [];
+                    const cornerY = corner => railY + (highCorners.includes(corner) ? 1 : 0);
                     const st = vc;
                     pos.push(
-                        x + inset, railY, z + 1 - inset,
-                        x + 1 - inset, railY, z + 1 - inset,
-                        x + 1 - inset, railY, z + inset,
-                        x + inset, railY, z + inset
+                        x + inset, cornerY(0), z + 1 - inset,
+                        x + 1 - inset, cornerY(1), z + 1 - inset,
+                        x + 1 - inset, cornerY(2), z + inset,
+                        x + inset, cornerY(3), z + inset
                     );
                     col.push(bcR,bcG,bcB, bcR,bcG,bcB, bcR,bcG,bcB, bcR,bcG,bcB);
-                    norm.push(0,1,0, 0,1,0, 0,1,0, 0,1,0);
+                    const rampNormal = [[0, 0.7071, 0.7071], [-0.7071, 0.7071, 0], [0, 0.7071, -0.7071], [0.7071, 0.7071, 0]][ramp] || [0, 1, 0];
+                    for (let corner = 0; corner < 4; corner++) norm.push(...rampNormal);
                     uv.push(...railUVs);
                     sway.push(0,0,0,0);
                     pushAtlasSentinel(4);
@@ -2947,7 +3330,7 @@ self.onmessage = function (e) {
     }
 
     if (e.data.type === 'worldGenerationVersion') {
-        WORLD_GENERATION_VERSION = e.data.version === 1 ? 1 : 2;
+        WORLD_GENERATION_VERSION = e.data.version === 1 || e.data.version === 3 ? e.data.version : 2;
         return;
     }
 

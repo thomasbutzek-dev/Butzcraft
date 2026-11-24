@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CONFIG } from '../config.js?v=20260719a';
+import { CONFIG } from '../config.js?v=20260511a';
 import { SoundManager } from './sound.js?v=20260731a';
 import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260801b';
 import { Physics } from './Physics.js?v=20260717a';

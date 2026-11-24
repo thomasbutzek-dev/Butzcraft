@@ -10,7 +10,7 @@
  */
 
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=20260507b';
+import { CONFIG } from '../config.js?v=20260511a';
 import { ParticleSystem } from './particles.js?v=20260801a';
 import { BIOMES } from './world.js?v=20260801d';
 import { SoundManager } from './sound.js?v=20260731a';

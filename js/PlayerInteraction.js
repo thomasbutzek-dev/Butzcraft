@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=20260507b';
+import { CONFIG } from '../config.js?v=20260511a';
 import { classifyChestLoot, getLootDiscoveryMessage, rollLoot } from './structures.js?v=20260731c';
 import { openFurnace } from './furnace.js?v=20260723e';
 import { createBlockHTML, getItemName } from './inventory.js?v=20260801c';

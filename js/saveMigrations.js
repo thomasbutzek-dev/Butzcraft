@@ -22,10 +22,12 @@ import { normalizeBloodMoonSurvival } from './bloodMoonCycle.js?v=20260730a';
 
 // Aktuelle Save-Version. INKREMENTIEREN bei jeder Format-Änderung.
 export const CURRENT_SAVE_VERSION = 18;
-export const CURRENT_WORLD_GENERATION_VERSION = 2;
+export const CURRENT_WORLD_GENERATION_VERSION = 3;
+const KNOWN_WORLD_GENERATION_VERSIONS = [1, 2, 3];
 
 export function getWorldGenerationLoadNotice(rawData, saveName) {
-    if (rawData?.worldGenerationVersion === CURRENT_WORLD_GENERATION_VERSION) return null;
+    // Only worldgen 1 lacks the large mines and dungeons; later versions load without a notice.
+    if (rawData?.worldGenerationVersion >= 2) return null;
     const suffix = ' - Worldgen 1 Backup';
     const baseName = String(saveName || 'Legacy World').slice(0, 64 - suffix.length).trimEnd();
     return {
@@ -153,7 +155,7 @@ function migrateV10toV11(data) {
 }
 
 function migrateV11toV12(data) {
-    if (data.worldGenerationVersion !== 1 && data.worldGenerationVersion !== 2) {
+    if (!KNOWN_WORLD_GENERATION_VERSIONS.includes(data.worldGenerationVersion)) {
         data.worldGenerationVersion = 1;
     }
     if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {
@@ -254,7 +256,7 @@ function normalizeInventory(data) {
 }
 
 function normalizeWorldGeneration(data) {
-    if (data.worldGenerationVersion !== 1 && data.worldGenerationVersion !== 2) {
+    if (!KNOWN_WORLD_GENERATION_VERSIONS.includes(data.worldGenerationVersion)) {
         data.worldGenerationVersion = CURRENT_WORLD_GENERATION_VERSION;
     }
     if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {
@@ -321,7 +323,7 @@ export function prepareSaveForLoad(rawData) {
 export function stampSaveVersion(data) {
     if (data && typeof data === 'object') {
         data.version = CURRENT_SAVE_VERSION;
-        if (data.worldGenerationVersion !== 1 && data.worldGenerationVersion !== 2) {
+        if (!KNOWN_WORLD_GENERATION_VERSIONS.includes(data.worldGenerationVersion)) {
             data.worldGenerationVersion = CURRENT_WORLD_GENERATION_VERSION;
         }
         if (!data.structureProgress || typeof data.structureProgress !== 'object' || Array.isArray(data.structureProgress)) {

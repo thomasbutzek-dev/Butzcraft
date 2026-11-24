@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=20260507b';
+import { CONFIG } from '../config.js?v=20260511a';
 import { BLOCK_TYPES, BLOCK_COLORS, BLOCK_TEX, textureAtlas } from './blocks.js?v=20260801b';
 import { getOceanDepthFactor } from './terrainHeightRules.js?v=20260801a';
 
@@ -38,7 +38,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
         export class World {
             constructor(scene) {
                 this.scene = scene;
-                this.worldGenerationVersion = 2;
+                this.worldGenerationVersion = 3;
                 this.chunks = new Map();
                 this.modifiedBlocks = {};
                 this.blockMeta = {};    // "x,y,z" → metadata byte (Tür-Rotation etc.)
@@ -329,7 +329,7 @@ export const BIOMES = { OCEAN: 'Ozean', DESERT: 'Wüste', JUNGLE: 'Urwald', SNOW
             }
 
             setGenerationVersion(version) {
-                const normalized = version === 1 ? 1 : 2;
+                const normalized = version === 1 || version === 3 ? version : 2;
                 if (normalized === this.worldGenerationVersion) return;
                 this.worldGenerationVersion = normalized;
                 this.worker.postMessage({ type: 'worldGenerationVersion', version: normalized });

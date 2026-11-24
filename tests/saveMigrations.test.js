@@ -299,7 +299,7 @@ describe('stampSaveVersion', () => {
         const data = { foo: 'bar' };
         const stamped = stampSaveVersion(data);
         expect(stamped.version).toBe(CURRENT_SAVE_VERSION);
-        expect(stamped.worldGenerationVersion).toBe(2);
+        expect(stamped.worldGenerationVersion).toBe(3);
         expect(stamped.structureProgress).toEqual({});
         expect(stamped.penalizedVillageChests).toEqual([]);
         expect(stamped.foo).toBe('bar');
@@ -309,6 +309,7 @@ describe('stampSaveVersion', () => {
         const stamped = stampSaveVersion({ worldGenerationVersion: 1 });
 
         expect(stamped.worldGenerationVersion).toBe(1);
+        expect(stampSaveVersion({ worldGenerationVersion: 2 }).worldGenerationVersion).toBe(2);
     });
 
     it('überschreibt eine veraltete Version', () => {
@@ -379,7 +380,8 @@ describe('world generation compatibility notice', () => {
         expect(notice.message).toContain('neue Welt');
     });
 
-    it('does not warn for a worldgen-v2 save', () => {
+    it('does not warn for worldgen-v2 or worldgen-v3 saves', () => {
         expect(getWorldGenerationLoadNotice({ worldGenerationVersion: 2 }, 'Neue Welt')).toBeNull();
+        expect(getWorldGenerationLoadNotice({ worldGenerationVersion: 3 }, 'Neue Welt')).toBeNull();
     });
 });

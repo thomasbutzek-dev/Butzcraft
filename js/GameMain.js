@@ -12,7 +12,7 @@
 
         import { Input } from './Input.js?v=20260731a';
         import { initTouchControls, isTouchDevice } from './touch.js?v=20260813d';
-        import { getWorldGenerationLoadNotice, prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260731c';
+        import { CURRENT_WORLD_GENERATION_VERSION, getWorldGenerationLoadNotice, prepareSaveForLoad, stampSaveVersion } from './saveMigrations.js?v=20260731c';
         import { Game } from './Game.js?v=20260716b'; // Central state container
         import { Player } from './Player.js?v=20260801b';
         import { createCharacterProfile, normalizeCharacterProfile, parseCharacterProfile } from './characterProfile.js?v=20260602a';
@@ -288,6 +288,7 @@
         const minecarts = [];
         const spawnedMinecartKeys = new Set();
         let activeMinecart = null;
+        const minecartViewEuler = new THREE.Euler(0, 0, 0, 'YXZ');
         window.minecarts = minecarts;
         // Tier 3: Spawner-Tick-Timer auf Modul-Scope. WICHTIG nicht `this._spawnerTickTimer`
         // verwenden — `this` ist in einer Top-Level-Funktion innerhalb eines ES-Moduls `undefined`
@@ -1012,7 +1013,7 @@
 
         window.startNewGame = function() {
             if (gameStarted) return;
-            world.setGenerationVersion(2);
+            world.setGenerationVersion(CURRENT_WORLD_GENERATION_VERSION);
             setActiveCharacterProfile(activeCharacterProfile);
             document.getElementById('start-menu').style.display = 'none';
             document.body.classList.add('game-started');
@@ -1586,6 +1587,12 @@
             };
             window.applyRenderDistance = applyRenderDistance;
             window.applyRenderScale = applyRenderScale;
+            // Desktop default is 6 chunks (measured headroom); touch devices keep 4.
+            // Not persisted, so a stored choice of the player still wins below.
+            if (!isTouchDevice()) {
+                CONFIG.WORLD.RENDER_DIST = 6;
+                applyRenderDistanceVisuals();
+            }
             // Initial-Apply: aus localStorage laden, falls vorhanden
             try {
                 const stored = localStorage.getItem(RD_STORAGE_KEY);
@@ -2281,6 +2288,13 @@
                 if (activeMinecart) {
                     activeMinecart.syncRider(playerPos);
                     Game.player.velocity.set(0, 0, 0);
+                    // Turn the view with the cart, so curves feel like a ride, not a slide.
+                    if (activeMinecart.lastYawDelta) {
+                        const camera = controls.getObject();
+                        minecartViewEuler.setFromQuaternion(camera.quaternion, 'YXZ');
+                        minecartViewEuler.y += activeMinecart.lastYawDelta;
+                        camera.quaternion.setFromEuler(minecartViewEuler);
+                    }
                 } else {
                     Game.player.updatePhysics(delta, Input, world, SoundManager);
                 }

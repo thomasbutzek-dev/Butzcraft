@@ -227,4 +227,123 @@ describe('underground structure generation', () => {
         expect(spawners.filter(spawner => spawner.structureId === dungeons[0].id).length)
             .toBeGreaterThanOrEqual(2);
     });
+
+    it('places no mine or dungeon entrance on reserved ground such as village grounds', () => {
+        const generateRegion = isReserved => {
+            const structures = [];
+            for (let cx = 0; cx < 24; cx++) {
+                for (let cz = 0; cz < 24; cz++) {
+                    structures.push(...generateUndergroundStructures({
+                        world: { seed: 0, version: 3, chunkSize: CHUNK_SIZE, chunkHeight: CHUNK_HEIGHT, waterLevel: 32 },
+                        terrain: { biomeAt: () => 'Grasland', heightAt: () => 44, isReserved },
+                        chunk: { cx, cz, data: new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE) }
+                    }).structures);
+                }
+            }
+            return structures;
+        };
+
+        const free = generateRegion(undefined);
+        expect(free.length).toBeGreaterThan(0);
+        expect(generateRegion(() => true)).toHaveLength(0);
+
+        const reservedAround = free.map(structure => structure.entrance);
+        const isReserved = (x, z) => reservedAround.some(point => Math.hypot(x - point.x, z - point.z) < 12);
+        for (const structure of generateRegion(isReserved)) {
+            expect(isReserved(structure.origin.x, structure.origin.z), structure.id).toBe(false);
+        }
+    });
+
+    function generateV3Region({ heightAt = () => 44, size = 24 } = {}) {
+        const chunks = new Map();
+        const structures = [];
+        const chests = [];
+        const terrain = { biomeAt: () => 'Grasland', heightAt };
+        for (let cx = 0; cx < size; cx++) {
+            for (let cz = 0; cz < size; cz++) {
+                const data = new Uint8Array(CHUNK_SIZE * CHUNK_HEIGHT * CHUNK_SIZE);
+                const result = generateUndergroundStructures({
+                    world: { seed: 0, version: 3, chunkSize: CHUNK_SIZE, chunkHeight: CHUNK_HEIGHT, waterLevel: 32 },
+                    terrain,
+                    chunk: { cx, cz, data }
+                });
+                structures.push(...result.structures);
+                chests.push(...result.chests);
+                chunks.set(`${cx},${cz}`, data);
+            }
+        }
+        return { chunks, structures, chests };
+    }
+
+    it('sinks worldgen-v3 mines below the lowest ground of their footprint', () => {
+        // Mines start in chunks 5..7 of their region and run 36 blocks towards +z: the
+        // entrance stands on a terrace six blocks above the ground the far end runs under.
+        const regionOffset = value => ((Math.floor(value / 16) % 12) + 12) % 12;
+        const heightAt = (x, z) => regionOffset(z) <= 6 ? 44 : 38;
+        const { chunks, structures } = generateV3Region({ heightAt, size: 12 });
+        const mines = structures.filter(structure => structure.kind === 'mine');
+        expect(mines.length).toBeGreaterThan(0);
+        for (const mine of mines) {
+            let rails = 0;
+            for (let x = mine.bounds.minX; x <= mine.bounds.maxX; x++) {
+                for (let z = mine.bounds.minZ; z <= mine.bounds.maxZ; z++) {
+                    for (let y = mine.bounds.minY; y <= mine.bounds.maxY; y++) {
+                        if (blockAt(chunks, x, y, z) !== 80) continue;
+                        if (x === mine.entrance.x && z < mine.origin.z) continue; // entrance ramp
+                        rails++;
+                        expect(heightAt(x, z) - y, `${mine.id} rail at ${x},${y},${z}`).toBeGreaterThanOrEqual(5);
+                    }
+                }
+            }
+            expect(rails).toBeGreaterThan(50);
+        }
+    });
+
+    it('gives worldgen-v3 dungeons a climbable spiral staircase, a marked gate and lit passages', () => {
+        const { chunks, structures, chests } = generateV3Region();
+        // Furnishing must never overwrite a loot chest (a store annex can overlap the key room).
+        for (const chest of chests) expect(blockAt(chunks, chest.x, chest.y, chest.z), chest.role).toBe(75);
+        const dungeon = structures.find(structure => structure.kind === 'dungeon');
+        expect(dungeon).toBeTruthy();
+        const block = (x, y, z) => blockAt(chunks, x, y, z);
+        const free = (x, y, z) => block(x, y, z) === 0 || block(x, y, z) === 101;
+        const canStand = (x, y, z) => !free(x, y - 1, z) && free(x, y, z) && free(x, y + 1, z);
+        const { x: ex, z: ez } = dungeon.entrance;
+        const start = { x: ex + 2, y: dungeon.origin.y, z: ez };
+        expect(canStand(start.x, start.y, start.z)).toBe(true);
+        const seen = new Set([`${start.x},${start.y},${start.z}`]);
+        const queue = [start];
+        let reachedSurface = false;
+        while (queue.length && !reachedSurface) {
+            const cell = queue.shift();
+            for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+                for (const dy of [0, 1, -1]) {
+                    const next = { x: cell.x + dx, y: cell.y + dy, z: cell.z + dz };
+                    if (Math.abs(next.x - ex) > 2 || Math.abs(next.z - ez) > 2) continue;
+                    if (!canStand(next.x, next.y, next.z)) continue;
+                    if (dy === 1 && !free(cell.x, cell.y + 2, cell.z)) continue;
+                    const key = `${next.x},${next.y},${next.z}`;
+                    if (seen.has(key)) continue;
+                    seen.add(key);
+                    if (next.y >= dungeon.entrance.y) reachedSurface = true;
+                    queue.push(next);
+                }
+            }
+        }
+        expect(reachedSurface, 'climb from the entrance room to the surface').toBe(true);
+
+        const gate = dungeon.gate;
+        for (let width = -1; width <= 1; width++) {
+            for (let dy = 0; dy <= 2; dy++) expect(block(gate.x, gate.y + dy, gate.z + width)).toBe(26);
+        }
+        expect(block(gate.x, gate.y + 3, gate.z)).toBe(29);
+
+        let torches = 0;
+        for (let x = dungeon.bounds.minX; x <= dungeon.bounds.maxX; x++) {
+            for (let z = dungeon.bounds.minZ; z <= dungeon.bounds.maxZ; z++) {
+                for (let y = dungeon.bounds.minY; y < dungeon.entrance.y; y++) if (block(x, y, z) === 101) torches++;
+            }
+        }
+        expect(torches).toBeGreaterThanOrEqual(15);
+    });
 });

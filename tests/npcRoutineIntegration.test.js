@@ -58,6 +58,59 @@ describe('villager routine integration', () => {
         npc.dispose();
     });
 
+    it('never climbs onto a house roof while walking around it', () => {
+        const blocks = new Map();
+        for (let x = 2; x <= 5; x++) {
+            for (let z = -2; z <= 2; z++) {
+                for (let y = 1; y <= 4; y++) blocks.set(`${x},${y},${z}`, 26);
+                blocks.set(`${x},5,${z}`, 85);
+            }
+        }
+        const world = createWorld(new Set(), blocks);
+        const scene = new THREE.Scene();
+        const npc = new NPC(scene, 0, 1, 0, 0, {
+            npcId: 'npc:test:roof',
+            home: { x: 0, y: 1, z: 0 },
+            work: { x: 8, y: 1, z: 0 }
+        });
+
+        let highestY = npc.group.position.y;
+        for (let frame = 0; frame < 800; frame++) {
+            npc.update(0.05, new THREE.Vector3(20, 1, 20), world, 0.4, [npc]);
+            highestY = Math.max(highestY, npc.group.position.y);
+        }
+
+        expect(highestY).toBeLessThan(2);
+        expect(npc.group.position.x).toBeGreaterThan(6);
+        npc.dispose();
+    });
+
+    it('returns a villager stranded on a roof to its home', () => {
+        const blocks = new Map();
+        for (let x = 2; x <= 5; x++) {
+            for (let z = -2; z <= 2; z++) {
+                const wall = x === 2 || x === 5 || z === -2 || z === 2;
+                if (wall) for (let y = 1; y <= 4; y++) blocks.set(`${x},${y},${z}`, 26);
+                blocks.set(`${x},5,${z}`, 85);
+            }
+        }
+        const world = createWorld(new Set(), blocks);
+        const scene = new THREE.Scene();
+        const npc = new NPC(scene, 0, 1, 0, 0, {
+            npcId: 'npc:test:roof-rescue',
+            home: { x: 0, y: 1, z: 0 },
+            work: { x: 0, y: 1, z: 0 }
+        });
+        npc.group.position.set(3.5, 6, 0.5);
+
+        for (let frame = 0; frame < 400; frame++) {
+            npc.update(0.05, new THREE.Vector3(20, 1, 20), world, 0.4, [npc]);
+        }
+
+        expect(npc.group.position.y).toBeLessThan(2);
+        npc.dispose();
+    });
+
     it('pauses and hides residents while their chunk is unloaded', () => {
         const world = createWorld();
         world.chunks = new Map([['0,0', {}]]);

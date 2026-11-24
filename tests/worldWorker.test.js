@@ -38,14 +38,25 @@ beforeAll(() => {
 });
 
 describe('World worker buffer recycling', () => {
-    it('initializes the module worker with world generation version two', async () => {
+    it('initializes the module worker with world generation version three', async () => {
         const { World } = await import('../js/world.js');
         new World(new THREE.Scene());
         const worker = FakeWorker.instance;
         const initialization = worker.messages.find(entry => entry.message.type === 'init');
 
         expect(worker.options).toEqual({ type: 'module' });
-        expect(initialization.message.worldGenerationVersion).toBe(2);
+        expect(initialization.message.worldGenerationVersion).toBe(3);
+    }, 15000);
+
+    it('keeps worldgen-v2 saves on version two', async () => {
+        const { World } = await import('../js/world.js');
+        const world = new World(new THREE.Scene());
+        const worker = FakeWorker.instance;
+
+        world.setGenerationVersion(2);
+
+        expect(world.worldGenerationVersion).toBe(2);
+        expect(worker.messages.at(-1).message).toEqual({ type: 'worldGenerationVersion', version: 2 });
     }, 15000);
 
     it('switches the worker back to legacy generation for a legacy save', async () => {

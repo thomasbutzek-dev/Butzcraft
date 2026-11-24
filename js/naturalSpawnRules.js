@@ -12,23 +12,34 @@ function mulberry32(seed) {
     };
 }
 
-export function getFloatingIslandAt(wx, wz) {
+// Returns the island of the 100-block cell containing (wx, wz), or null if the cell has none.
+export function getFloatingIslandCellAt(wx, wz) {
     const cellSize = 100;
     const cellX = Math.floor(wx / cellSize);
     const cellZ = Math.floor(wz / cellSize);
     const rng = mulberry32(cellX * 91827 + cellZ * 12345);
     if (rng() > 0.3) return null;
 
-    const centerX = cellX * cellSize + 20 + rng() * 60;
-    const centerZ = cellZ * cellSize + 20 + rng() * 60;
-    const islandRadius = 6 + rng() * 4;
-    const islandY = 48 + rng() * 5;
-    const dx = wx - centerX;
-    const dz = wz - centerZ;
+    return {
+        centerX: cellX * cellSize + 20 + rng() * 60,
+        centerZ: cellZ * cellSize + 20 + rng() * 60,
+        radius: 6 + rng() * 4,
+        y: 48 + rng() * 5,
+        maxThick: 3 + rng() * 3
+    };
+}
+
+export function getFloatingIslandAt(wx, wz) {
+    const cell = getFloatingIslandCellAt(wx, wz);
+    if (!cell) return null;
+    const islandRadius = cell.radius;
+    const islandY = cell.y;
+    const dx = wx - cell.centerX;
+    const dz = wz - cell.centerZ;
     const distSq = dx * dx + dz * dz;
     if (distSq >= islandRadius * islandRadius) return null;
 
-    const maxThick = 3 + rng() * 3;
+    const maxThick = cell.maxThick;
     const thickness = maxThick * (1 - distSq / (islandRadius * islandRadius));
     return {
         y: Math.floor(islandY),

@@ -14,6 +14,8 @@ const BLOCK = Object.freeze({
     SUPPORT: 81,
     MOSSY_STONE: 84,
     COBBLESTONE: 85,
+    HAY_BALE: 88,
+    STONE_BRICK: 29,
     TORCH: 101
 });
 
@@ -152,7 +154,7 @@ function selectMinecartSpawns(track) {
     });
 }
 
-function createMinePlan(random, theme, surfaceY) {
+function createMinePlan(random, theme, surfaceY, baseYOverride = null) {
     const levels = 2 + Math.floor(random() * 2);
     const moduleCount = MINE_MODULE_MIN
         + Math.floor(random() * (MINE_MODULE_MAX - MINE_MODULE_MIN + 1));
@@ -216,8 +218,10 @@ function createMinePlan(random, theme, surfaceY) {
         }
     }
 
-    const baseY = surfaceY - 7;
-    const surfaceEntrance = { x: 0, y: surfaceY - baseY, z: -7 };
+    const baseY = baseYOverride ?? surfaceY - 7;
+    // A deeper mine gets a longer ramp, so the track still climbs one block per cell.
+    const entranceZ = -Math.max(7, surfaceY - baseY);
+    const surfaceEntrance = { x: 0, y: surfaceY - baseY, z: entranceZ };
     for (const cell of lineBetween(surfaceEntrance, mainModules[0])) addTrack(cell, true);
 
     const cells = [...trackByPosition.values()];
@@ -232,11 +236,39 @@ function createMinePlan(random, theme, surfaceY) {
         theme,
         levels,
         baseY,
+        entranceZ,
         modules,
         connections,
         track: cells,
         bounds: { minX, maxX, minY, maxY, minZ, maxZ }
     };
+}
+
+// Worldgen 3 sinks a mine below the lowest ground over its whole footprint (ramp included),
+// so tunnels no longer open up where the terrain falls away from the entrance. Sites
+// that would need a very deep mine (valleys, lakes) are skipped.
+const MINE_COVER = 6;
+const MINE_MAX_DEPTH = 16;
+
+const coveredBaseYCache = new WeakMap();
+
+function getCoveredMineBaseY(x, z, surfaceY, terrain) {
+    let cache = coveredBaseYCache.get(terrain);
+    if (!cache) coveredBaseYCache.set(terrain, cache = new Map());
+    const key = `${x},${z}`;
+    if (!cache.has(key)) cache.set(key, computeCoveredMineBaseY(x, z, surfaceY, terrain));
+    return cache.get(key);
+}
+
+function computeCoveredMineBaseY(x, z, surfaceY, terrain) {
+    let lowestGround = surfaceY;
+    for (let dx = -10; dx <= 30; dx += 2) {
+        for (let dz = -MINE_MAX_DEPTH - 2; dz <= 36; dz += 2) {
+            lowestGround = Math.min(lowestGround, terrain.heightAt(x + dx, z + dz));
+        }
+    }
+    const baseY = Math.min(surfaceY - 7, lowestGround - MINE_COVER);
+    return surfaceY - baseY > MINE_MAX_DEPTH ? null : baseY;
 }
 
 function createMineCandidate(regionX, regionZ, world, terrain) {
@@ -252,8 +284,10 @@ function createMineCandidate(regionX, regionZ, world, terrain) {
         const biome = terrain.biomeAt(x, z);
         const theme = themeForBiome(biome);
         const surfaceY = terrain.heightAt(x, z);
-        if (theme && surfaceY > world.waterLevel + 2) {
-            placement = { originCx, originCz, x, z, biome, theme, surfaceY };
+        if (theme && surfaceY > world.waterLevel + 2 && !terrain.isReserved?.(x, z)) {
+            const baseY = world.version >= 3 ? getCoveredMineBaseY(x, z, surfaceY, terrain) : surfaceY - 7;
+            if (baseY === null) continue;
+            placement = { originCx, originCz, x, z, biome, theme, surfaceY, baseY };
             break;
         }
     }
@@ -261,7 +295,7 @@ function createMineCandidate(regionX, regionZ, world, terrain) {
 
     const { originCx, originCz, x, z, biome, theme, surfaceY } = placement;
 
-    const plan = createMinePlan(random, theme, surfaceY);
+    const plan = createMinePlan(random, theme, surfaceY, placement.baseY);
     return {
         id: `mine:${regionX},${regionZ}:v${world.version}`,
         kind: 'mine',
@@ -382,7 +416,7 @@ function createDungeonCandidate(regionX, regionZ, world, terrain) {
         const biome = terrain.biomeAt(x, z);
         const theme = dungeonThemeForBiome(biome);
         const surfaceY = terrain.heightAt(x, z);
-        if (theme && surfaceY > world.waterLevel + 2) {
+        if (theme && surfaceY > world.waterLevel + 2 && !terrain.isReserved?.(x, z)) {
             placement = { originCx, originCz, x, z, biome, theme, surfaceY };
             break;
         }
@@ -518,10 +552,17 @@ function stampMine(candidate, chunk, world) {
         }
     }
 
-    setBlock(chunk.data, chunk, world, candidate.x - 2, candidate.surfaceY, candidate.z - 7, palette.support);
-    setBlock(chunk.data, chunk, world, candidate.x + 2, candidate.surfaceY, candidate.z - 7, palette.support);
-    setBlock(chunk.data, chunk, world, candidate.x - 2, candidate.surfaceY + 1, candidate.z - 7, BLOCK.TORCH);
-    setBlock(chunk.data, chunk, world, candidate.x + 2, candidate.surfaceY + 1, candidate.z - 7, BLOCK.TORCH);
+    const entranceZ = candidate.z + candidate.plan.entranceZ;
+    setBlock(chunk.data, chunk, world, candidate.x - 2, candidate.surfaceY, entranceZ, palette.support);
+    setBlock(chunk.data, chunk, world, candidate.x + 2, candidate.surfaceY, entranceZ, palette.support);
+    setBlock(chunk.data, chunk, world, candidate.x - 2, candidate.surfaceY + 1, entranceZ, BLOCK.TORCH);
+    setBlock(chunk.data, chunk, world, candidate.x + 2, candidate.surfaceY + 1, entranceZ, BLOCK.TORCH);
+
+    if (world.version >= 3) {
+        // Supports of a nearby straight track used to overwrite the reward chest.
+        const reward = candidate.plan.modules.find(module => module.role === 'reward');
+        setBlock(chunk.data, chunk, world, candidate.x + reward.x + 2, candidate.plan.baseY + reward.y, candidate.z + reward.z + 2, BLOCK.CHEST);
+    }
 
     // Gleise zuletzt wiederherstellen, damit Stützen, Gefahren und überlappende
     // Steigungs-Aushübe weder Fahrweg noch Unterbau oder Kopffreiheit zerstören.
@@ -540,7 +581,8 @@ function stampDungeonRoom(candidate, room, chunk, world, palette) {
     const centerX = candidate.x + room.x;
     const centerY = candidate.plan.baseY + room.y;
     const centerZ = candidate.z + room.z;
-    const radius = room.role === 'encounter' || room.role === 'reward' ? 3 : 2;
+    // Worldgen 3 gives every room a 5x5 floor, so decorations stand inside instead of in the walls.
+    const radius = world.version >= 3 || room.role === 'encounter' || room.role === 'reward' ? 3 : 2;
     for (let dx = -radius; dx <= radius; dx++) {
         for (let dz = -radius; dz <= radius; dz++) {
             setBlock(chunk.data, chunk, world, centerX + dx, centerY - 1, centerZ + dz, palette.floor);
@@ -600,10 +642,37 @@ function decorateDungeonRoom(candidate, room, chunk, world, palette) {
     } else if (room.role === 'secret') {
         setBlock(chunk.data, chunk, world, x - 1, y, z, palette.accent);
         setBlock(chunk.data, chunk, world, x + 1, y, z, palette.accent);
-    } else if (room.type === 'gallery' || room.type === 'crypt') {
+    } else if (world.version < 3 && (room.type === 'gallery' || room.type === 'crypt')) {
         setBlock(chunk.data, chunk, world, x - 2, y, z, palette.accent);
         setBlock(chunk.data, chunk, world, x + 2, y, z, palette.accent);
     }
+    if (world.version >= 3) furnishDungeonRoom(room, x, y, z, chunk, world, palette);
+}
+
+// Worldgen 3: each room type gets its own look, and every room but the gallery a torch.
+function furnishDungeonRoom(room, x, y, z, chunk, world, palette) {
+    const put = (dx, dy, dz, block) => setBlock(chunk.data, chunk, world, x + dx, y + dy, z + dz, block);
+    if (room.role === 'entrance') return;
+    if (room.type === 'gallery') {
+        for (const [px, pz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) {
+            for (let dy = 0; dy <= 4; dy++) put(px, dy, pz, dy === 0 || dy === 4 ? BLOCK.STONE_BRICK : palette.wall);
+        }
+        return;
+    }
+    if (room.type === 'crypt') {
+        // Sarcophagus with a carved lid along the back wall.
+        for (let dx = -1; dx <= 1; dx++) {
+            put(dx, 0, 2, BLOCK.STONE_BRICK);
+            put(dx, 1, 2, dx === 0 ? palette.accent : BLOCK.STONE_BRICK);
+        }
+    } else if (room.type === 'store') {
+        // Along the -z wall: a store annex can share its spot with the key room, whose
+        // chest stands at +2/+2.
+        put(2, 0, -2, BLOCK.HAY_BALE);
+        put(2, 1, -2, BLOCK.HAY_BALE);
+        put(1, 0, -2, BLOCK.PLANKS);
+    }
+    put(-2, 0, -2, BLOCK.TORCH);
 }
 
 function stampDungeonGate(candidate, chunk, world, palette) {
@@ -611,10 +680,81 @@ function stampDungeonGate(candidate, chunk, world, palette) {
     const x = candidate.x + gate.x;
     const y = candidate.plan.baseY + gate.y;
     const z = candidate.z + gate.z;
+    const v3 = world.version >= 3;
     for (let width = -1; width <= 1; width++) {
         for (let dy = 0; dy <= 2; dy++) {
-            setBlock(chunk.data, chunk, world, x, y + dy, z + width, palette.wall);
+            // Worldgen 3: a timber gate, so it stands out from the stone walls around it.
+            setBlock(chunk.data, chunk, world, x, y + dy, z + width, v3 ? BLOCK.PLANKS : palette.wall);
         }
+    }
+    if (!v3) return;
+    // Stone-brick frame with a lintel, and torches on the side the player comes from.
+    for (let width = -2; width <= 2; width++) {
+        setBlock(chunk.data, chunk, world, x, y + 3, z + width, BLOCK.STONE_BRICK);
+        if (Math.abs(width) === 2) {
+            for (let dy = 0; dy <= 2; dy++) setBlock(chunk.data, chunk, world, x, y + dy, z + width, BLOCK.STONE_BRICK);
+        }
+    }
+    const approach = Math.sign(candidate.plan.rooms.find(room => room.id === 'gate-approach').x - gate.x) || 1;
+    setBlock(chunk.data, chunk, world, x + approach, y, z - 1, BLOCK.TORCH);
+    setBlock(chunk.data, chunk, world, x + approach, y, z + 1, BLOCK.TORCH);
+}
+
+// Worldgen 3: torches along the side of the main passages, about every fifth block.
+function lightDungeonPassages(candidate, chunk, world) {
+    candidate.plan.passages.forEach((cell, index) => {
+        if (cell.kind !== 'main' || index % 5 !== 2) return;
+        const side = index % 10 === 2 ? 1 : -1;
+        setBlock(
+            chunk.data, chunk, world,
+            candidate.x + cell.x + (cell.widthAxis === 'x' ? side : 0),
+            candidate.plan.baseY + cell.y,
+            candidate.z + cell.z + (cell.widthAxis === 'z' ? side : 0),
+            BLOCK.TORCH
+        );
+    });
+}
+
+// Worldgen 3: a spiral staircase around a stone pillar replaces the 19-block drop shaft,
+// and a small gatehouse marks the entrance at the surface.
+function stampDungeonStairs(candidate, chunk, world, palette) {
+    const put = (dx, y, dz, block) => setBlock(chunk.data, chunk, world, candidate.x + dx, y, candidate.z + dz, block);
+    const baseY = candidate.plan.baseY;
+    const topY = candidate.surfaceY;
+    const ring = [[0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1]];
+    for (let y = baseY; y <= topY + 3; y++) {
+        for (let dx = -1; dx <= 1; dx++) {
+            for (let dz = -1; dz <= 1; dz++) put(dx, y, dz, dx === 0 && dz === 0 && y <= topY ? palette.wall : BLOCK.AIR);
+        }
+        // Shaft lining above the entrance room, so caves or loose ground never open into it.
+        if (y >= baseY + 5 && y < topY) {
+            for (let dx = -2; dx <= 2; dx++) {
+                for (let dz = -2; dz <= 2; dz++) {
+                    if (Math.abs(dx) === 2 || Math.abs(dz) === 2) put(dx, y, dz, palette.wall);
+                }
+            }
+        }
+    }
+    // Step i stands on a block at baseY + i, one ring cell further each step; the last step
+    // ends at ground level. The bottom of the ring stays walkable under the high steps.
+    const steps = topY - baseY;
+    for (let i = 0; i < steps; i++) {
+        const [dx, dz] = ring[i % ring.length];
+        put(dx, baseY + i, dz, palette.wall);
+        if (i % 8 === 4 && i + 1 < steps) put(dx, baseY + i + 1, dz, BLOCK.TORCH);
+    }
+    // Gatehouse: a paved 5x5 landing, open on all sides, with four stone-brick pillars.
+    for (let dx = -2; dx <= 2; dx++) {
+        for (let dz = -2; dz <= 2; dz++) {
+            if (Math.abs(dx) < 2 && Math.abs(dz) < 2) continue;
+            put(dx, topY - 1, dz, palette.wall);
+            for (let y = topY; y <= topY + 3; y++) put(dx, y, dz, BLOCK.AIR);
+        }
+    }
+    put(0, topY + 1, 0, BLOCK.TORCH);
+    for (const [px, pz] of [[-2, -2], [2, -2], [-2, 2], [2, 2]]) {
+        for (let y = topY; y <= topY + 2; y++) put(px, y, pz, BLOCK.STONE_BRICK);
+        put(px, topY + 3, pz, BLOCK.TORCH);
     }
 }
 
@@ -655,6 +795,11 @@ function stampDungeon(candidate, chunk, world) {
     for (const room of candidate.plan.rooms) decorateDungeonRoom(candidate, room, chunk, world, palette);
     stampDungeonGate(candidate, chunk, world, palette);
     stampRitualAltar(candidate, chunk, world);
+    if (world.version >= 3) {
+        lightDungeonPassages(candidate, chunk, world);
+        stampDungeonStairs(candidate, chunk, world, palette);
+        return;
+    }
 
     for (let y = candidate.plan.baseY; y <= candidate.surfaceY + 1; y++) {
         setBlock(chunk.data, chunk, world, candidate.x, y, candidate.z, BLOCK.AIR);
@@ -680,7 +825,7 @@ function publicMineStructure(candidate) {
         theme: candidate.plan.theme,
         biome: candidate.biome,
         origin: { x: candidate.x, y: candidate.plan.baseY, z: candidate.z },
-        entrance: { x: candidate.x, y: candidate.surfaceY, z: candidate.z - 7 },
+        entrance: { x: candidate.x, y: candidate.surfaceY, z: candidate.z + candidate.plan.entranceZ },
         bounds: { ...candidate.bounds },
         moduleCount: candidate.plan.modules.length,
         levels: candidate.plan.levels
@@ -727,7 +872,7 @@ function publicDungeonStructure(candidate) {
  */
 export function generateUndergroundStructures({ chunk, world, terrain }) {
     const result = { structures: [], entities: [], chests: [], spawners: [] };
-    if (!chunk?.data || world?.version !== 2) return result;
+    if (!chunk?.data || !(world?.version >= 2)) return result;
 
     const centerRegionX = Math.floor(chunk.cx / MINE_REGION_CHUNKS);
     const centerRegionZ = Math.floor(chunk.cz / MINE_REGION_CHUNKS);

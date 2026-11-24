@@ -10,7 +10,7 @@
  */
 
 import * as THREE from 'three';
-import { CONFIG } from '../config.js?v=20260507b';
+import { CONFIG } from '../config.js?v=20260511a';
 import { Physics } from './Physics.js?v=20260717a';
 import { getPainterlyEntityTexture, selectEntityTextureVariant } from './entityMaterials.js?v=20260801a';
 import { getArmorSetItems } from './equipmentRules.js?v=20260723e';
@@ -341,6 +341,26 @@ export class NPC {
         return this._findNearestFootY(world, this.homeX, this.homeZ, this.group.position.y);
     }
 
+    // A villager standing still on a block with air beneath it (a roof or eave) is stranded,
+    // e.g. from an older save; after a moment it is returned to its home.
+    _rescueFromRoof(world, delta) {
+        const pos = this.group.position;
+        const footY = Math.round(pos.y);
+        const onRoof = !this.isWalking && footY - 2 >= 0 &&
+            Physics.isSolid(world, Math.floor(pos.x), footY - 1, Math.floor(pos.z), false) &&
+            world.getBlock(Math.floor(pos.x), footY - 2, Math.floor(pos.z)) === 0;
+        this.strandedTime = onRoof ? (this.strandedTime || 0) + delta : 0;
+        if (this.strandedTime < 2) return;
+        this.strandedTime = 0;
+        const homeY = this._findSafeHomeFootY(world);
+        if (homeY === null) return;
+        pos.set(this.homeX, homeY, this.homeZ);
+        this.velocity.set(0, 0, 0);
+        this.path = [];
+        this.pathIndex = 0;
+        this.repathTimer = 0;
+    }
+
     _resolveGround(world, force = false) {
         const pos = this.group.position;
         const footY = this._findNearestFootY(world, pos.x, pos.z, pos.y);
@@ -567,7 +587,10 @@ export class NPC {
                     const nextY = getStandY(nextX, nextZ);
                     this._openDoorAt(world, nextX, pos.y, nextZ);
 
+                    // Same step rule as the path planner: one block up, a short drop down.
+                    // Without it, sidestepping along a wall snapped villagers onto roof edges.
                     if (nextY !== null &&
+                        nextY - pos.y <= 1.05 && pos.y - nextY <= 3 &&
                         !checkNpcCollision({ x: nextX, y: nextY, z: nextZ }) &&
                         this._isNpcPositionFree(nextX, nextZ, npcs)) {
                         pos.x = nextX;
@@ -599,6 +622,7 @@ export class NPC {
             this.isWalking = false;
             this.activity = routine.action;
         }
+        this._rescueFromRoof(world, delta);
 
         const groundY = this._findNearestFootY(world, pos.x, pos.z, pos.y);
         if (groundY === null || pos.y > groundY + 0.05) {

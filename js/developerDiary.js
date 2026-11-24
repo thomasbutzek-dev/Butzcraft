@@ -91,6 +91,25 @@ export const DEVELOPER_DIARY_ENTRIES = Object.freeze([
             'Bei einer Messreise durch zehn Dörfer sank die Rechenzeit für Dorfbewohner von fast 2 ms auf unter 0,25 ms je Bild.',
             'Ein neuer automatisierter Test sichert das Pausieren und Wiederaufnehmen der Dorfbewohner ab.'
         ])
+    }),
+    Object.freeze({
+        version: '0.4.0',
+        date: '2026-11-24',
+        title: 'Lebendige Dörfer, tiefe Minen und eine weite Sicht',
+        summary: 'Version 0.4.0 erneuert die Welt für neue Spielstände: Dörfer stehen auf eingeebnetem Grund und sehen natürlicher aus, Minen und Dungeons sind sauber in den Untergrund gebaut, und Loren fahren über geneigte Gleise. Bestehende Welten bleiben unverändert.',
+        changes: Object.freeze([
+            'Neue Welten ebnen das Gelände rund um Dörfer ein: keine meterhohen Wege oder Fundamente mehr, sanfte Übergänge in die Landschaft und keine schwebenden Fackeln oder Laternen.',
+            'Dörfer wirken natürlicher: unregelmäßiger Rand, Satteldächer, flache Lehmdächer in der Wüste, ein Langhaus im Schneedorf, Steinsockel und Blumenbeete.',
+            'Das Obergeschoss des großen Dorfgebäudes ist über eine Treppe erreichbar und mit Betten, Truhe und Werkbank eingerichtet.',
+            'Dorfbewohner bleiben nicht mehr auf Dächern stehen; wer doch hinaufgerät, kehrt nach kurzer Zeit nach Hause zurück.',
+            'Tempel, Iglus, Minen- und Dungeoneingänge entstehen nicht mehr mitten im Dorf.',
+            'Baumkronen enden an Geländegrenzen nicht mehr in glatten Laubwänden.',
+            'Wolken ziehen höher und nicht mehr durch Hügel und Dächer; schwebende Inseln schweben deutlich über dem Boden.',
+            'Minen liegen vollständig unter der Erde, Gleise an Steigungen sind als Rampe gebaut, und Loren fahren weich durch Kurven, rollen bergab schneller und erreichen höheres Tempo.',
+            'Dungeons haben eine Wendeltreppe mit Torbau statt eines tiefen Schachts, ein gut sichtbares Holztor, beleuchtete Gänge und eigene Ausstattung je Raum.',
+            'Die Sichtweite steht auf dem Desktop jetzt standardmäßig auf 6 Chunks; die Einstellung im Menü wirkt wieder auf die ganze Welt.',
+            'Neue automatisierte Tests sichern Dörfer, Untergrund, Gleise, Loren und die gemeinsame Spielkonfiguration ab.'
+        ])
     })
 ]);
 
