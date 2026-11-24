@@ -123,6 +123,19 @@ export const DEVELOPER_DIARY_ENTRIES = Object.freeze([
             'Bäume und Palmen halten Abstand zum Torbau der Dungeons, der Eingang liegt nun auf einer kleinen Lichtung.',
             'Neue automatisierte Tests sichern Fallschaden, Insel-Erkennung und den Freiraum am Dungeoneingang ab.'
         ])
+    }),
+    Object.freeze({
+        version: '0.4.2',
+        date: '2026-11-24',
+        title: 'Eine schnellere, frischere Webseite',
+        summary: 'Version 0.4.2 erneuert die Webseite: ein neuer Flug in den Morgen, aktuelle Bilder aus der Welt und deutlich kürzere Ladezeiten.',
+        changes: Object.freeze([
+            'Der Einstieg zeigt einen neuen Flug von der Morgendämmerung bis zwischen die Giebelhäuser eines Dorfs; er reagiert schon auf die ersten Scrollschritte und ist kürzer.',
+            'Die Startseite lädt auf dem Desktop etwa 2 statt fast 8 MB, auf dem Handy nur noch rund ein Viertel Megabyte, weil das Video dort durch zwei Standbilder ersetzt ist.',
+            'Neue Aufnahmen zeigen Dörfer, die Gleisrampe in der Mine und das Holztor der Dungeons; alle Bilder kommen in passender Größe.',
+            'Der Charakter-Editor startet erst auf Klick, und der Spielrhythmus steht kompakt in vier Kacheln, sodass die Seite deutlich kürzer ist.',
+            'Geteilte Links zeigen jetzt ein Vorschaubild, und Suchmaschinen finden Seitenübersicht, Spielbeschreibung und App-Symbole.'
+        ])
     })
 ]);
 

@@ -1,0 +1,14 @@
+{
+  "name": "Butzcraft",
+  "short_name": "Butzcraft",
+  "description": "Survival-Abenteuer mit Dörfern, Minen und Dungeons – direkt im Browser.",
+  "lang": "de",
+  "start_url": "https://play.butzcraft.de/",
+  "display": "fullscreen",
+  "background_color": "#252a1f",
+  "theme_color": "#252a1f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

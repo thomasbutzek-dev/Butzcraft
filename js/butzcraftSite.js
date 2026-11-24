@@ -10,7 +10,21 @@ document.querySelectorAll('[data-app-version]').forEach(element => { element.tex
 const hero = document.querySelector('[data-cinematic-hero]');
 const heroVideo = document.querySelector('[data-hero-video]');
 const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+const wideQuery = window.matchMedia('(min-width: 901px)');
 let desiredHeroTime = 0;
+
+// The scroll flight is a few megabytes: load it only where it is shown (wide screens,
+// motion allowed, no data saver). Phones get the two still frames instead.
+let heroVideoRequested = false;
+function loadHeroVideo() {
+    if (!heroVideo || heroVideoRequested) return;
+    if (!wideQuery.matches || motionQuery.matches || navigator.connection?.saveData) return;
+    heroVideoRequested = true;
+    heroVideo.preload = 'auto';
+    heroVideo.load();
+}
+loadHeroVideo();
+wideQuery.addEventListener?.('change', loadHeroVideo);
 
 function seekHeroVideo() {
     if (!heroVideo || heroVideo.readyState < 1 || heroVideo.seeking || motionQuery.matches) return;
@@ -23,7 +37,9 @@ function updateHero() {
     if (!hero || motionQuery.matches) return;
     const rect = hero.getBoundingClientRect();
     const distance = Math.max(1, rect.height - window.innerHeight);
-    const progress = Math.min(1, Math.max(0, -rect.top / distance));
+    const scrolled = Math.min(1, Math.max(0, -rect.top / distance));
+    // Ease out: the flight responds right from the first scroll step and settles at the end.
+    const progress = 1 - (1 - scrolled) * (1 - scrolled);
     const blend = progress * progress * (3 - 2 * progress);
     hero.style.setProperty('--hero-progress', progress.toFixed(4));
     hero.style.setProperty('--hero-blend', blend.toFixed(4));
@@ -91,6 +107,21 @@ document.addEventListener('click', event => {
 });
 
 const characterEditorFrame = document.getElementById('landing-character-editor');
+const editorFacade = document.querySelector('[data-editor-facade]');
+let editorLoaded = null;
+
+// Starts the 3D editor on first use; resolves once it can receive messages.
+function openCharacterEditor() {
+    if (editorLoaded) return editorLoaded;
+    editorLoaded = new Promise(resolve => {
+        characterEditorFrame.addEventListener('load', resolve, { once: true });
+        characterEditorFrame.src = characterEditorFrame.dataset.src;
+        characterEditorFrame.hidden = false;
+        if (editorFacade) editorFacade.hidden = true;
+    });
+    return editorLoaded;
+}
+document.querySelector('[data-open-editor]')?.addEventListener('click', openCharacterEditor);
 const playCreatedCharacterButton = document.getElementById('play-created-character');
 const characterTransferStatus = document.getElementById('character-transfer-status');
 let restoreContactAnchorAfterEditorResize = window.location.hash === '#kontakt';
@@ -101,10 +132,11 @@ if (restoreContactAnchorAfterEditorResize) {
     }, { once: true });
 }
 
-playCreatedCharacterButton?.addEventListener('click', () => {
-    if (!characterEditorFrame?.contentWindow) return;
+playCreatedCharacterButton?.addEventListener('click', async () => {
+    if (!characterEditorFrame) return;
     characterTransferStatus.textContent = 'Charakter wird übernommen …';
-    characterEditorFrame.contentWindow.postMessage({ type: 'apply-profile' }, window.location.origin);
+    await openCharacterEditor();
+    characterEditorFrame.contentWindow?.postMessage({ type: 'apply-profile' }, window.location.origin);
 });
 
 window.addEventListener('message', event => {

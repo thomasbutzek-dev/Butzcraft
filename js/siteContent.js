@@ -29,6 +29,8 @@ function applyContent(content) {
     for (const image of document.querySelectorAll('[data-image-key]')) {
         const value = content.images[image.dataset.imageKey];
         if (typeof value !== 'string') continue;
+        // A custom image replaces the responsive default set entirely.
+        image.removeAttribute('srcset');
         image.src = value;
         image.dataset.siteImageValue = value;
         image.closest('.world-card-placeholder')?.classList.add('has-custom-image');
@@ -219,6 +221,7 @@ function setupAdminMode(initialContent) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key: selectedImage.dataset.imageKey, dataUrl })
             });
+            selectedImage.removeAttribute('srcset');
             selectedImage.src = result.url;
             selectedImage.dataset.siteImageValue = result.url;
             selectedImage.closest('.world-card-placeholder')?.classList.add('has-custom-image');
