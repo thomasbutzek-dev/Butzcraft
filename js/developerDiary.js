@@ -78,6 +78,19 @@ export const DEVELOPER_DIARY_ENTRIES = Object.freeze([
             'Neue Sicherheits-Header verhindern das Einbetten der Seiten in fremde Websites, erzwingen HTTPS und verraten die Servertechnik nicht mehr.',
             'Neue automatisierte Servertests prüfen Sicherheits-Header und die Login-Sperre pro Besucher.'
         ])
+    }),
+    Object.freeze({
+        version: '0.3.3',
+        date: '2026-11-24',
+        title: 'Weite Reisen ohne schleichenden Leistungsverlust',
+        summary: 'Version 0.3.3 hält das Spiel auch auf langen Erkundungsreisen flüssig. Dorfbewohner weit entfernter Dörfer ruhen jetzt, bis man zurückkehrt, statt im Hintergrund weiter Rechenzeit zu verbrauchen.',
+        changes: Object.freeze([
+            'Dorfbewohner, deren Gelände gerade nicht geladen ist, pausieren ihren Tagesablauf und werden nicht mehr jede Bildfolge berechnet.',
+            'Diese ruhenden Dorfbewohner werden ausgeblendet und sinken nicht mehr ins ungeladene Gelände ab.',
+            'Kehrt man in ein Dorf zurück, erscheinen alle Bewohner wieder an ihrem Platz und setzen ihren Tagesablauf fort.',
+            'Bei einer Messreise durch zehn Dörfer sank die Rechenzeit für Dorfbewohner von fast 2 ms auf unter 0,25 ms je Bild.',
+            'Ein neuer automatisierter Test sichert das Pausieren und Wiederaufnehmen der Dorfbewohner ab.'
+        ])
     })
 ]);
 

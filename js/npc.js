@@ -480,6 +480,15 @@ export class NPC {
 
     update(delta, playerPos, world, dayRatio = 0.5, npcs = []) {
         if (this.isDead) return;
+        // Without loaded terrain there is no ground or path; pause and hide instead of
+        // simulating every far-away village each frame.
+        if (world.chunks) {
+            const size = CONFIG.WORLD.CHUNK_SIZE;
+            const { x, z } = this.group.position;
+            const loaded = world.chunks.has(`${Math.floor(x / size)},${Math.floor(z / size)}`);
+            this.group.visible = loaded;
+            if (!loaded) return;
+        }
         this._updateNameTag(playerPos);
         if (this.isUnconscious) {
             if (dayRatio >= 0.25 && dayRatio <= 0.35) {

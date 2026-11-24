@@ -58,6 +58,33 @@ describe('villager routine integration', () => {
         npc.dispose();
     });
 
+    it('pauses and hides residents while their chunk is unloaded', () => {
+        const world = createWorld();
+        world.chunks = new Map([['0,0', {}]]);
+        const scene = new THREE.Scene();
+        const npc = new NPC(scene, 0, 1, 1, 0, {
+            npcId: 'npc:test:unloaded',
+            home: { x: 0, y: 1, z: 1 },
+            work: { x: 5, y: 1, z: 1 }
+        });
+
+        world.chunks.clear();
+        const pausedAt = npc.group.position.clone();
+        for (let frame = 0; frame < 100; frame++) {
+            npc.update(0.05, new THREE.Vector3(500, 1, 500), world, 0.4, [npc]);
+        }
+        expect(npc.group.visible).toBe(false);
+        expect(npc.group.position.toArray()).toEqual(pausedAt.toArray());
+
+        world.chunks.set('0,0', {});
+        for (let frame = 0; frame < 100; frame++) {
+            npc.update(0.05, new THREE.Vector3(20, 1, 20), world, 0.4, [npc]);
+        }
+        expect(npc.group.visible).toBe(true);
+        expect(npc.group.position.x).toBeGreaterThan(0.5);
+        npc.dispose();
+    });
+
     it('keeps residents apart while they cross the same village path', () => {
         const world = createWorld();
         const scene = new THREE.Scene();
